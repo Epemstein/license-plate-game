@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>License Plate Game v3</title>
+    <title>License Plate Game v4</title>
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -65,7 +65,7 @@
     </style>
 </head>
 <body>
-    <h1>License Plate Game v3</h1>
+    <h1>License Plate Game v4</h1>
 
     <p>
         The plate letters must appear in your word in this order (not necessarily consecutively).<br>
@@ -77,7 +77,7 @@
     </div>
 
     <div class="controls">
-        <input id="wordInput" type="text" placeholder="Type a word (e.g., promise)">
+        <input id="wordInput" type="text" placeholder="Type a word">
         <button id="checkButton">Check word</button>
         <button id="newPlateButton">New plate</button>
     </div>
@@ -87,14 +87,19 @@
 
     <script>
         // ===== 1. Globals =====
-        let WORDS = [];
-        let DICTIONARY = new Set();
-        let plateToExampleWord = {};
-        let allPlates = [];
+        let WORDS = [];             // all words from words.txt (lowercase)
+        let DICTIONARY = new Set(); // uppercase, for fast lookup
         let dictionaryReady = false;
         let currentPlate = null;
 
-        // ===== 2. Core plate-matching logic =====
+        const plateEl = document.getElementById("plate");
+        const wordInputEl = document.getElementById("wordInput");
+        const resultEl = document.getElementById("result");
+        const debugEl = document.getElementById("debug");
+        const checkButtonEl = document.getElementById("checkButton");
+        const newPlateButtonEl = document.getElementById("newPlateButton");
+
+        // ===== 2. Core plate-matching logic (your PMS rule) =====
         function wordMatchesPlate(plate, word) {
             plate = plate.toUpperCase();
             word = word.toUpperCase();
@@ -137,47 +142,72 @@
             return false;
         }
 
-        // ===== 3. Build plate map from WORDS =====
-        function buildPlateMap() {
-            plateToExampleWord = {};
+        // ===== 3. Generate a plate from a single word (lazy approach) =====
+        function generatePlateFromWord(word) {
+            const upper = word.toUpperCase();
+            const len = upper.length;
 
-            WORDS.forEach((word) => {
-                const upper = word.toUpperCase();
-                const len = upper.length;
+            if (len < 3) return null;
 
-                for (let i = 0; i < len; i++) {
-                    for (let j = i + 1; j < len; j++) {
-                        for (let k = j + 1; k < len; k++) {
-                            const a = upper[i];
-                            const b = upper[j];
-                            const c = upper[k];
+            // Try a few times to find 3 positions with distinct letters
+            for (let attempts = 0; attempts < 50; attempts++) {
+                const i = Math.floor(Math.random() * (len - 2));
+                const j = i + 1 + Math.floor(Math.random() * (len - i - 2));
+                const k = j + 1 + Math.floor(Math.random() * (len - j - 1));
 
-                            // Skip if any letters repeat (no AAB, etc.)
-                            if (a === b || a === c || b === c) continue;
+                const a = upper[i];
+                const b = upper[j];
+                const c = upper[k];
 
-                            const plate = a + b + c;
+                if (a === b || a === c || b === c) continue;
 
-                            if (!plateToExampleWord[plate]) {
-                                if (wordMatchesPlate(plate, upper)) {
-                                    plateToExampleWord[plate] = word;
-                                }
-                            }
-                        }
-                    }
+                const plate = a + b + c;
+
+                // Sanity check: word should match this plate by our own rules
+                if (wordMatchesPlate(plate, upper)) {
+                    return plate;
                 }
-            });
+            }
 
-            allPlates = Object.keys(plateToExampleWord);
-            console.log("Built plates:", allPlates.length);
+            return null;
         }
 
-        // ===== 4. DOM references =====
-        const plateEl = document.getElementById("plate");
-        const wordInputEl = document.getElementById("wordInput");
-        const resultEl = document.getElementById("result");
-        const debugEl = document.getElementById("debug");
-        const checkButtonEl = document.getElementById("checkButton");
-        const newPlateButtonEl = document.getElementById("newPlateButton");
+        // ===== 4. Pick a random plate using lazy generation =====
+        function pickRandomPlate() {
+            if (!dictionaryReady) {
+                resultEl.textContent = "Dictionary not loaded yet.";
+                resultEl.style.color = "red";
+                return;
+            }
+
+            if (WORDS.length === 0) {
+                plateEl.textContent = "ERR";
+                resultEl.textContent = "No words available. Check words.txt.";
+                resultEl.style.color = "red";
+                return;
+            }
+
+            // Try multiple times to find a good plate from random words
+            for (let attempts = 0; attempts < 500; attempts++) {
+                const idx = Math.floor(Math.random() * WORDS.length);
+                const word = WORDS[idx];
+                const plate = generatePlateFromWord(word);
+                if (plate) {
+                    currentPlate = plate;
+                    plateEl.textContent = currentPlate;
+                    resultEl.textContent = "";
+                    wordInputEl.value = "";
+                    wordInputEl.focus();
+                    debugEl.textContent = `Plate ${currentPlate} generated from some dictionary word. Loaded ${WORDS.length} words.`;
+                    return;
+                }
+            }
+
+            // If we somehow fail after many tries:
+            plateEl.textContent = "ERR";
+            resultEl.textContent = "Could not generate a plate. Try reloading.";
+            resultEl.style.color = "red";
+        }
 
         // ===== 5. Dictionary loading =====
         async function loadDictionary() {
@@ -196,17 +226,17 @@
                 for (const line of lines) {
                     const w = line.trim().toLowerCase();
                     if (!w) continue;
-                    if (!/^[a-z]+$/.test(w)) continue;
+                    if (!/^[a-z]+$/.test(w)) continue; // letters only
+
+                    // keep words length >= 3 (for plates). We do NOT cap max length.
                     if (w.length < 3) continue;
 
                     WORDS.push(w);
                     DICTIONARY.add(w.toUpperCase());
                 }
 
-                buildPlateMap();
                 dictionaryReady = true;
-
-                debugEl.textContent = `Loaded ${WORDS.length} words, ${allPlates.length} plates.`;
+                debugEl.textContent = `Loaded ${WORDS.length} words.`;
                 pickRandomPlate();
             } catch (err) {
                 console.error("Error loading dictionary:", err);
@@ -215,29 +245,7 @@
             }
         }
 
-        // ===== 6. Game functions =====
-        function pickRandomPlate() {
-            if (!dictionaryReady) {
-                resultEl.textContent = "Dictionary not loaded yet.";
-                resultEl.style.color = "red";
-                return;
-            }
-
-            if (allPlates.length === 0) {
-                plateEl.textContent = "ERR";
-                resultEl.textContent = "No plates available. Check words.txt.";
-                resultEl.style.color = "red";
-                return;
-            }
-
-            const index = Math.floor(Math.random() * allPlates.length);
-            currentPlate = allPlates[index];
-            plateEl.textContent = currentPlate;
-            resultEl.textContent = "";
-            wordInputEl.value = "";
-            wordInputEl.focus();
-        }
-
+        // ===== 6. Check a guess =====
         function checkWord() {
             const rawWord = wordInputEl.value.trim();
 
@@ -267,12 +275,14 @@
 
             const upperWord = rawWord.toUpperCase();
 
+            // 1) Check dictionary
             if (!DICTIONARY.has(upperWord)) {
                 resultEl.textContent = `❌ "${rawWord}" is not in my dictionary.`;
                 resultEl.style.color = "red";
                 return;
             }
 
+            // 2) Check plate-matching rule
             const isMatch = wordMatchesPlate(currentPlate, upperWord);
 
             if (isMatch) {
@@ -297,7 +307,7 @@
             pickRandomPlate();
         });
 
-        // Kick off dictionary loading
+        // Kick off dictionary loading on page load
         loadDictionary();
     </script>
 </body>
