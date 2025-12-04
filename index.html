@@ -157,6 +157,12 @@
             transition: opacity 0.3s ease;
         }
 
+        /* Highlighted letters in the WORD that correspond to the plate sequence */
+        .plate-letter-highlight {
+            color: #16a34a;
+            font-weight: 600;
+        }
+
         @media (max-width: 800px) {
             .layout {
                 flex-direction: column;
@@ -197,15 +203,15 @@
     </style>
 </head>
 <body>
-    <h1>License Plate Game – Time Trial v2</h1>
+    <h1>License Plate Game – Time Trial</h1>
 
     <div class="layout">
         <!-- LEFT: game -->
         <div class="left-panel">
             <p>
                 Solve <strong>10 plates</strong> as fast as you can. Timer starts immediately when the game loads.<br>
-                Enter a word where your plate letters appear in order (not necessarily consecutively). <br>A word like
-                <strong>Spams</strong> does <em>not</em> work for <strong>"PMS"</strong> because the first S appears before the M.
+                The plate letters must appear in your word in this order (not necessarily consecutively). A word like
+                <strong>spams</strong> does <em>not</em> work for <strong>PMS</strong> because the S appears before the M.
             </p>
 
             <div class="plate-wrapper">
@@ -282,28 +288,42 @@
         const timerDisplayEl = document.getElementById("timerDisplay");
         const progressDisplayEl = document.getElementById("progressDisplay");
 
-        // ===== Matching logic =====
-        function wordMatchesPlate(plate, word) {
+        // ===== Plate matching indices (for logic + highlighting) =====
+        function getPlateMatchIndices(plate, word) {
             plate = plate.toUpperCase();
-            word = word.toUpperCase();
+            const upperWord = word.toUpperCase();
 
             let expectedPlateIndex = 0;
+            const matchedIndices = [];
 
-            for (let i = 0; i < word.length; i++) {
-                const ch = word[i];
+            for (let i = 0; i < upperWord.length; i++) {
+                const ch = upperWord[i];
                 const posInPlate = plate.indexOf(ch);
 
                 if (posInPlate === -1) continue;
 
                 if (posInPlate === expectedPlateIndex) {
+                    matchedIndices.push(i);
                     expectedPlateIndex++;
-                    if (expectedPlateIndex === plate.length) return true;
+                    if (expectedPlateIndex === plate.length) {
+                        // once we've matched all plate letters in order, we're done
+                        return matchedIndices;
+                    }
                 } else if (posInPlate > expectedPlateIndex) {
-                    return false;
+                    // saw a later plate letter before the one we were expecting
+                    return null;
+                } else {
+                    // posInPlate < expectedPlateIndex (we've already passed this plate letter), ignore
+                    continue;
                 }
             }
 
-            return false;
+            // didn't match all plate letters
+            return null;
+        }
+
+        function wordMatchesPlate(plate, word) {
+            return getPlateMatchIndices(plate, word) !== null;
         }
 
         // ===== Plate generation from a single word =====
@@ -360,7 +380,7 @@
             if (gameOver) return;
             gameOver = true;
             gameStarted = false;
-            // Ensure timer shows final time including penalties
+
             const baseElapsedSec = (performance.now() - startTime) / 1000;
             const totalSec = baseElapsedSec + penaltySeconds;
             timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
@@ -400,8 +420,8 @@
             return el;
         }
 
-        // ===== Add to history with animation =====
-        function addToHistoryWithAnimation(plate, word, fromRectWord, onComplete) {
+        // ===== Add to history with animation (word letters highlighted) =====
+        function addToHistoryWithAnimation(plate, word, matchIndices, fromRectWord, onComplete) {
             if (!plate || !word) {
                 if (onComplete) onComplete();
                 return;
@@ -415,8 +435,26 @@
 
             const plateTd = document.createElement("td");
             const wordTd = document.createElement("td");
+
             plateTd.textContent = plate;
-            wordTd.textContent = word;
+
+            // For correct solved words: highlight only the letters that formed the plate sequence.
+            // For penalties (skips): matchIndices will be null, so we just use plain text.
+            if (Array.isArray(matchIndices) && matchIndices.length > 0) {
+                const set = new Set(matchIndices);
+                let html = "";
+                for (let i = 0; i < word.length; i++) {
+                    const ch = word[i];
+                    if (set.has(i)) {
+                        html += '<span class="plate-letter-highlight">' + ch + '</span>';
+                    } else {
+                        html += ch;
+                    }
+                }
+                wordTd.innerHTML = html;
+            } else {
+                wordTd.textContent = word;
+            }
 
             row.appendChild(plateTd);
             row.appendChild(wordTd);
@@ -564,7 +602,8 @@
                 return;
             }
 
-            if (!wordMatchesPlate(currentPlate, rawWord)) {
+            const matchIndices = getPlateMatchIndices(currentPlate, rawWord);
+            if (!matchIndices) {
                 resultEl.textContent = `❌ "${rawWord}" does not match the plate order.`;
                 resultEl.style.color = "red";
                 return;
@@ -580,7 +619,7 @@
             const plate = currentPlate;
             const word = rawWord.toLowerCase();
 
-            addToHistoryWithAnimation(plate, word, null, () => {
+            addToHistoryWithAnimation(plate, word, matchIndices, null, () => {
                 if (solvedCount >= TOTAL_PLATES) {
                     endGame();
                 } else {
@@ -605,10 +644,10 @@
 
             const plate = currentPlate;
             const penaltyLabel = "+10s (skipped)";
-            // Use the Skip button's rect as the source for the word animation
             const skipButtonRect = document.getElementById("newPlateButton").getBoundingClientRect();
 
-            addToHistoryWithAnimation(plate, penaltyLabel, skipButtonRect, () => {
+            // No matchIndices for penalty rows (so word is plain text)
+            addToHistoryWithAnimation(plate, penaltyLabel, null, skipButtonRect, () => {
                 pickRandomPlate();
             });
         }
