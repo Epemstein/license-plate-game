@@ -22,32 +22,37 @@
             margin: 20px 0;
         }
 
+        /* Cropping container */
         .car-wrapper {
             position: relative;
             display: inline-block;
-            max-width: 400px;   /* tweak this to make the car bigger/smaller */
             width: 100%;
+            max-width: 360px;   /* overall car size */
+            height: 380px;      /* controls how much top/bottom is cropped */
+            overflow: hidden;
         }
 
         .car-image {
-            display: block;
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover;      /* crop top/bottom instead of shrinking */
+            object-position: center;/* keep car centered */
+            display: block;
         }
 
-        /* This is the text that sits on top of the license plate */
+        /* Text that sits ON the license plate */
         .plate-text {
             position: absolute;
             left: 50%;
-            bottom: 25%;        /* tweak this up/down if it’s not perfectly on the plate */
+            bottom: 8%;            /* move up/down to sit perfectly on the plate */
             transform: translateX(-50%);
-            font-size: 2.3rem;  /* tweak for size */
-            letter-spacing: 0.4em;
+            font-size: 2.3rem;     /* adjust size as needed */
+            letter-spacing: 0.45em;
             color: #333;
             font-weight: 600;
             text-transform: uppercase;
             text-shadow: 0 1px 2px rgba(0,0,0,0.25);
-            pointer-events: none;  /* clicks go through to the image/container */
+            pointer-events: none;
         }
 
         .controls {
@@ -84,7 +89,7 @@
     </style>
 </head>
 <body>
-    <h1>License Plate Game</h1>
+    <h1>License Plate Game v10</h1>
 
     <p>
         The plate letters must appear in your word in this order (not necessarily consecutively).<br>
@@ -93,6 +98,7 @@
 
     <div class="plate-wrapper">
         <div class="car-wrapper">
+            <!-- make sure this filename matches what you uploaded (car.png) -->
             <img src="car.png" alt="Car with license plate" class="car-image">
             <div class="plate-text" id="plate">---</div>
         </div>
