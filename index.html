@@ -87,7 +87,9 @@
 
     <script>
         // --- 1. A small starter word list ------------------------------------
-        // Later we can replace this with a big dictionary file.
+        // For now, this is both:
+        //  - the dictionary of allowed words
+        //  - the source we use to generate plates
         const WORDS = [
             "promise", "promises", "promote", "promoted", "promotes",
             "planet", "planets", "random", "sample", "market", "marker",
@@ -98,6 +100,9 @@
             "future", "animal", "bottle", "charge", "signal",
             "record", "button", "driver", "drivers", "stone", "stones"
         ];
+
+        // Build a Set for fast dictionary lookup (case-insensitive)
+        const DICTIONARY = new Set(WORDS.map(w => w.toUpperCase()));
 
         // --- 2. Core matching logic (same rules you described) ---------------
         function wordMatchesPlate(plate, word) {
@@ -143,7 +148,7 @@
         }
 
         // --- 3. Build a map of: plate -> one example word --------------------
-        // This guarantees every plate we generate has at least one valid word.
+        // This guarantees every plate we generate has at least one valid dictionary word.
         let plateToExampleWord = {};
         let allPlates = [];
 
@@ -205,7 +210,7 @@
             currentPlate = allPlates[index];
             plateEl.textContent = currentPlate;
             resultEl.textContent = "";
-            debugEl.textContent = ""; // we can show example word later if we want
+            debugEl.textContent = ""; // could show example word here if we want
             wordInputEl.value = "";
             wordInputEl.focus();
         }
@@ -231,13 +236,23 @@
                 return;
             }
 
-            const isMatch = wordMatchesPlate(currentPlate, rawWord);
+            const upperWord = rawWord.toUpperCase();
+
+            // 1) Check dictionary
+            if (!DICTIONARY.has(upperWord)) {
+                resultEl.textContent = `❌ "${rawWord}" is not in my dictionary.`;
+                resultEl.style.color = "red";
+                return;
+            }
+
+            // 2) Check plate-matching rule
+            const isMatch = wordMatchesPlate(currentPlate, upperWord);
 
             if (isMatch) {
-                resultEl.textContent = `✅ "${rawWord}" is a valid word for plate ${currentPlate}.`;
+                resultEl.textContent = `✅ "${rawWord}" is a valid dictionary word for plate ${currentPlate}.`;
                 resultEl.style.color = "green";
             } else {
-                resultEl.textContent = `❌ "${rawWord}" does NOT match plate ${currentPlate} in the correct order.`;
+                resultEl.textContent = `❌ "${rawWord}" is in the dictionary but does NOT match plate ${currentPlate} in the correct order.`;
                 resultEl.style.color = "red";
             }
         }
