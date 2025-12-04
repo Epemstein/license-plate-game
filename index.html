@@ -197,20 +197,19 @@
     </style>
 </head>
 <body>
-    <h1>License Plate Game – Time Trial</h1>
+    <h1>License Plate Game – Time Trial v2</h1>
 
     <div class="layout">
         <!-- LEFT: game -->
         <div class="left-panel">
             <p>
-                Solve <strong>10 plates</strong> as fast as you can. Timer starts when you solve the first plate.<br>
+                Solve <strong>10 plates</strong> as fast as you can. Timer starts immediately when the game loads.<br>
                 The plate letters must appear in your word in this order (not necessarily consecutively). A word like
                 <strong>spams</strong> does <em>not</em> work for <strong>PMS</strong> because the S appears before the M.
             </p>
 
             <div class="plate-wrapper">
                 <div class="car-wrapper">
-                    <!-- make sure this filename matches your uploaded image -->
                     <img src="car.png" alt="Car with license plate" class="car-image">
                     <div class="plate-text" id="plate">---</div>
                 </div>
@@ -219,7 +218,7 @@
             <div class="controls">
                 <input id="wordInput" type="text" placeholder="Type a word">
                 <button id="checkButton">Check word</button>
-                <button id="newPlateButton">Skip</button>
+                <button id="newPlateButton">Skip (+10s)</button>
             </div>
 
             <div id="result"></div>
@@ -238,7 +237,7 @@
                 <thead>
                     <tr>
                         <th>Plate</th>
-                        <th>Word</th>
+                        <th>Word / Penalty</th>
                     </tr>
                 </thead>
                 <tbody id="historyBody">
@@ -246,7 +245,7 @@
                 </tbody>
             </table>
             <div id="historyEmpty" class="history-empty">
-                Solve a plate to add it here.
+                Solve or skip a plate to add it here.
             </div>
         </div>
     </div>
@@ -272,6 +271,7 @@
         let gameOver = false;
         let startTime = null;
         let timerIntervalId = null;
+        let penaltySeconds = 0; // +10s per skip
 
         const plateEl = document.getElementById("plate");
         const wordInputEl = document.getElementById("wordInput");
@@ -332,19 +332,24 @@
         }
 
         // ===== Timer / progress helpers =====
-        function startGameIfNeeded() {
+        function startGame() {
             if (gameStarted || gameOver) return;
             gameStarted = true;
             solvedCount = 0;
+            penaltySeconds = 0;
             startTime = performance.now();
             updateProgressDisplay();
+            if (timerIntervalId) {
+                clearInterval(timerIntervalId);
+            }
             timerIntervalId = setInterval(updateTimer, 100);
         }
 
         function updateTimer() {
             if (!gameStarted || !startTime) return;
-            const elapsedSec = (performance.now() - startTime) / 1000;
-            timerDisplayEl.textContent = "Time: " + elapsedSec.toFixed(1) + " s";
+            const baseElapsedSec = (performance.now() - startTime) / 1000;
+            const totalSec = baseElapsedSec + penaltySeconds;
+            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
         }
 
         function updateProgressDisplay() {
@@ -355,12 +360,17 @@
             if (gameOver) return;
             gameOver = true;
             gameStarted = false;
+            // Ensure timer shows final time including penalties
+            const baseElapsedSec = (performance.now() - startTime) / 1000;
+            const totalSec = baseElapsedSec + penaltySeconds;
+            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
+
             if (timerIntervalId) {
                 clearInterval(timerIntervalId);
                 timerIntervalId = null;
             }
-            const finalText = timerDisplayEl.textContent;
-            resultEl.textContent = `🏁 Finished ${solvedCount} plates. ${finalText}`;
+
+            resultEl.textContent = `🏁 Finished ${solvedCount} plates. Time: ${totalSec.toFixed(1)} s`;
             resultEl.style.color = "green";
             wordInputEl.blur();
         }
@@ -390,8 +400,8 @@
             return el;
         }
 
-        // ===== Add solved plate to history with animation =====
-        function addToHistoryWithAnimation(plate, word, onComplete) {
+        // ===== Add to history with animation =====
+        function addToHistoryWithAnimation(plate, word, fromRectWord, onComplete) {
             if (!plate || !word) {
                 if (onComplete) onComplete();
                 return;
@@ -422,7 +432,7 @@
             }
 
             const plateFrom = plateEl.getBoundingClientRect();
-            const wordFrom = wordInputEl.getBoundingClientRect();
+            const wordFrom = fromRectWord || wordInputEl.getBoundingClientRect();
             const plateTo = plateTd.getBoundingClientRect();
             const wordTo = wordTd.getBoundingClientRect();
 
@@ -459,7 +469,7 @@
             }
 
             if (gameOver) {
-                return; // don't keep generating plates after game finished
+                return;
             }
 
             const wantFunky = Math.random() < TARGET_FUNKY_SHARE;
@@ -498,7 +508,7 @@
             resultEl.style.color = "red";
         }
 
-        // ===== Load dictionary =====
+        // ===== Load dictionary and start game immediately =====
         async function loadDictionary() {
             try {
                 const response = await fetch("words.txt");
@@ -528,6 +538,8 @@
                 dictionaryReady = true;
                 updateProgressDisplay();
                 pickRandomPlate();
+                // Start the game (timer) immediately once first plate is ready
+                startGame();
             } catch (err) {
                 resultEl.textContent = "Failed to load words.txt";
                 resultEl.style.color = "red";
@@ -559,10 +571,6 @@
             }
 
             // Correct!
-            if (!gameStarted) {
-                startGameIfNeeded();
-            }
-
             solvedCount++;
             updateProgressDisplay();
 
@@ -572,7 +580,7 @@
             const plate = currentPlate;
             const word = rawWord.toLowerCase();
 
-            addToHistoryWithAnimation(plate, word, () => {
+            addToHistoryWithAnimation(plate, word, null, () => {
                 if (solvedCount >= TOTAL_PLATES) {
                     endGame();
                 } else {
@@ -581,14 +589,28 @@
             });
         }
 
-        // ===== Skip handler =====
+        // ===== Skip handler (adds +10s and logs skip) =====
         function handleSkip() {
             if (gameOver) {
                 resultEl.textContent = "Game over. Refresh the page to play again.";
                 resultEl.style.color = "red";
                 return;
             }
-            pickRandomPlate();
+
+            if (!currentPlate) return;
+
+            penaltySeconds += 10;
+            resultEl.textContent = `⏩ Skipped ${currentPlate}. +10s penalty.`;
+            resultEl.style.color = "orange";
+
+            const plate = currentPlate;
+            const penaltyLabel = "+10s (skipped)";
+            // Use the Skip button's rect as the source for the word animation
+            const skipButtonRect = document.getElementById("newPlateButton").getBoundingClientRect();
+
+            addToHistoryWithAnimation(plate, penaltyLabel, skipButtonRect, () => {
+                pickRandomPlate();
+            });
         }
 
         // ===== Event listeners =====
