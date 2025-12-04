@@ -3,14 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <title>License Plate Game</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 0 16px;
+            line-height: 1.5;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .plate-box {
+            font-size: 2.5rem;
+            letter-spacing: 0.4rem;
+            text-align: center;
+            border: 2px solid #333;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 24px 0;
+            display: inline-block;
+        }
+
+        .plate-wrapper {
+            text-align: center;
+        }
+
+        .controls {
+            margin-top: 24px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .controls input[type="text"] {
+            flex: 1;
+            padding: 8px;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 8px 16px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 16px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
     <h1>License Plate Game</h1>
-    <p>This is where your game will appear.</p>
+
+    <p>Plate letters must appear in your word in this order (not necessarily consecutively).<br>
+       If a later plate letter appears before an earlier one (like <strong>spams</strong> for PMS), it’s invalid.</p>
+
+    <div class="plate-wrapper">
+        <div class="plate-box" id="plate">PMS</div>
+    </div>
+
+    <div class="controls">
+        <input id="wordInput" type="text" placeholder="Type a word (e.g., promise)">
+        <button id="checkButton">Check word</button>
+    </div>
+
+    <div id="result"></div>
 
     <script>
-        // Your JavaScript will go here
-        console.log("Game loaded!");
+        // For now, we use a fixed plate.
+        // Later, we'll generate random valid plates.
+        let currentPlate = "PMS";
+
+        const plateEl = document.getElementById("plate");
+        const wordInputEl = document.getElementById("wordInput");
+        const resultEl = document.getElementById("result");
+        const checkButtonEl = document.getElementById("checkButton");
+
+        plateEl.textContent = currentPlate;
+
+        // Core logic: does 'word' match the plate letters in order,
+        // without "skipping ahead" (no later plate letter before the earlier ones)?
+        function wordMatchesPlate(plate, word) {
+            plate = plate.toUpperCase();
+            word = word.toUpperCase();
+
+            let expectedPlateIndex = 0; // which plate letter we're expecting next
+
+            for (let i = 0; i < word.length; i++) {
+                const ch = word[i];
+
+                // Is this character one of the plate letters?
+                const posInPlate = plate.indexOf(ch);
+
+                if (posInPlate === -1) {
+                    // Not in the plate at all -> ignore it
+                    continue;
+                }
+
+                if (posInPlate === expectedPlateIndex) {
+                    // We saw exactly the letter we were waiting for (e.g. P, then M, then S)
+                    expectedPlateIndex++;
+
+                    // If we've matched all plate letters in order, it's a valid word
+                    if (expectedPlateIndex === plate.length) {
+                        return true;
+                    }
+                } else if (posInPlate > expectedPlateIndex) {
+                    // We saw a *later* plate letter before an earlier one.
+                    // Example: plate PMS, word "spams":
+                    // The first S appears before we've ever seen P -> invalid.
+                    return false;
+                } else {
+                    // posInPlate < expectedPlateIndex:
+                    // We've already passed this plate letter (e.g., another P after we've moved on to M).
+                    // That’s fine; just ignore it.
+                    continue;
+                }
+            }
+
+            // If we finish the loop without matching all plate letters, it's not valid
+            return false;
+        }
+
+        function checkWord() {
+            const rawWord = wordInputEl.value.trim();
+
+            if (!rawWord) {
+                resultEl.textContent = "Please type a word first.";
+                resultEl.style.color = "red";
+                return;
+            }
+
+            // Basic validation: letters only
+            if (!/^[a-zA-Z]+$/.test(rawWord)) {
+                resultEl.textContent = "Please use letters only (A–Z).";
+                resultEl.style.color = "red";
+                return;
+            }
+
+            const isMatch = wordMatchesPlate(currentPlate, rawWord);
+
+            if (isMatch) {
+                resultEl.textContent = `✅ "${rawWord}" is a valid word for plate ${currentPlate}.`;
+                resultEl.style.color = "green";
+            } else {
+                resultEl.textContent = `❌ "${rawWord}" does NOT match plate ${currentPlate} in the correct order.`;
+                resultEl.style.color = "red";
+            }
+        }
+
+        checkButtonEl.addEventListener("click", checkWord);
+
+        // Allow pressing Enter in the input to check the word
+        wordInputEl.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                checkWord();
+            }
+        });
     </script>
 </body>
 </html>
