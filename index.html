@@ -187,40 +187,15 @@
 
         let currentPlate = null;
 
-        async function loadDictionary() {
-            try:
-                const response = await fetch("words.txt");
-                if (!response.ok) {
-                    throw new Error("Failed to load words.txt");
-                }
-                const text = await response.text();
+async function loadDictionary() {
+    try {
+        const response = await fetch("words.txt");
+        ...
+    } catch (err) {
+        ...
+    }
+}
 
-                const lines = text.split(/\r?\n/);
-                WORDS = [];
-                DICTIONARY = new Set();
-
-                for (const line of lines) {
-                    const w = line.trim().toLowerCase();
-                    if (!w) continue;
-                    // letters only, at least 3 chars
-                    if (!/^[a-z]+$/.test(w)) continue;
-                    if (w.length < 3) continue;
-
-                    WORDS.push(w);
-                    DICTIONARY.add(w.toUpperCase());
-                }
-
-                buildPlateMap();
-                dictionaryReady = true;
-
-                debugEl.textContent = `Loaded ${WORDS.length} words, ${allPlates.length} plates.`;
-                pickRandomPlate();
-            } catch (err) {
-                console.error(err);
-                resultEl.textContent = "Error loading dictionary. Check words.txt.";
-                resultEl.style.color = "red";
-            }
-        }
 
         // --- 5. Game functions -------------------------------------------------
 
