@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>License Plate Game v15</title>
+    <title>License Plate Game – Time Trial</title>
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -102,9 +102,27 @@
             color: #666;
         }
 
+        /* Timer + progress above table */
+        #timerRow {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        #timerDisplay {
+            color: #111827;
+        }
+
+        #progressDisplay {
+            color: #374151;
+        }
+
         /* Solved plates table */
         .history-title {
-            margin-top: 0;
+            margin-top: 8px;
             margin-bottom: 8px;
         }
 
@@ -135,7 +153,6 @@
             margin-top: 4px;
         }
 
-        /* History rows fade in */
         .history-row {
             transition: opacity 0.3s ease;
         }
@@ -180,14 +197,15 @@
     </style>
 </head>
 <body>
-    <h1>License Plate Game v20</h1>
+    <h1>License Plate Game – Time Trial</h1>
 
     <div class="layout">
         <!-- LEFT: game -->
         <div class="left-panel">
             <p>
-                The plate letters must appear in your word in this order (not necessarily consecutively).<br>
-                A word like <strong>spams</strong> does <em>not</em> work for <strong>PMS</strong> because the S appears before the M.
+                Solve <strong>10 plates</strong> as fast as you can. Timer starts when you solve the first plate.<br>
+                The plate letters must appear in your word in this order (not necessarily consecutively). A word like
+                <strong>spams</strong> does <em>not</em> work for <strong>PMS</strong> because the S appears before the M.
             </p>
 
             <div class="plate-wrapper">
@@ -201,15 +219,20 @@
             <div class="controls">
                 <input id="wordInput" type="text" placeholder="Type a word">
                 <button id="checkButton">Check word</button>
-                <button id="newPlateButton">New plate</button>
+                <button id="newPlateButton">Skip</button>
             </div>
 
             <div id="result"></div>
             <div id="debug"></div>
         </div>
 
-        <!-- RIGHT: history table -->
+        <!-- RIGHT: history / timer -->
         <div class="right-panel">
+            <div id="timerRow">
+                <span id="timerDisplay">Time: 0.0 s</span>
+                <span id="progressDisplay">Solved: 0 / 10</span>
+            </div>
+
             <h2 class="history-title">Solved plates</h2>
             <table>
                 <thead>
@@ -229,6 +252,9 @@
     </div>
 
     <script>
+        // ===== Game configuration =====
+        const TOTAL_PLATES = 10;
+
         // ===== Globals =====
         let WORDS = [];
         let DICTIONARY = new Set();
@@ -238,8 +264,14 @@
         // Buckets for funky / normal words
         let FUNKY_WORDS = [];
         let NORMAL_WORDS = [];
-
         const TARGET_FUNKY_SHARE = 0.3; // ~30% plates with J/Q/X/Z
+
+        // Time-trial state
+        let solvedCount = 0;
+        let gameStarted = false;
+        let gameOver = false;
+        let startTime = null;
+        let timerIntervalId = null;
 
         const plateEl = document.getElementById("plate");
         const wordInputEl = document.getElementById("wordInput");
@@ -247,6 +279,8 @@
         const debugEl = document.getElementById("debug");
         const historyBodyEl = document.getElementById("historyBody");
         const historyEmptyEl = document.getElementById("historyEmpty");
+        const timerDisplayEl = document.getElementById("timerDisplay");
+        const progressDisplayEl = document.getElementById("progressDisplay");
 
         // ===== Matching logic =====
         function wordMatchesPlate(plate, word) {
@@ -297,17 +331,48 @@
             return /[JQXZ]/.test(plate);
         }
 
+        // ===== Timer / progress helpers =====
+        function startGameIfNeeded() {
+            if (gameStarted || gameOver) return;
+            gameStarted = true;
+            solvedCount = 0;
+            startTime = performance.now();
+            updateProgressDisplay();
+            timerIntervalId = setInterval(updateTimer, 100);
+        }
+
+        function updateTimer() {
+            if (!gameStarted || !startTime) return;
+            const elapsedSec = (performance.now() - startTime) / 1000;
+            timerDisplayEl.textContent = "Time: " + elapsedSec.toFixed(1) + " s";
+        }
+
+        function updateProgressDisplay() {
+            progressDisplayEl.textContent = `Solved: ${solvedCount} / ${TOTAL_PLATES}`;
+        }
+
+        function endGame() {
+            if (gameOver) return;
+            gameOver = true;
+            gameStarted = false;
+            if (timerIntervalId) {
+                clearInterval(timerIntervalId);
+                timerIntervalId = null;
+            }
+            const finalText = timerDisplayEl.textContent;
+            resultEl.textContent = `🏁 Finished ${solvedCount} plates. ${finalText}`;
+            resultEl.style.color = "green";
+            wordInputEl.blur();
+        }
+
         // ===== Floating label helper =====
         function createFloatingLabel(text, fromRect, toRect, extraClass) {
             const el = document.createElement("div");
             el.textContent = text;
             el.className = "float-label " + (extraClass || "");
 
-            // Start at center of fromRect
             const startX = fromRect.left + fromRect.width / 2;
             const startY = fromRect.top + fromRect.height / 2;
-
-            // End at center of toRect
             const endX = toRect.left + toRect.width / 2;
             const endY = toRect.top + toRect.height / 2;
 
@@ -316,7 +381,6 @@
 
             document.body.appendChild(el);
 
-            // Next frame: move to destination
             requestAnimationFrame(() => {
                 el.style.left = endX + "px";
                 el.style.top = endY + "px";
@@ -327,12 +391,14 @@
         }
 
         // ===== Add solved plate to history with animation =====
-        function addToHistoryWithAnimation(plate, word) {
-            if (!plate || !word) return;
+        function addToHistoryWithAnimation(plate, word, onComplete) {
+            if (!plate || !word) {
+                if (onComplete) onComplete();
+                return;
+            }
 
             historyEmptyEl.style.display = "none";
 
-            // Create the real row (start invisible)
             const row = document.createElement("tr");
             row.className = "history-row";
             row.style.opacity = "0";
@@ -345,40 +411,35 @@
             row.appendChild(plateTd);
             row.appendChild(wordTd);
 
-            // Insert at top
             if (historyBodyEl.firstChild) {
                 historyBodyEl.insertBefore(row, historyBodyEl.firstChild);
             } else {
                 historyBodyEl.appendChild(row);
             }
 
-            // Cap history length
             while (historyBodyEl.rows.length > 20) {
                 historyBodyEl.removeChild(historyBodyEl.lastChild);
             }
 
-            // Get bounding boxes
             const plateFrom = plateEl.getBoundingClientRect();
             const wordFrom = wordInputEl.getBoundingClientRect();
             const plateTo = plateTd.getBoundingClientRect();
             const wordTo = wordTd.getBoundingClientRect();
 
-            // Create floating labels
             const plateClone = createFloatingLabel(plate, plateFrom, plateTo, "float-label-plate");
             const wordClone = createFloatingLabel(word, wordFrom, wordTo, "float-label-word");
 
             const animDuration = 650; // ms
 
             setTimeout(() => {
-                // Fade in the real row
                 row.style.opacity = "1";
 
-                // Remove clones
                 if (plateClone && plateClone.parentNode) plateClone.parentNode.removeChild(plateClone);
                 if (wordClone && wordClone.parentNode) wordClone.parentNode.removeChild(wordClone);
 
-                // Automatically move to next plate
-                pickRandomPlate();
+                if (typeof onComplete === "function") {
+                    onComplete();
+                }
             }, animDuration);
         }
 
@@ -397,6 +458,10 @@
                 return;
             }
 
+            if (gameOver) {
+                return; // don't keep generating plates after game finished
+            }
+
             const wantFunky = Math.random() < TARGET_FUNKY_SHARE;
 
             let sourceWords;
@@ -405,7 +470,7 @@
             } else if (!wantFunky && NORMAL_WORDS.length > 0) {
                 sourceWords = NORMAL_WORDS;
             } else {
-                sourceWords = WORDS; // fallback
+                sourceWords = WORDS;
             }
 
             for (let attempts = 0; attempts < 500; attempts++) {
@@ -461,6 +526,7 @@
                 }
 
                 dictionaryReady = true;
+                updateProgressDisplay();
                 pickRandomPlate();
             } catch (err) {
                 resultEl.textContent = "Failed to load words.txt";
@@ -474,6 +540,12 @@
             const rawWord = wordInputEl.value.trim();
             if (!rawWord) return;
 
+            if (gameOver) {
+                resultEl.textContent = "Game over. Refresh the page to play again.";
+                resultEl.style.color = "red";
+                return;
+            }
+
             if (!DICTIONARY.has(rawWord.toUpperCase())) {
                 resultEl.textContent = `❌ "${rawWord}" is not in the dictionary.`;
                 resultEl.style.color = "red";
@@ -486,16 +558,42 @@
                 return;
             }
 
+            // Correct!
+            if (!gameStarted) {
+                startGameIfNeeded();
+            }
+
+            solvedCount++;
+            updateProgressDisplay();
+
             resultEl.textContent = `✅ Correct! "${rawWord}" matches ${currentPlate}.`;
             resultEl.style.color = "green";
 
-            // Log success with animation and auto-new-plate
-            addToHistoryWithAnimation(currentPlate, rawWord.toLowerCase());
+            const plate = currentPlate;
+            const word = rawWord.toLowerCase();
+
+            addToHistoryWithAnimation(plate, word, () => {
+                if (solvedCount >= TOTAL_PLATES) {
+                    endGame();
+                } else {
+                    pickRandomPlate();
+                }
+            });
+        }
+
+        // ===== Skip handler =====
+        function handleSkip() {
+            if (gameOver) {
+                resultEl.textContent = "Game over. Refresh the page to play again.";
+                resultEl.style.color = "red";
+                return;
+            }
+            pickRandomPlate();
         }
 
         // ===== Event listeners =====
         document.getElementById("checkButton").onclick = checkWord;
-        document.getElementById("newPlateButton").onclick = pickRandomPlate;
+        document.getElementById("newPlateButton").onclick = handleSkip;
 
         wordInputEl.addEventListener("keydown", (e) => {
             if (e.key === "Enter") checkWord();
