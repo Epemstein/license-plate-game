@@ -120,6 +120,13 @@
         let dictionaryReady = false;
         let currentPlate = null;
 
+        // New: buckets for funky / normal words
+        let FUNKY_WORDS = [];
+        let NORMAL_WORDS = [];
+
+        const FUNKY_LETTERS = "JQXZ";
+        const TARGET_FUNKY_SHARE = 0.3; // ~30% of plates will have at least one J/Q/X/Z
+
         const plateEl = document.getElementById("plate");
         const wordInputEl = document.getElementById("wordInput");
         const resultEl = document.getElementById("result");
@@ -170,7 +177,11 @@
             return null;
         }
 
-        // ===== Pick a Random Plate =====
+        function plateHasFunkyLetter(plate) {
+            return /[JQXZ]/.test(plate);
+        }
+
+        // ===== Pick a Random Plate (with funky control) =====
         function pickRandomPlate() {
             if (!dictionaryReady) {
                 resultEl.textContent = "Dictionary not loaded yet.";
@@ -178,19 +189,44 @@
                 return;
             }
 
-            for (let attempts = 0; attempts < 300; attempts++) {
-                const word = WORDS[Math.floor(Math.random() * WORDS.length)];
+            if (WORDS.length === 0) {
+                plateEl.textContent = "ERR";
+                resultEl.textContent = "No words available. Check words.txt.";
+                resultEl.style.color = "red";
+                return;
+            }
+
+            const wantFunky = Math.random() < TARGET_FUNKY_SHARE;
+
+            // Choose appropriate word bucket
+            let sourceWords;
+            if (wantFunky && FUNKY_WORDS.length > 0) {
+                sourceWords = FUNKY_WORDS;
+            } else if (!wantFunky && NORMAL_WORDS.length > 0) {
+                sourceWords = NORMAL_WORDS;
+            } else {
+                sourceWords = WORDS; // fallback if one bucket is empty
+            }
+
+            for (let attempts = 0; attempts < 500; attempts++) {
+                const word = sourceWords[Math.floor(Math.random() * sourceWords.length)];
                 const plate = generatePlateFromWord(word);
-                if (plate) {
-                    currentPlate = plate;
-                    plateEl.textContent = plate;
-                    resultEl.textContent = "";
-                    resultEl.style.color = "";
-                    wordInputEl.value = "";
-                    wordInputEl.focus();
-                    debugEl.textContent = `Loaded ${WORDS.length.toLocaleString()} words.`;
-                    return;
-                }
+                if (!plate) continue;
+
+                const isFunky = plateHasFunkyLetter(plate);
+
+                // Enforce funky/non-funky according to target
+                if (wantFunky && !isFunky) continue;
+                if (!wantFunky && isFunky) continue;
+
+                currentPlate = plate;
+                plateEl.textContent = plate;
+                resultEl.textContent = "";
+                resultEl.style.color = "";
+                wordInputEl.value = "";
+                wordInputEl.focus();
+                debugEl.textContent = `Loaded ${WORDS.length.toLocaleString()} words. Funky plates target: ${(TARGET_FUNKY_SHARE * 100).toFixed(0)}%.`;
+                return;
             }
 
             plateEl.textContent = "ERR";
@@ -205,13 +241,24 @@
                 const text = await response.text();
 
                 WORDS = [];
+                FUNKY_WORDS = [];
+                NORMAL_WORDS = [];
+                DICTIONARY = new Set();
+
                 for (const line of text.split(/\r?\n/)) {
                     const w = line.trim().toLowerCase();
                     if (!w) continue;
                     if (!/^[a-z]+$/.test(w)) continue;
                     if (w.length < 3) continue;
+
                     WORDS.push(w);
                     DICTIONARY.add(w.toUpperCase());
+
+                    if (/[jqxz]/.test(w)) {
+                        FUNKY_WORDS.push(w);
+                    } else {
+                        NORMAL_WORDS.push(w);
+                    }
                 }
 
                 dictionaryReady = true;
@@ -255,5 +302,6 @@
         // ===== Begin =====
         loadDictionary();
     </script>
+
 </body>
 </html>
