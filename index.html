@@ -65,7 +65,7 @@
     </style>
 </head>
 <body>
-    <h1>License Plate Game v2</h1>
+    <h1>License Plate Game</h1>
 
     <p>
         The plate letters must appear in your word in this order (not necessarily consecutively).<br>
@@ -86,25 +86,16 @@
     <div id="debug"></div>
 
     <script>
-        // --- 1. A small starter word list ------------------------------------
-        // For now, this is both:
-        //  - the dictionary of allowed words
-        //  - the source we use to generate plates
-        const WORDS = [
-            "promise", "promises", "promote", "promoted", "promotes",
-            "planet", "planets", "random", "sample", "market", "marker",
-            "garden", "gardens", "castle", "castles", "rivers",
-            "simple", "simpler", "window", "windows", "flight",
-            "candle", "candles", "stream", "streams", "bridge",
-            "shadow", "forest", "forests", "bright", "modern",
-            "future", "animal", "bottle", "charge", "signal",
-            "record", "button", "driver", "drivers", "stone", "stones"
-        ];
+        // --- 1. Globals for dictionary + plates --------------------------------
 
-        // Build a Set for fast dictionary lookup (case-insensitive)
-        const DICTIONARY = new Set(WORDS.map(w => w.toUpperCase()));
+        let WORDS = [];                    // array of words from words.txt
+        let DICTIONARY = new Set();        // fast lookup (uppercased)
+        let plateToExampleWord = {};       // plate -> one example word
+        let allPlates = [];                // list of all plate strings
+        let dictionaryReady = false;       // flips true when words are loaded
 
-        // --- 2. Core matching logic (same rules you described) ---------------
+        // --- 2. Core matching logic (your PMS rule) ----------------------------
+
         function wordMatchesPlate(plate, word) {
             plate = plate.toUpperCase();
             word = word.toUpperCase();
@@ -147,10 +138,7 @@
             return false;
         }
 
-        // --- 3. Build a map of: plate -> one example word --------------------
-        // This guarantees every plate we generate has at least one valid dictionary word.
-        let plateToExampleWord = {};
-        let allPlates = [];
+        // --- 3. Build plate map: plate -> example word -------------------------
 
         function buildPlateMap() {
             plateToExampleWord = {};
@@ -188,7 +176,8 @@
             console.log("Built plates:", allPlates.length);
         }
 
-        // --- 4. DOM elements and game state ----------------------------------
+        // --- 4. Load dictionary from words.txt ---------------------------------
+
         const plateEl = document.getElementById("plate");
         const wordInputEl = document.getElementById("wordInput");
         const resultEl = document.getElementById("result");
@@ -198,10 +187,53 @@
 
         let currentPlate = null;
 
+        async function loadDictionary() {
+            try:
+                const response = await fetch("words.txt");
+                if (!response.ok) {
+                    throw new Error("Failed to load words.txt");
+                }
+                const text = await response.text();
+
+                const lines = text.split(/\r?\n/);
+                WORDS = [];
+                DICTIONARY = new Set();
+
+                for (const line of lines) {
+                    const w = line.trim().toLowerCase();
+                    if (!w) continue;
+                    // letters only, at least 3 chars
+                    if (!/^[a-z]+$/.test(w)) continue;
+                    if (w.length < 3) continue;
+
+                    WORDS.push(w);
+                    DICTIONARY.add(w.toUpperCase());
+                }
+
+                buildPlateMap();
+                dictionaryReady = true;
+
+                debugEl.textContent = `Loaded ${WORDS.length} words, ${allPlates.length} plates.`;
+                pickRandomPlate();
+            } catch (err) {
+                console.error(err);
+                resultEl.textContent = "Error loading dictionary. Check words.txt.";
+                resultEl.style.color = "red";
+            }
+        }
+
+        // --- 5. Game functions -------------------------------------------------
+
         function pickRandomPlate() {
+            if (!dictionaryReady) {
+                resultEl.textContent = "Dictionary not loaded yet.";
+                resultEl.style.color = "red";
+                return;
+            }
+
             if (allPlates.length === 0) {
                 plateEl.textContent = "ERR";
-                resultEl.textContent = "No plates available. Check word list.";
+                resultEl.textContent = "No plates available. Check words.txt.";
                 resultEl.style.color = "red";
                 return;
             }
@@ -210,7 +242,6 @@
             currentPlate = allPlates[index];
             plateEl.textContent = currentPlate;
             resultEl.textContent = "";
-            debugEl.textContent = ""; // could show example word here if we want
             wordInputEl.value = "";
             wordInputEl.focus();
         }
@@ -226,6 +257,12 @@
 
             if (!/^[a-zA-Z]+$/.test(rawWord)) {
                 resultEl.textContent = "Please use letters only (A–Z).";
+                resultEl.style.color = "red";
+                return;
+            }
+
+            if (!dictionaryReady) {
+                resultEl.textContent = "Dictionary still loading. Try again in a moment.";
                 resultEl.style.color = "red";
                 return;
             }
@@ -257,7 +294,8 @@
             }
         }
 
-        // --- 5. Hook up buttons and initialize -------------------------------
+        // --- 6. Hook up buttons and start -------------------------------------
+
         checkButtonEl.addEventListener("click", checkWord);
 
         wordInputEl.addEventListener("keydown", function (event) {
@@ -270,12 +308,8 @@
             pickRandomPlate();
         });
 
-        // Build the plate map from the word list and start the first round
-        buildPlateMap();
-        pickRandomPlate();
-
-        // Optional debug info:
-        debugEl.textContent = `Total plates available: ${allPlates.length}`;
+        // Start loading the dictionary as soon as the page loads
+        loadDictionary();
     </script>
 </body>
 </html>
