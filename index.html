@@ -36,10 +36,12 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         .controls input[type="text"] {
             flex: 1;
+            min-width: 180px;
             padding: 8px;
             font-size: 1rem;
         }
@@ -54,39 +56,50 @@
             margin-top: 16px;
             font-weight: bold;
         }
+
+        #debug {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <h1>License Plate Game</h1>
 
-    <p>Plate letters must appear in your word in this order (not necessarily consecutively).<br>
-       If a later plate letter appears before an earlier one (like <strong>spams</strong> for PMS), it’s invalid.</p>
+    <p>
+        The plate letters must appear in your word in this order (not necessarily consecutively).<br>
+        If a later plate letter appears before an earlier one (like <strong>spams</strong> for PMS), it’s invalid.
+    </p>
 
     <div class="plate-wrapper">
-        <div class="plate-box" id="plate">PMS</div>
+        <div class="plate-box" id="plate">---</div>
     </div>
 
     <div class="controls">
         <input id="wordInput" type="text" placeholder="Type a word (e.g., promise)">
         <button id="checkButton">Check word</button>
+        <button id="newPlateButton">New plate</button>
     </div>
 
     <div id="result"></div>
+    <div id="debug"></div>
 
     <script>
-        // For now, we use a fixed plate.
-        // Later, we'll generate random valid plates.
-        let currentPlate = "PMS";
+        // --- 1. A small starter word list ------------------------------------
+        // Later we can replace this with a big dictionary file.
+        const WORDS = [
+            "promise", "promises", "promote", "promoted", "promotes",
+            "planet", "planets", "random", "sample", "market", "marker",
+            "garden", "gardens", "castle", "castles", "rivers",
+            "simple", "simpler", "window", "windows", "flight",
+            "candle", "candles", "stream", "streams", "bridge",
+            "shadow", "forest", "forests", "bright", "modern",
+            "future", "animal", "bottle", "charge", "signal",
+            "record", "button", "driver", "drivers", "stone", "stones"
+        ];
 
-        const plateEl = document.getElementById("plate");
-        const wordInputEl = document.getElementById("wordInput");
-        const resultEl = document.getElementById("result");
-        const checkButtonEl = document.getElementById("checkButton");
-
-        plateEl.textContent = currentPlate;
-
-        // Core logic: does 'word' match the plate letters in order,
-        // without "skipping ahead" (no later plate letter before the earlier ones)?
+        // --- 2. Core matching logic (same rules you described) ---------------
         function wordMatchesPlate(plate, word) {
             plate = plate.toUpperCase();
             word = word.toUpperCase();
@@ -129,6 +142,74 @@
             return false;
         }
 
+        // --- 3. Build a map of: plate -> one example word --------------------
+        // This guarantees every plate we generate has at least one valid word.
+        let plateToExampleWord = {};
+        let allPlates = [];
+
+        function buildPlateMap() {
+            plateToExampleWord = {};
+
+            WORDS.forEach((word) => {
+                const upper = word.toUpperCase();
+                const len = upper.length;
+
+                // Choose all combinations of 3 positions i < j < k
+                for (let i = 0; i < len; i++) {
+                    for (let j = i + 1; j < len; j++) {
+                        for (let k = j + 1; k < len; k++) {
+                            const a = upper[i];
+                            const b = upper[j];
+                            const c = upper[k];
+
+                            // Skip if any letters repeat (no AAB, etc.)
+                            if (a === b || a === c || b === c) continue;
+
+                            const plate = a + b + c;
+
+                            // If we don't already have this plate, and the word really matches it by our rules,
+                            // store this word as an example.
+                            if (!plateToExampleWord[plate]) {
+                                if (wordMatchesPlate(plate, upper)) {
+                                    plateToExampleWord[plate] = word;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            allPlates = Object.keys(plateToExampleWord);
+            console.log("Built plates:", allPlates.length);
+        }
+
+        // --- 4. DOM elements and game state ----------------------------------
+        const plateEl = document.getElementById("plate");
+        const wordInputEl = document.getElementById("wordInput");
+        const resultEl = document.getElementById("result");
+        const debugEl = document.getElementById("debug");
+        const checkButtonEl = document.getElementById("checkButton");
+        const newPlateButtonEl = document.getElementById("newPlateButton");
+
+        let currentPlate = null;
+
+        function pickRandomPlate() {
+            if (allPlates.length === 0) {
+                plateEl.textContent = "ERR";
+                resultEl.textContent = "No plates available. Check word list.";
+                resultEl.style.color = "red";
+                return;
+            }
+
+            const index = Math.floor(Math.random() * allPlates.length);
+            currentPlate = allPlates[index];
+            plateEl.textContent = currentPlate;
+            resultEl.textContent = "";
+            debugEl.textContent = ""; // we can show example word later if we want
+            wordInputEl.value = "";
+            wordInputEl.focus();
+        }
+
         function checkWord() {
             const rawWord = wordInputEl.value.trim();
 
@@ -138,9 +219,14 @@
                 return;
             }
 
-            // Basic validation: letters only
             if (!/^[a-zA-Z]+$/.test(rawWord)) {
                 resultEl.textContent = "Please use letters only (A–Z).";
+                resultEl.style.color = "red";
+                return;
+            }
+
+            if (!currentPlate) {
+                resultEl.textContent = "No plate yet. Click 'New plate'.";
                 resultEl.style.color = "red";
                 return;
             }
@@ -156,14 +242,25 @@
             }
         }
 
+        // --- 5. Hook up buttons and initialize -------------------------------
         checkButtonEl.addEventListener("click", checkWord);
 
-        // Allow pressing Enter in the input to check the word
         wordInputEl.addEventListener("keydown", function (event) {
             if (event.key === "Enter") {
                 checkWord();
             }
         });
+
+        newPlateButtonEl.addEventListener("click", function () {
+            pickRandomPlate();
+        });
+
+        // Build the plate map from the word list and start the first round
+        buildPlateMap();
+        pickRandomPlate();
+
+        // Optional debug info:
+        debugEl.textContent = `Total plates available: ${allPlates.length}`;
     </script>
 </body>
 </html>
