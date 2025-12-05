@@ -27,7 +27,14 @@ def build_counts(words):
     """
     Loop over words and generate all possible 3-letter plates (i<j<k)
     with distinct letters that can be formed from each word.
-    For each such plate, increment its count.
+
+    IMPORTANT CHANGE:
+    - Each word contributes at most 1 to a given plate.
+      (So if a word can form XCR in multiple ways, it still only
+       adds 1 to the count for XCR.)
+
+    This makes `count` = number of DISTINCT WORDS that can form that plate,
+    which matches the browser popup behavior.
     """
     counts = Counter()
 
@@ -37,7 +44,9 @@ def build_counts(words):
         if L < 3:
             continue
 
-        # Generate all combinations i<j<k
+        plates_for_word = set()
+
+        # Generate all combinations i<j<k for this word
         for i in range(L - 2):
             a = upper[i]
             for j in range(i + 1, L - 1):
@@ -50,12 +59,16 @@ def build_counts(words):
                         continue
 
                     plate = a + b + c
-                    counts[plate] += 1
+                    plates_for_word.add(plate)
+
+        # Now increment each plate ONCE for this word
+        for plate in plates_for_word:
+            counts[plate] += 1
 
         if (idx + 1) % 10000 == 0:
             print(f"Processed {idx + 1} words...")
 
-    print(f"Computed counts for {len(counts)} distinct plates with at least one match.")
+    print(f"Computed counts for {len(counts)} distinct plates with at least one matching word.")
     return counts
 
 
@@ -63,7 +76,7 @@ def difficulty_for_count(c):
     """
     Convert a viable word count (c) into a difficulty score from 1–100.
 
-    Anchors (in rough terms):
+    Anchors (approximate):
         1 word      -> 100
         ~100 words  -> 95
         ~1,000      -> 75
