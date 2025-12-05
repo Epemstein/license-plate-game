@@ -1,5 +1,6 @@
 import json
 from collections import Counter
+import math
 
 WORDS_FILE = "words.txt"
 OUT_FILE = "plate_difficulty.json"
@@ -60,44 +61,73 @@ def build_counts(words):
 
 def difficulty_for_count(c):
     """
-    Returns difficulty in [0,1].
+    Convert a viable word count (c) into a difficulty score from 1–100.
 
-    1.0 = brutally hard (few viable words)
-    0.0 = easiest (tons of viable words)
+    Anchors (in rough terms):
+        1 word      -> 100
+        ~100 words  -> 95
+        ~1,000      -> 75
+        ~10,000     -> 20
+        ~20,000     -> 1
 
-    0-count plates (no valid words) get 0.0 here because you
-    won't actually use those plates in the game.
+    We interpolate piecewise in log10(count) space between these points,
+    then round to the nearest integer in [1, 100].
+
+    0-count plates return 0 because they're unusable in the game.
     """
     if c <= 0:
-        return 0.0
+        return 0  # unusable
 
-    # Hand-tuned buckets to reflect how nasty low counts really are.
+    # Exact hardest case
     if c == 1:
-        score = 100
-    elif c == 2:
-        score = 98
-    elif c <= 5:
-        score = 96
-    elif c <= 10:
-        score = 94
-    elif c <= 25:
-        score = 92
-    elif c <= 50:
-        score = 90
-    elif c <= 100:
-        score = 88
-    elif c <= 250:
-        score = 85
-    elif c <= 500:
-        score = 80
-    elif c <= 1000:
-        score = 75
-    elif c <= 2500:
-        score = 65
-    else:
-        score = 50
+        return 100
 
-    return score / 100.0
+    # Use log10 for smooth scaling
+    x = math.log10(c)
+
+    # Segment boundaries in log10 space:
+    # 1       -> x = 0
+    # 100     -> x = 2
+    # 1000    -> x = 3
+    # 10000   -> x = 4
+    # 20000   -> x = log10(20000)
+    x1 = 0.0
+    x2 = 2.0
+    x3 = 3.0
+    x4 = 4.0
+    x5 = math.log10(20000.0)
+
+    def lerp(x_val, xa, xb, ya, yb):
+        """Linear interpolation from (xa,ya) to (xb,yb) at x_val."""
+        if xb == xa:
+            return ya
+        t = (x_val - xa) / (xb - xa)
+        return ya + t * (yb - ya)
+
+    # Piecewise interpolation across the defined segments
+    if x <= x2:
+        # From 1 word (x=0, 100) to 100 words (x=2, 95)
+        y = lerp(x, x1, x2, 100.0, 95.0)
+    elif x <= x3:
+        # From 100 words (x=2, 95) to 1,000 words (x=3, 75)
+        y = lerp(x, x2, x3, 95.0, 75.0)
+    elif x <= x4:
+        # From 1,000 words (x=3, 75) to 10,000 words (x=4, 20)
+        y = lerp(x, x3, x4, 75.0, 20.0)
+    elif x <= x5:
+        # From 10,000 words (x=4, 20) to 20,000 words (x~4.301, 1)
+        y = lerp(x, x4, x5, 20.0, 1.0)
+    else:
+        # Anything beyond 20,000 viable words is basically trivial
+        y = 1.0
+
+    # Round and clamp to [1, 100]
+    score = int(round(y))
+    if score < 1:
+        score = 1
+    if score > 100:
+        score = 100
+    return score
 
 
 def main():
