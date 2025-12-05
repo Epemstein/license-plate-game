@@ -257,9 +257,12 @@
         }
 
         .words-list span {
-            display: inline-block;
-            margin-right: 8px;
-            margin-bottom: 4px;
+            /* we now use per-line wrapper, so no margin needed here */
+        }
+
+        .words-list-item {
+            display: block;
+            margin-bottom: 2px;
         }
 
         @media (max-width: 800px) {
@@ -271,7 +274,7 @@
 </head>
 <body>
 
-<h1>License Plate Game – Time Trial</h1>
+<h1>License Plate Game – Time Trial v2</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -296,7 +299,7 @@
             <button id="startButton">Loading...</button>
             <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
             <button id="checkButton">Check</button>
-            <button id="skipButton">Skip (+5s, then +10s, ...)</button>
+            <button id="skipButton">Skip +5s</button>
         </div>
 
         <div id="result"></div>
@@ -596,7 +599,7 @@
     }
 
     function updateDifficultyDisplay(plate) {
-        // Difficulty from JSON (just uses difficulty score)
+        // Difficulty from JSON
         if (!PLATE_DIFFICULTY || !PLATE_DIFFICULTY[plate]) {
             difficultyLabelEl.textContent = "Difficulty: —";
             difficultyLabelEl.className = "difficulty diff-med";
@@ -633,6 +636,11 @@
         progressDisplayEl.textContent = `Solved: ${solvedCount} / ${TOTAL_PLATES}`;
     }
 
+    function updateSkipButtonLabel() {
+        const nextPenalty = (skipCount + 1) * 5;
+        skipButtonEl.textContent = `Skip +${nextPenalty}s`;
+    }
+
     function resetGameState() {
         gameStarted = false;
         gameOver = false;
@@ -640,6 +648,7 @@
         startTime = null;
         penaltySeconds = 0;
         skipCount = 0; // reset skip counter
+        updateSkipButtonLabel();
 
         if (timerIntervalId) clearInterval(timerIntervalId);
         timerIntervalId = null;
@@ -849,16 +858,34 @@
 
         if (matches.length === 0) {
             wordsModalListEl.textContent = "(no viable words found)";
-        } else {
-            const frag = document.createDocumentFragment();
-            for (const w of matches) {
-                const span = document.createElement("span");
-                span.textContent = w;
-                frag.appendChild(span);
-            }
-            wordsModalListEl.innerHTML = "";
-            wordsModalListEl.appendChild(frag);
+            return;
         }
+
+        // Build one line per word, with plate letters highlighted
+        const frag = document.createDocumentFragment();
+        for (const w of matches) {
+            const line = document.createElement("div");
+            line.className = "words-list-item";
+
+            const indices = getPlateMatchIndices(plate, w) || [];
+            const indexSet = new Set(indices);
+
+            let html = "";
+            for (let i = 0; i < w.length; i++) {
+                const ch = w[i];
+                if (indexSet.has(i)) {
+                    html += `<span class="plate-letter-highlight">${ch}</span>`;
+                } else {
+                    html += ch;
+                }
+            }
+
+            line.innerHTML = html;
+            frag.appendChild(line);
+        }
+
+        wordsModalListEl.innerHTML = "";
+        wordsModalListEl.appendChild(frag);
     }
 
     function closeWordsModal() {
@@ -942,11 +969,15 @@
         addToHistoryWithAnimation(plate, penaltyLabel, null, skipRect, diffScore, () => {
             pickRandomPlate();
         });
+
+        // Update button label for next skip
+        updateSkipButtonLabel();
     }
 
     // --------- INIT ---------
     startButtonEl.disabled = true;
     startButtonEl.textContent = "Loading...";
+    updateSkipButtonLabel();
 
     startButtonEl.addEventListener("click", startGame);
     checkButtonEl.addEventListener("click", checkWord);
