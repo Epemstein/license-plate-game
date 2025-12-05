@@ -1,12 +1,12 @@
 import json
 from collections import Counter
-import bisect
 
 WORDS_FILE = "words.txt"
 OUT_FILE = "plate_difficulty.json"
 
 
 def load_words():
+    """Load and clean words from words.txt"""
     words = []
     with open(WORDS_FILE, "r", encoding="utf-8") as f:
         for line in f:
@@ -24,12 +24,11 @@ def load_words():
 
 def build_counts(words):
     """
-    Instead of looping over all plates for each word (very slow),
-    we loop over words and generate all possible 3-letter plates
-    that can come from that word (combinations of positions).
+    Loop over words and generate all possible 3-letter plates (i<j<k)
+    with distinct letters that can be formed from each word.
+    For each such plate, increment its count.
     """
     counts = Counter()
-    dict_words = {w.upper() for w in words}
 
     for idx, w in enumerate(words):
         upper = w.upper()
@@ -37,7 +36,7 @@ def build_counts(words):
         if L < 3:
             continue
 
-        # Generate all i<j<k combinations of positions
+        # Generate all combinations i<j<k
         for i in range(L - 2):
             a = upper[i]
             for j in range(i + 1, L - 1):
@@ -50,7 +49,6 @@ def build_counts(words):
                         continue
 
                     plate = a + b + c
-
                     counts[plate] += 1
 
         if (idx + 1) % 10000 == 0:
@@ -58,6 +56,48 @@ def build_counts(words):
 
     print(f"Computed counts for {len(counts)} distinct plates with at least one match.")
     return counts
+
+
+def difficulty_for_count(c):
+    """
+    Returns difficulty in [0,1].
+
+    1.0 = brutally hard (few viable words)
+    0.0 = easiest (tons of viable words)
+
+    0-count plates (no valid words) get 0.0 here because you
+    won't actually use those plates in the game.
+    """
+    if c <= 0:
+        return 0.0
+
+    # Hand-tuned buckets to reflect how nasty low counts really are.
+    if c == 1:
+        score = 100
+    elif c == 2:
+        score = 98
+    elif c <= 5:
+        score = 96
+    elif c <= 10:
+        score = 94
+    elif c <= 25:
+        score = 92
+    elif c <= 50:
+        score = 90
+    elif c <= 100:
+        score = 88
+    elif c <= 250:
+        score = 85
+    elif c <= 500:
+        score = 80
+    elif c <= 1000:
+        score = 75
+    elif c <= 2500:
+        score = 65
+    else:
+        score = 50
+
+    return score / 100.0
 
 
 def main():
@@ -76,35 +116,13 @@ def main():
                     continue
                 all_plates.append(a + b + c)
 
-    # Build a sorted list of POSITIVE counts only (c > 0) for percentile calc
-    all_values = [counts.get(p, 0) for p in all_plates]
-    positive_vals = sorted(v for v in all_values if v > 0)
-    n_pos = len(positive_vals)
-    
-    def percentile_for_count(x):
-        """
-        Difficulty percentile:
-          - 0-count plates -> 0.0 (unviable / not in distribution)
-          - Among x > 0, lower counts = harder = HIGHER percentile.
-    
-        So:
-          count = 1  -> percentile ~ 1.0 (hardest)
-          count = max -> percentile ~ 0.0 (easiest)
-        """
-        if x <= 0 or n_pos <= 1:
-            return 0.0
-    
-        # rank of x among positive counts (ascending)
-        pos = bisect.bisect_left(positive_vals, x)
-    
-        # Convert to difficulty percentile (invert: smaller count = higher difficulty)
-        return 1.0 - (pos / (n_pos - 1))
+    print(f"Generated {len(all_plates)} possible plates.")
 
     data = {}
     for p in all_plates:
         c = counts.get(p, 0)
-        pct = percentile_for_count(c)
-        data[p] = {"count": c, "percentile": pct}
+        d = difficulty_for_count(c)
+        data[p] = {"count": c, "difficulty": d}
 
     with open(OUT_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f)
