@@ -174,9 +174,9 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.25);
             opacity: 1;
             transition:
-                top 0.6s ease-out,
-                left 0.6s ease-out,
-                opacity 0.6s ease-out;
+                top 0.4s ease-out,
+                left 0.4s ease-out,
+                opacity 0.4s ease-out;
             white-space: nowrap;
             font-size: 0.9rem;
         }
@@ -278,7 +278,7 @@
 </head>
 <body>
 
-<h1>License Plate Game – Time Trial v1</h1>
+<h1>License Plate Game – Time Trial</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -881,18 +881,19 @@
         const diffText = (diffScore === null || diffScore <= 0) ? "—" : String(diffScore);
         const diffClone = createFloatingLabel(diffText, plateFrom, diffTo, "float-label-diff");
 
-        const animDuration = 650;
+        // ✅ Call onComplete immediately so the next plate appears right away
+        if (typeof onComplete === "function") {
+            onComplete();
+        }
 
+        // Animation just finishes visually in the background
+        const animDuration = 400;
         setTimeout(() => {
             row.style.opacity = "1";
 
             [plateClone, wordClone, diffClone].forEach(clone => {
                 if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
             });
-
-            if (typeof onComplete === "function") {
-                onComplete();
-            }
         }, animDuration);
     }
 
@@ -1018,7 +1019,6 @@
             return;
         }
         if (plateLocked) {
-            // This plate is already being resolved or has been resolved
             return;
         }
 
@@ -1055,7 +1055,7 @@
             if (solvedCount >= TOTAL_PLATES) {
                 endGame();
             } else {
-                pickRandomPlate(); // unlock happens inside pickRandomPlate()
+                pickRandomPlate(); // next plate appears immediately
             }
         });
     }
@@ -1073,7 +1073,6 @@
         }
         if (!currentPlate) return;
         if (plateLocked) {
-            // Already skipping / resolving this plate
             return;
         }
 
@@ -1098,7 +1097,7 @@
 
         addToHistoryWithAnimation(plate, penaltyLabel, null, skipRect, diffScore, () => {
             updateSkipButtonLabel();
-            pickRandomPlate(); // unlock & re-enable happens there
+            pickRandomPlate(); // next plate appears immediately
         });
     }
 
