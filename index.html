@@ -7,7 +7,7 @@
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             max-width: 1100px;
-            margin: 40px;
+            margin: 40px auto;
             padding: 0 16px 40px;
             line-height: 1.5;
         }
@@ -17,27 +17,15 @@
             margin-bottom: 0.5rem;
         }
 
-        /* Two-column layout */
         .layout {
             display: flex;
             align-items: flex-start;
             gap: 32px;
         }
 
-        .left-panel {
-            flex: 0 0 55%;
-        }
+        .left-panel { flex: 0 0 55%; }
+        .right-panel { flex: 1; }
 
-        .right-panel {
-            flex: 1;
-        }
-
-        .plate-wrapper {
-            text-align: left;
-            margin: 20px 0;
-        }
-
-        /* Cropped car image */
         .car-wrapper {
             position: relative;
             display: inline-block;
@@ -51,11 +39,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            object-position: center;
-            display: block;
         }
 
-        /* Your tuned plate position */
         .plate-text {
             position: absolute;
             left: 52.5%;
@@ -70,12 +55,22 @@
             pointer-events: none;
         }
 
+        .difficulty {
+            margin-top: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .diff-easy { color: #16a34a; }   /* green */
+        .diff-med  { color: #d97706; }   /* orange */
+        .diff-hard { color: #dc2626; }   /* red */
+
         .controls {
             margin: 24px 0 12px;
             display: flex;
-            gap: 10px;
-            align-items: center;
             flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
         }
 
         .controls input[type="text"] {
@@ -86,54 +81,48 @@
         }
 
         button {
-            padding: 8px 16px;
-            font-size: 1rem;
+            padding: 8px 14px;
+            font-size: 0.95rem;
             cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: default;
         }
 
         #result {
             margin-top: 10px;
-            font-weight: bold;
+            font-weight: 600;
         }
 
         #debug {
             margin-top: 6px;
-            font-size: 0.9rem;
-            color: #666;
+            font-size: 0.85rem;
+            color: #6b7280;
         }
 
-        /* Timer + progress above table */
         #timerRow {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
             margin-bottom: 8px;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 0.95rem;
         }
 
-        #timerDisplay {
-            color: #111827;
-        }
-
-        #progressDisplay {
-            color: #374151;
-        }
-
-        /* Solved plates table */
-        .history-title {
-            margin-top: 8px;
-            margin-bottom: 8px;
-        }
+        #timerDisplay { color: #111827; }
+        #progressDisplay { color: #374151; }
 
         table {
-            border-collapse: collapse;
             width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
             font-size: 0.95rem;
         }
 
         th, td {
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid #e5e7eb;
             padding: 6px 8px;
             text-align: left;
         }
@@ -148,523 +137,638 @@
         }
 
         .history-empty {
-            font-size: 0.9rem;
-            color: #777;
+            font-size: 0.85rem;
+            color: #6b7280;
             margin-top: 4px;
         }
 
-        .history-row {
-            transition: opacity 0.3s ease;
-        }
-
-        /* Highlighted letters in the WORD that correspond to the plate sequence */
         .plate-letter-highlight {
             color: #16a34a;
-            font-weight: 600;
+            font-weight: 700;
         }
 
-        @media (max-width: 800px) {
-            .layout {
-                flex-direction: column;
-            }
-            .left-panel, .right-panel {
-                flex: 1 1 auto;
-            }
-        }
-
-        /* Floating labels animation */
+        /* Floating labels */
         .float-label {
             position: fixed;
             transform: translate(-50%, -50%);
-            z-index: 1000;
+            z-index: 999;
             pointer-events: none;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 2px 6px;
+            background: rgba(255,255,255,0.95);
+            padding: 3px 6px;
             border-radius: 4px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-            font-size: 0.9rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
             opacity: 1;
             transition:
                 top 0.6s ease-out,
                 left 0.6s ease-out,
                 opacity 0.6s ease-out;
             white-space: nowrap;
+            font-size: 0.9rem;
         }
 
         .float-label-plate {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             letter-spacing: 0.3em;
             font-weight: 600;
         }
 
         .float-label-word {
-            font-weight: 500;
+            font-weight: 600;
+        }
+
+        .float-label-diff {
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        @media (max-width: 800px) {
+            .layout {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>License Plate Game – Time Trial v4</h1>
 
-    <div class="layout">
-        <!-- LEFT: game -->
-        <div class="left-panel">
-            <p>
-                Solve <strong>10 plates</strong> as fast as you can. Timer starts immediately when the game loads.<br>
-                The plate letters must appear in your word in this order (not necessarily consecutively). A word like
-                <strong>spams</strong> does <em>not</em> work for <strong>PMS</strong> because the S appears before the M.
-            </p>
+<h1>License Plate Game – Time Trial v5</h1>
 
-            <div class="plate-wrapper">
-                <div class="car-wrapper">
-                    <img src="car.png" alt="Car with license plate" class="car-image">
-                    <div class="plate-text" id="plate">---</div>
-                </div>
-            </div>
+<div class="layout">
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+        <p>
+            Press <strong>Start</strong> to begin. Solve <strong>10 plates</strong> as fast as you can.<br>
+            The plate letters must appear in your word in order (not necessarily consecutively).
+        </p>
 
-            <div class="controls">
-                <input id="wordInput" type="text" placeholder="Type a word">
-                <button id="checkButton">Check word</button>
-                <button id="newPlateButton">Skip (+10s)</button>
-            </div>
-
-            <div id="result"></div>
-            <div id="debug"></div>
+        <div class="car-wrapper">
+            <img src="car.png" alt="Car with license plate" class="car-image">
+            <div id="plate" class="plate-text">---</div>
         </div>
 
-        <!-- RIGHT: history / timer -->
-        <div class="right-panel">
-            <div id="timerRow">
-                <span id="timerDisplay">Time: 0.0 s</span>
-                <span id="progressDisplay">Solved: 0 / 10</span>
-            </div>
-
-            <h2 class="history-title">Solved plates</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Plate</th>
-                        <th>Word / Penalty</th>
-                    </tr>
-                </thead>
-                <tbody id="historyBody">
-                    <!-- rows added here -->
-                </tbody>
-            </table>
-            <div id="historyEmpty" class="history-empty">
-                Solve or skip a plate to add it here.
-            </div>
+        <div id="difficultyLabel" class="difficulty diff-med">
+            Difficulty: —
         </div>
+
+        <div class="controls">
+            <button id="startButton">Start Game</button>
+            <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
+            <button id="checkButton">Check</button>
+            <button id="skipButton">Skip (+10s)</button>
+        </div>
+
+        <div id="result"></div>
+        <div id="debug"></div>
     </div>
 
-    <script>
-        // ===== Game configuration =====
-        const TOTAL_PLATES = 10;
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+        <div id="timerRow">
+            <span id="timerDisplay">Time: 0.0 s</span>
+            <span id="progressDisplay">Solved: 0 / 10</span>
+        </div>
 
-        // ===== Globals =====
-        let WORDS = [];
-        let DICTIONARY = new Set();
-        let dictionaryReady = false;
-        let currentPlate = null;
+        <h2>Solved Plates</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>Plate</th>
+                <th>Word / Penalty</th>
+                <th>Difficulty</th>
+            </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+        </table>
+        <div id="historyEmpty" class="history-empty">
+            No solved plates yet.
+        </div>
+    </div>
+</div>
 
-        // Buckets for funky / normal words
-        let FUNKY_WORDS = [];
-        let NORMAL_WORDS = [];
-        const TARGET_FUNKY_SHARE = 0.3; // ~30% plates with J/Q/X/Z
+<script>
+    // --------- CONFIG ---------
+    const TOTAL_PLATES = 10;
+    const TARGET_FUNKY_SHARE = 0.3; // ~30% plates with J/Q/X/Z
 
-        // Time-trial state
-        let solvedCount = 0;
-        let gameStarted = false;
-        let gameOver = false;
-        let startTime = null;
-        let timerIntervalId = null;
-        let penaltySeconds = 0; // +10s per skip
+    // --------- GLOBAL STATE ---------
+    let WORDS = [];
+    let DICTIONARY = new Set();
+    let dictionaryReady = false;
 
-        const plateEl = document.getElementById("plate");
-        const wordInputEl = document.getElementById("wordInput");
-        const resultEl = document.getElementById("result");
-        const debugEl = document.getElementById("debug");
-        const historyBodyEl = document.getElementById("historyBody");
-        const historyEmptyEl = document.getElementById("historyEmpty");
-        const timerDisplayEl = document.getElementById("timerDisplay");
-        const progressDisplayEl = document.getElementById("progressDisplay");
+    let FUNKY_WORDS = [];
+    let NORMAL_WORDS = [];
 
-        // ===== Plate matching indices (for logic + highlighting) =====
-        function getPlateMatchIndices(plate, word) {
-            plate = plate.toUpperCase();
-            const upperWord = word.toUpperCase();
+    let PLATE_DIFFICULTY = null;
+    let difficultyReady = false;
 
-            let expectedPlateIndex = 0;
-            const matchedIndices = [];
+    let currentPlate = null;
 
-            for (let i = 0; i < upperWord.length; i++) {
-                const ch = upperWord[i];
-                const posInPlate = plate.indexOf(ch);
+    let gameStarted = false;
+    let gameOver = false;
+    let solvedCount = 0;
+    let startTime = null;
+    let penaltySeconds = 0;
+    let timerIntervalId = null;
 
-                if (posInPlate === -1) continue;
+    // DOM refs
+    const plateEl = document.getElementById("plate");
+    const difficultyLabelEl = document.getElementById("difficultyLabel");
+    const wordInputEl = document.getElementById("wordInput");
+    const resultEl = document.getElementById("result");
+    const debugEl = document.getElementById("debug");
+    const timerDisplayEl = document.getElementById("timerDisplay");
+    const progressDisplayEl = document.getElementById("progressDisplay");
+    const historyBodyEl = document.getElementById("historyBody");
+    const historyEmptyEl = document.getElementById("historyEmpty");
+    const startButtonEl = document.getElementById("startButton");
+    const checkButtonEl = document.getElementById("checkButton");
+    const skipButtonEl = document.getElementById("skipButton");
 
-                if (posInPlate === expectedPlateIndex) {
-                    matchedIndices.push(i);
-                    expectedPlateIndex++;
-                    if (expectedPlateIndex === plate.length) {
-                        // once we've matched all plate letters in order, we're done
-                        return matchedIndices;
-                    }
-                } else if (posInPlate > expectedPlateIndex) {
-                    // saw a later plate letter before the one we were expecting
-                    return null;
+    // --------- LOADING ---------
+    async function loadDictionary() {
+        try {
+            const res = await fetch("words.txt");
+            const text = await res.text();
+
+            WORDS = [];
+            FUNKY_WORDS = [];
+            NORMAL_WORDS = [];
+            DICTIONARY = new Set();
+
+            for (const line of text.split(/\r?\n/)) {
+                const w = line.trim().toLowerCase();
+                if (!w) continue;
+                if (!/^[a-z]+$/.test(w)) continue;
+                if (w.length < 3) continue;
+
+                WORDS.push(w);
+                DICTIONARY.add(w.toUpperCase());
+
+                if (/[jqxz]/.test(w)) {
+                    FUNKY_WORDS.push(w);
                 } else {
-                    // posInPlate < expectedPlateIndex (we've already passed this plate letter), ignore
-                    continue;
+                    NORMAL_WORDS.push(w);
                 }
             }
 
-            // didn't match all plate letters
-            return null;
-        }
-
-        function wordMatchesPlate(plate, word) {
-            return getPlateMatchIndices(plate, word) !== null;
-        }
-
-        // ===== Plate generation from a single word =====
-        function generatePlateFromWord(word) {
-            const upper = word.toUpperCase();
-            const len = upper.length;
-            if (len < 3) return null;
-
-            for (let attempt = 0; attempt < 40; attempt++) {
-                const i = Math.floor(Math.random() * (len - 2));
-                const j = i + 1 + Math.floor(Math.random() * (len - i - 2));
-                const k = j + 1 + Math.floor(Math.random() * (len - j - 1));
-
-                const a = upper[i], b = upper[j], c = upper[k];
-                if (a === b || a === c || b === c) continue;
-
-                const plate = a + b + c;
-                // Skip plates that are actual dictionary words (3-letter valid words)
-                if (DICTIONARY.has(plate)) continue;
-
-                if (wordMatchesPlate(plate, upper)) return plate;
-            }
-
-            return null;
-        }
-
-        function plateHasFunkyLetter(plate) {
-            return /[JQXZ]/.test(plate);
-        }
-
-        // ===== Timer / progress helpers =====
-        function startGame() {
-            if (gameStarted || gameOver) return;
-            gameStarted = true;
-            solvedCount = 0;
-            penaltySeconds = 0;
-            startTime = performance.now();
-            updateProgressDisplay();
-            if (timerIntervalId) {
-                clearInterval(timerIntervalId);
-            }
-            timerIntervalId = setInterval(updateTimer, 100);
-        }
-
-        function updateTimer() {
-            if (!gameStarted || !startTime) return;
-            const baseElapsedSec = (performance.now() - startTime) / 1000;
-            const totalSec = baseElapsedSec + penaltySeconds;
-            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
-        }
-
-        function updateProgressDisplay() {
-            progressDisplayEl.textContent = `Solved: ${solvedCount} / ${TOTAL_PLATES}`;
-        }
-
-        function endGame() {
-            if (gameOver) return;
-            gameOver = true;
-            gameStarted = false;
-
-            const baseElapsedSec = (performance.now() - startTime) / 1000;
-            const totalSec = baseElapsedSec + penaltySeconds;
-            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
-
-            if (timerIntervalId) {
-                clearInterval(timerIntervalId);
-                timerIntervalId = null;
-            }
-
-            resultEl.textContent = `🏁 Finished ${solvedCount} plates. Time: ${totalSec.toFixed(1)} s`;
-            resultEl.style.color = "green";
-            wordInputEl.blur();
-        }
-
-        // ===== Floating label helper =====
-        function createFloatingLabel(text, fromRect, toRect, extraClass) {
-            const el = document.createElement("div");
-            el.textContent = text;
-            el.className = "float-label " + (extraClass || "");
-
-            const startX = fromRect.left + fromRect.width / 2;
-            const startY = fromRect.top + fromRect.height / 2;
-            const endX = toRect.left + toRect.width / 2;
-            const endY = toRect.top + toRect.height / 2;
-
-            el.style.left = startX + "px";
-            el.style.top = startY + "px";
-
-            document.body.appendChild(el);
-
-            requestAnimationFrame(() => {
-                el.style.left = endX + "px";
-                el.style.top = endY + "px";
-                el.style.opacity = "0";
-            });
-
-            return el;
-        }
-
-        // ===== Add to history with animation (word letters highlighted) =====
-        function addToHistoryWithAnimation(plate, word, matchIndices, fromRectWord, onComplete) {
-            if (!plate || !word) {
-                if (onComplete) onComplete();
-                return;
-            }
-
-            historyEmptyEl.style.display = "none";
-
-            const row = document.createElement("tr");
-            row.className = "history-row";
-            row.style.opacity = "0";
-
-            const plateTd = document.createElement("td");
-            const wordTd = document.createElement("td");
-
-            plateTd.textContent = plate;
-
-            // For correct solved words: highlight only the letters that formed the plate sequence.
-            // For penalties (skips): matchIndices will be null, so we just use plain text.
-            if (Array.isArray(matchIndices) && matchIndices.length > 0) {
-                const set = new Set(matchIndices);
-                let html = "";
-                for (let i = 0; i < word.length; i++) {
-                    const ch = word[i];
-                    if (set.has(i)) {
-                        html += '<span class="plate-letter-highlight">' + ch + '</span>';
-                    } else {
-                        html += ch;
-                    }
-                }
-                wordTd.innerHTML = html;
-            } else {
-                wordTd.textContent = word;
-            }
-
-            row.appendChild(plateTd);
-            row.appendChild(wordTd);
-
-            if (historyBodyEl.firstChild) {
-                historyBodyEl.insertBefore(row, historyBodyEl.firstChild);
-            } else {
-                historyBodyEl.appendChild(row);
-            }
-
-            while (historyBodyEl.rows.length > 20) {
-                historyBodyEl.removeChild(historyBodyEl.lastChild);
-            }
-
-            const plateFrom = plateEl.getBoundingClientRect();
-            const wordFrom = fromRectWord || wordInputEl.getBoundingClientRect();
-            const plateTo = plateTd.getBoundingClientRect();
-            const wordTo = wordTd.getBoundingClientRect();
-
-            const plateClone = createFloatingLabel(plate, plateFrom, plateTo, "float-label-plate");
-            const wordClone = createFloatingLabel(word, wordFrom, wordTo, "float-label-word");
-
-            const animDuration = 650; // ms
-
-            setTimeout(() => {
-                row.style.opacity = "1";
-
-                if (plateClone && plateClone.parentNode) plateClone.parentNode.removeChild(plateClone);
-                if (wordClone && wordClone.parentNode) wordClone.parentNode.removeChild(wordClone);
-
-                if (typeof onComplete === "function") {
-                    onComplete();
-                }
-            }, animDuration);
-        }
-
-        // ===== Pick a random plate (with funky control) =====
-        function pickRandomPlate() {
-            if (!dictionaryReady) {
-                resultEl.textContent = "Dictionary not loaded yet.";
-                resultEl.style.color = "red";
-                return;
-            }
-
-            if (WORDS.length === 0) {
-                plateEl.textContent = "ERR";
-                resultEl.textContent = "No words available. Check words.txt.";
-                resultEl.style.color = "red";
-                return;
-            }
-
-            if (gameOver) {
-                return;
-            }
-
-            const wantFunky = Math.random() < TARGET_FUNKY_SHARE;
-
-            let sourceWords;
-            if (wantFunky && FUNKY_WORDS.length > 0) {
-                sourceWords = FUNKY_WORDS;
-            } else if (!wantFunky && NORMAL_WORDS.length > 0) {
-                sourceWords = NORMAL_WORDS;
-            } else {
-                sourceWords = WORDS;
-            }
-
-            for (let attempts = 0; attempts < 500; attempts++) {
-                const word = sourceWords[Math.floor(Math.random() * sourceWords.length)];
-                const plate = generatePlateFromWord(word);
-                if (!plate) continue;
-
-                const isFunky = plateHasFunkyLetter(plate);
-                if (wantFunky && !isFunky) continue;
-                if (!wantFunky && isFunky) continue;
-
-                currentPlate = plate;
-                plateEl.textContent = plate;
-                resultEl.textContent = "";
-                resultEl.style.color = "";
-                wordInputEl.value = "";
-                wordInputEl.focus();
-                debugEl.textContent =
-                    `Loaded ${WORDS.length.toLocaleString()} words. Funky plates target: ${(TARGET_FUNKY_SHARE * 100).toFixed(0)}%.`;
-                return;
-            }
-
-            plateEl.textContent = "ERR";
-            resultEl.textContent = "Could not generate plate.";
+            dictionaryReady = true;
+            debugEl.textContent = `Loaded ${WORDS.length.toLocaleString()} words.`;
+            maybeEnableStart();
+        } catch (err) {
+            console.error(err);
+            resultEl.textContent = "Failed to load words.txt.";
             resultEl.style.color = "red";
         }
+    }
 
-        // ===== Load dictionary and start game immediately =====
-        async function loadDictionary() {
-            try {
-                const response = await fetch("words.txt");
-                const text = await response.text();
+    async function loadDifficulty() {
+        try {
+            const res = await fetch("plate_difficulty.json");
+            PLATE_DIFFICULTY = await res.json();
+            difficultyReady = true;
+            maybeEnableStart();
+        } catch (err) {
+            console.warn("Difficulty JSON not loaded:", err);
+            PLATE_DIFFICULTY = null;
+            difficultyReady = false;
+            maybeEnableStart();
+        }
+    }
 
-                WORDS = [];
-                FUNKY_WORDS = [];
-                NORMAL_WORDS = [];
-                DICTIONARY = new Set();
+    function maybeEnableStart() {
+        if (dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null)) {
+            startButtonEl.disabled = false;
+            startButtonEl.textContent = "Start Game";
+        } else {
+            startButtonEl.disabled = true;
+            startButtonEl.textContent = "Loading...";
+        }
+    }
 
-                for (const line of text.split(/\r?\n/)) {
-                    const w = line.trim().toLowerCase();
-                    if (!w) continue;
-                    if (!/^[a-z]+$/.test(w)) continue;
-                    if (w.length < 3) continue;
+    // --------- PLATE MATCHING ---------
+    function getPlateMatchIndices(plate, word) {
+        plate = plate.toUpperCase();
+        const upperWord = word.toUpperCase();
 
-                    WORDS.push(w);
-                    DICTIONARY.add(w.toUpperCase());
+        let expectedPlateIndex = 0;
+        const matchedIndices = [];
 
-                    if (/[jqxz]/.test(w)) {
-                        FUNKY_WORDS.push(w);
-                    } else {
-                        NORMAL_WORDS.push(w);
-                    }
+        for (let i = 0; i < upperWord.length; i++) {
+            const ch = upperWord[i];
+            const posInPlate = plate.indexOf(ch);
+
+            if (posInPlate === -1) continue;
+
+            if (posInPlate === expectedPlateIndex) {
+                matchedIndices.push(i);
+                expectedPlateIndex++;
+                if (expectedPlateIndex === plate.length) {
+                    return matchedIndices;
                 }
-
-                dictionaryReady = true;
-                updateProgressDisplay();
-                pickRandomPlate();
-                // Start the game (timer) immediately once first plate is ready
-                startGame();
-            } catch (err) {
-                resultEl.textContent = "Failed to load words.txt";
-                resultEl.style.color = "red";
-                console.error(err);
+            } else if (posInPlate > expectedPlateIndex) {
+                return null; // saw a later plate letter too early
+            } else {
+                continue; // already passed this plate letter
             }
         }
+        return null;
+    }
 
-        // ===== Check guess =====
-        function checkWord() {
-            const rawWord = wordInputEl.value.trim();
-            if (!rawWord) return;
+    function wordMatchesPlate(plate, word) {
+        return getPlateMatchIndices(plate, word) !== null;
+    }
 
-            if (gameOver) {
-                resultEl.textContent = "Game over. Refresh the page to play again.";
-                resultEl.style.color = "red";
-                return;
-            }
+    // --------- PLATE GENERATION ---------
+    function plateHasFunkyLetter(plate) {
+        return /[JQXZ]/.test(plate);
+    }
 
-            if (!DICTIONARY.has(rawWord.toUpperCase())) {
-                resultEl.textContent = `❌ "${rawWord}" is not in the dictionary.`;
-                resultEl.style.color = "red";
-                return;
-            }
+    function generatePlateFromWord(word) {
+        const upper = word.toUpperCase();
+        const len = upper.length;
+        if (len < 3) return null;
 
-            const matchIndices = getPlateMatchIndices(currentPlate, rawWord);
-            if (!matchIndices) {
-                resultEl.textContent = `❌ "${rawWord}" does not match the plate order.`;
-                resultEl.style.color = "red";
-                return;
-            }
+        for (let attempt = 0; attempt < 40; attempt++) {
+            const i = Math.floor(Math.random() * (len - 2));
+            const j = i + 1 + Math.floor(Math.random() * (len - i - 2));
+            const k = j + 1 + Math.floor(Math.random() * (len - j - 1));
 
-            // Correct!
-            solvedCount++;
-            updateProgressDisplay();
+            const a = upper[i], b = upper[j], c = upper[k];
+            if (a === b || a === c || b === c) continue;
 
-            resultEl.textContent = `✅ Correct! "${rawWord}" matches ${currentPlate}.`;
-            resultEl.style.color = "green";
+            const plate = a + b + c;
 
-            const plate = currentPlate;
-            const word = rawWord.toLowerCase();
+            // skip plates that are exact words
+            if (DICTIONARY.has(plate)) continue;
 
-            addToHistoryWithAnimation(plate, word, matchIndices, null, () => {
-                if (solvedCount >= TOTAL_PLATES) {
-                    endGame();
-                } else {
-                    pickRandomPlate();
-                }
-            });
+            if (!wordMatchesPlate(plate, upper)) continue;
+
+            return plate;
+        }
+        return null;
+    }
+
+    function pickRandomPlate() {
+        if (!dictionaryReady) {
+            resultEl.textContent = "Dictionary still loading...";
+            resultEl.style.color = "red";
+            return;
+        }
+        if (gameOver || !gameStarted) {
+            return;
         }
 
-        // ===== Skip handler (adds +10s and logs skip) =====
-        function handleSkip() {
-            if (gameOver) {
-                resultEl.textContent = "Game over. Refresh the page to play again.";
-                resultEl.style.color = "red";
-                return;
-            }
-
-            if (!currentPlate) return;
-
-            penaltySeconds += 10;
-            resultEl.textContent = `⏩ Skipped ${currentPlate}. +10s penalty.`;
-            resultEl.style.color = "orange";
-
-            const plate = currentPlate;
-            const penaltyLabel = "+10s (skipped)";
-            const skipButtonRect = document.getElementById("newPlateButton").getBoundingClientRect();
-
-            // No matchIndices for penalty rows (so word is plain text)
-            addToHistoryWithAnimation(plate, penaltyLabel, null, skipButtonRect, () => {
-                pickRandomPlate();
-            });
+        if (WORDS.length === 0) {
+            plateEl.textContent = "ERR";
+            resultEl.textContent = "No words available.";
+            resultEl.style.color = "red";
+            return;
         }
 
-        // ===== Event listeners =====
-        document.getElementById("checkButton").onclick = checkWord;
-        document.getElementById("newPlateButton").onclick = handleSkip;
+        const wantFunky = Math.random() < TARGET_FUNKY_SHARE;
+        let sourceWords;
 
-        wordInputEl.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") checkWord();
+        if (wantFunky && FUNKY_WORDS.length > 0) {
+            sourceWords = FUNKY_WORDS;
+        } else if (!wantFunky && NORMAL_WORDS.length > 0) {
+            sourceWords = NORMAL_WORDS;
+        } else {
+            sourceWords = WORDS;
+        }
+
+        for (let attempts = 0; attempts < 500; attempts++) {
+            const word = sourceWords[Math.floor(Math.random() * sourceWords.length)];
+            const plate = generatePlateFromWord(word);
+            if (!plate) continue;
+
+            const isFunky = plateHasFunkyLetter(plate);
+            if (wantFunky && !isFunky) continue;
+            if (!wantFunky && isFunky) continue;
+
+            currentPlate = plate;
+            plateEl.textContent = plate;
+            resultEl.textContent = "";
+            resultEl.style.color = "";
+
+            updateDifficultyDisplay(plate);
+            wordInputEl.value = "";
+            wordInputEl.focus();
+            return;
+        }
+
+        plateEl.textContent = "ERR";
+        resultEl.textContent = "Could not generate plate.";
+        resultEl.style.color = "red";
+    }
+
+    // --------- DIFFICULTY DISPLAY ---------
+    function classifyDifficulty(score) {
+        if (score >= 80) return "diff-hard";
+        if (score >= 40) return "diff-med";
+        return "diff-easy";
+    }
+
+    function updateDifficultyDisplay(plate) {
+        if (!PLATE_DIFFICULTY || !PLATE_DIFFICULTY[plate]) {
+            difficultyLabelEl.textContent = "Difficulty: —";
+            difficultyLabelEl.className = "difficulty diff-med";
+            return;
+        }
+
+        const diff = PLATE_DIFFICULTY[plate].difficulty;
+        if (!diff || diff <= 0) {
+            difficultyLabelEl.textContent = "Difficulty: —";
+            difficultyLabelEl.className = "difficulty diff-med";
+            return;
+        }
+
+        difficultyLabelEl.textContent = `Difficulty: ${diff} / 100`;
+        difficultyLabelEl.className = "difficulty " + classifyDifficulty(diff);
+    }
+
+    function getPlateDifficultyScore(plate) {
+        if (!PLATE_DIFFICULTY || !PLATE_DIFFICULTY[plate]) return null;
+        const d = PLATE_DIFFICULTY[plate].difficulty;
+        if (!d || d <= 0) return null;
+        return d;
+    }
+
+    // --------- TIMER / GAME STATE ---------
+    function updateProgressDisplay() {
+        progressDisplayEl.textContent = `Solved: ${solvedCount} / ${TOTAL_PLATES}`;
+    }
+
+    function resetGameState() {
+        gameStarted = false;
+        gameOver = false;
+        solvedCount = 0;
+        startTime = null;
+        penaltySeconds = 0;
+        if (timerIntervalId) clearInterval(timerIntervalId);
+        timerIntervalId = null;
+
+        plateEl.textContent = "---";
+        difficultyLabelEl.textContent = "Difficulty: —";
+        difficultyLabelEl.className = "difficulty diff-med";
+        timerDisplayEl.textContent = "Time: 0.0 s";
+        updateProgressDisplay();
+        resultEl.textContent = "";
+        wordInputEl.value = "";
+
+        // clear history
+        while (historyBodyEl.firstChild) {
+            historyBodyEl.removeChild(historyBodyEl.firstChild);
+        }
+        historyEmptyEl.style.display = "block";
+    }
+
+    function startGame() {
+        if (!dictionaryReady) {
+            resultEl.textContent = "Still loading dictionary...";
+            resultEl.style.color = "red";
+            return;
+        }
+        if (!difficultyReady && PLATE_DIFFICULTY !== null) {
+            resultEl.textContent = "Still loading difficulty data...";
+            resultEl.style.color = "red";
+            return;
+        }
+
+        resetGameState();
+        gameStarted = true;
+        gameOver = false;
+        startTime = performance.now();
+        timerIntervalId = setInterval(updateTimer, 100);
+        updateProgressDisplay();
+        pickRandomPlate();
+    }
+
+    function updateTimer() {
+        if (!gameStarted || !startTime) return;
+        const baseElapsedSec = (performance.now() - startTime) / 1000;
+        const totalSec = baseElapsedSec + penaltySeconds;
+        timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
+    }
+
+    function endGame() {
+        if (gameOver) return;
+        gameOver = true;
+        gameStarted = false;
+        if (!startTime) return;
+
+        const baseElapsedSec = (performance.now() - startTime) / 1000;
+        const totalSec = baseElapsedSec + penaltySeconds;
+
+        if (timerIntervalId) {
+            clearInterval(timerIntervalId);
+            timerIntervalId = null;
+        }
+
+        resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
+        resultEl.style.color = "green";
+        wordInputEl.blur();
+    }
+
+    // --------- FLOATING LABELS & HISTORY ---------
+    function createFloatingLabel(text, fromRect, toRect, extraClass) {
+        const el = document.createElement("div");
+        el.textContent = text;
+        el.className = "float-label " + (extraClass || "");
+
+        const startX = fromRect.left + fromRect.width / 2;
+        const startY = fromRect.top + fromRect.height / 2;
+        const endX = toRect.left + toRect.width / 2;
+        const endY = toRect.top + toRect.height / 2;
+
+        el.style.left = startX + "px";
+        el.style.top = startY + "px";
+
+        document.body.appendChild(el);
+
+        requestAnimationFrame(() => {
+            el.style.left = endX + "px";
+            el.style.top = endY + "px";
+            el.style.opacity = "0";
         });
 
-        // ===== Start =====
-        loadDictionary();
-    </script>
+        return el;
+    }
+
+    function addToHistoryWithAnimation(plate, word, matchIndices, fromRectWord, diffScore, onComplete) {
+        if (!plate || !word) {
+            if (onComplete) onComplete();
+            return;
+        }
+
+        historyEmptyEl.style.display = "none";
+
+        const row = document.createElement("tr");
+        row.style.opacity = "0";
+
+        const plateTd = document.createElement("td");
+        const wordTd = document.createElement("td");
+        const diffTd = document.createElement("td");
+
+        plateTd.textContent = plate;
+
+        if (Array.isArray(matchIndices) && matchIndices.length > 0) {
+            const set = new Set(matchIndices);
+            let html = "";
+            for (let i = 0; i < word.length; i++) {
+                const ch = word[i];
+                if (set.has(i)) {
+                    html += `<span class="plate-letter-highlight">${ch}</span>`;
+                } else {
+                    html += ch;
+                }
+            }
+            wordTd.innerHTML = html;
+        } else {
+            wordTd.textContent = word;
+        }
+
+        if (diffScore === null || diffScore <= 0) {
+            diffTd.textContent = "—";
+        } else {
+            diffTd.textContent = diffScore;
+            diffTd.className = classifyDifficulty(diffScore);
+        }
+
+        row.appendChild(plateTd);
+        row.appendChild(wordTd);
+        row.appendChild(diffTd);
+
+        // insert at top
+        if (historyBodyEl.firstChild) {
+            historyBodyEl.insertBefore(row, historyBodyEl.firstChild);
+        } else {
+            historyBodyEl.appendChild(row);
+        }
+
+        // keep table reasonably short
+        while (historyBodyEl.rows.length > 30) {
+            historyBodyEl.removeChild(historyBodyEl.lastChild);
+        }
+
+        const plateFrom = plateEl.getBoundingClientRect();
+        const wordFrom = fromRectWord || wordInputEl.getBoundingClientRect();
+        const plateTo = plateTd.getBoundingClientRect();
+        const wordTo = wordTd.getBoundingClientRect();
+        const diffTo = diffTd.getBoundingClientRect();
+
+        const plateClone = createFloatingLabel(plate, plateFrom, plateTo, "float-label-plate");
+        const wordClone = createFloatingLabel(word, wordFrom, wordTo, "float-label-word");
+        const diffText = (diffScore === null || diffScore <= 0) ? "—" : String(diffScore);
+        const diffClone = createFloatingLabel(diffText, plateFrom, diffTo, "float-label-diff");
+
+        const animDuration = 650;
+
+        setTimeout(() => {
+            row.style.opacity = "1";
+
+            [plateClone, wordClone, diffClone].forEach(clone => {
+                if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+            });
+
+            if (typeof onComplete === "function") {
+                onComplete();
+            }
+        }, animDuration);
+    }
+
+    // --------- ACTIONS ---------
+    function checkWord() {
+        const rawWord = wordInputEl.value.trim();
+        if (!rawWord) return;
+
+        if (!gameStarted) {
+            resultEl.textContent = "Press Start to begin the game.";
+            resultEl.style.color = "red";
+            return;
+        }
+        if (gameOver) {
+            resultEl.textContent = "Game over. Press Start to play again.";
+            resultEl.style.color = "red";
+            return;
+        }
+
+        if (!DICTIONARY.has(rawWord.toUpperCase())) {
+            resultEl.textContent = `❌ "${rawWord}" is not in the dictionary.`;
+            resultEl.style.color = "red";
+            return;
+        }
+
+        const matchIndices = getPlateMatchIndices(currentPlate, rawWord);
+        if (!matchIndices) {
+            resultEl.textContent = `❌ "${rawWord}" does not match ${currentPlate}.`;
+            resultEl.style.color = "red";
+            return;
+        }
+
+        // Correct
+        solvedCount++;
+        updateProgressDisplay();
+
+        resultEl.textContent = `✅ "${rawWord}" matches ${currentPlate}.`;
+        resultEl.style.color = "green";
+
+        const plate = currentPlate;
+        const word = rawWord.toLowerCase();
+        const diffScore = getPlateDifficultyScore(plate);
+
+        addToHistoryWithAnimation(plate, word, matchIndices, null, diffScore, () => {
+            if (solvedCount >= TOTAL_PLATES) {
+                endGame();
+            } else {
+                pickRandomPlate();
+            }
+        });
+    }
+
+    function handleSkip() {
+        if (!gameStarted) {
+            resultEl.textContent = "Press Start to begin the game.";
+            resultEl.style.color = "red";
+            return;
+        }
+        if (gameOver) {
+            resultEl.textContent = "Game over. Press Start to play again.";
+            resultEl.style.color = "red";
+            return;
+        }
+        if (!currentPlate) return;
+
+        penaltySeconds += 10;
+        resultEl.textContent = `⏩ Skipped ${currentPlate}. +10s penalty.`;
+        resultEl.style.color = "orange";
+
+        const plate = currentPlate;
+        const penaltyLabel = "+10s (skipped)";
+        const diffScore = getPlateDifficultyScore(plate);
+        const skipRect = skipButtonEl.getBoundingClientRect();
+
+        addToHistoryWithAnimation(plate, penaltyLabel, null, skipRect, diffScore, () => {
+            pickRandomPlate();
+        });
+    }
+
+    // --------- INIT ---------
+    startButtonEl.disabled = true;
+    startButtonEl.textContent = "Loading...";
+
+    startButtonEl.addEventListener("click", startGame);
+    checkButtonEl.addEventListener("click", checkWord);
+    skipButtonEl.addEventListener("click", handleSkip);
+
+    wordInputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            checkWord();
+        }
+    });
+
+    // Load data on startup
+    loadDictionary();
+    loadDifficulty();
+</script>
+
 </body>
 </html>
