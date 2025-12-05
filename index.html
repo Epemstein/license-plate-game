@@ -278,7 +278,7 @@
 </head>
 <body>
 
-<h1>License Plate Game – Time Trial v12</h1>
+<h1>License Plate Game – Time Trial</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -396,6 +396,7 @@
     let timerIntervalId = null;
 
     let skipCount = 0; // track number of skips
+    let plateLocked = false; // prevent double submit / double skip on same plate
 
     let gameModalMode = "start"; // "start" or "end"
 
@@ -612,6 +613,12 @@
             resultEl.textContent = "";
             resultEl.style.color = "";
 
+            plateLocked = false; // unlock for this new plate
+            checkButtonEl.disabled = false;
+            skipButtonEl.disabled = false;
+            wordInputEl.disabled = false;
+            wordInputEl.readOnly = false;
+
             updateDifficultyDisplay(plate);
             wordInputEl.value = "";
             wordInputEl.focus();
@@ -690,6 +697,7 @@
         startTime = null;
         penaltySeconds = 0;
         skipCount = 0;
+        plateLocked = false;
         updateSkipButtonLabel();
 
         if (timerIntervalId) clearInterval(timerIntervalId);
@@ -704,6 +712,11 @@
         resultEl.textContent = "";
         resultEl.style.color = "";
         wordInputEl.value = "";
+
+        checkButtonEl.disabled = false;
+        skipButtonEl.disabled = false;
+        wordInputEl.disabled = false;
+        wordInputEl.readOnly = false;
 
         while (historyBodyEl.firstChild) {
             historyBodyEl.removeChild(historyBodyEl.firstChild);
@@ -742,6 +755,8 @@
         if (gameOver) return;
         gameOver = true;
         gameStarted = false;
+        plateLocked = true;
+
         if (!startTime) return;
 
         const baseElapsedSec = (performance.now() - startTime) / 1000;
@@ -755,6 +770,12 @@
         resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
         resultEl.style.color = "green";
         wordInputEl.blur();
+
+        // disable controls at end of run
+        checkButtonEl.disabled = true;
+        skipButtonEl.disabled = true;
+        wordInputEl.disabled = true;
+        wordInputEl.readOnly = true;
 
         openEndModal(totalSec);
         showPlayAgainButton();
@@ -996,6 +1017,10 @@
             resultEl.style.color = "red";
             return;
         }
+        if (plateLocked) {
+            // This plate is already being resolved or has been resolved
+            return;
+        }
 
         if (!DICTIONARY.has(rawWord.toUpperCase())) {
             resultEl.textContent = `❌ "${rawWord}" is not in the dictionary.`;
@@ -1009,6 +1034,12 @@
             resultEl.style.color = "red";
             return;
         }
+
+        // Lock this plate so Enter spam can't double-submit
+        plateLocked = true;
+        checkButtonEl.disabled = true;
+        skipButtonEl.disabled = true;
+        wordInputEl.readOnly = true;
 
         solvedCount++;
         updateProgressDisplay();
@@ -1024,7 +1055,7 @@
             if (solvedCount >= TOTAL_PLATES) {
                 endGame();
             } else {
-                pickRandomPlate();
+                pickRandomPlate(); // unlock happens inside pickRandomPlate()
             }
         });
     }
@@ -1041,6 +1072,16 @@
             return;
         }
         if (!currentPlate) return;
+        if (plateLocked) {
+            // Already skipping / resolving this plate
+            return;
+        }
+
+        // Lock this plate so skip can't be spammed
+        plateLocked = true;
+        checkButtonEl.disabled = true;
+        skipButtonEl.disabled = true;
+        wordInputEl.readOnly = true;
 
         // Escalating penalty: 5s, 10s, 15s, ...
         skipCount += 1;
@@ -1056,10 +1097,9 @@
         const skipRect = skipButtonEl.getBoundingClientRect();
 
         addToHistoryWithAnimation(plate, penaltyLabel, null, skipRect, diffScore, () => {
-            pickRandomPlate();
+            updateSkipButtonLabel();
+            pickRandomPlate(); // unlock & re-enable happens there
         });
-
-        updateSkipButtonLabel();
     }
 
     // --------- INIT ---------
