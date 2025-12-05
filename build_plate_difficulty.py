@@ -51,10 +51,6 @@ def build_counts(words):
 
                     plate = a + b + c
 
-                    # Skip plates that are actual dictionary words
-                    if plate in dict_words:
-                        continue
-
                     counts[plate] += 1
 
         if (idx + 1) % 10000 == 0:
