@@ -1,93 +1,108 @@
 import json
-import math
-from tqdm import tqdm
+from collections import Counter
+import bisect
 
-# --------------------------------------------
-# Load dictionary
-# --------------------------------------------
-with open("words.txt", "r") as f:
-    words = [w.strip().lower() for w in f.readlines() if w.strip()]
-
-# Only keep clean words (a–z only, length >= 3)
-words = [w for w in words if w.isalpha() and len(w) >= 3]
-
-print(f"Loaded {len(words)} words.")
+WORDS_FILE = "words.txt"
+OUT_FILE = "plate_difficulty.json"
 
 
-# --------------------------------------------
-# Helper: check if a word matches a plate (SPA rule)
-# --------------------------------------------
-def matches_plate(plate, word):
-    plate = plate.upper()
-    word = word.upper()
-    pi = 0
-
-    for i, ch in enumerate(word):
-        if ch == plate[pi]:
-            pi += 1
-            if pi == 3:
-                return True
-        elif ch in plate[pi+1:]:
-            # Found a later plate letter too early → invalid
-            return False
-
-    return False
+def load_words():
+    words = []
+    with open(WORDS_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            w = line.strip().lower()
+            if not w:
+                continue
+            if not w.isalpha():
+                continue
+            if len(w) < 3:
+                continue
+            words.append(w)
+    print(f"Loaded {len(words)} words.")
+    return words
 
 
-# --------------------------------------------
-# Generate all 15,600 plate combinations (distinct letters)
-# --------------------------------------------
-letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-plates = []
+def build_counts(words):
+    """
+    Instead of looping over all plates for each word (very slow),
+    we loop over words and generate all possible 3-letter plates
+    that can come from that word (combinations of positions).
+    """
+    counts = Counter()
+    dict_words = {w.upper() for w in words}
 
-for a in letters:
-    for b in letters:
-        if b == a: continue
-        for c in letters:
-            if c == a or c == b: continue
-            plates.append(a + b + c)
+    for idx, w in enumerate(words):
+        upper = w.upper()
+        L = len(upper)
+        if L < 3:
+            continue
 
-print(f"Generated {len(plates)} possible plates.")
+        # Generate all i<j<k combinations of positions
+        for i in range(L - 2):
+            a = upper[i]
+            for j in range(i + 1, L - 1):
+                b = upper[j]
+                for k in range(j + 1, L):
+                    c = upper[k]
 
+                    # Skip plates with repeated letters
+                    if a == b or a == c or b == c:
+                        continue
 
-# --------------------------------------------
-# Compute match counts for each plate
-# --------------------------------------------
-results = {}
+                    plate = a + b + c
 
-print("Computing word counts for each plate...")
-for plate in tqdm(plates):
-    count = 0
-    for w in words:
-        if matches_plate(plate, w):
-            count += 1
-    results[plate] = count
+                    # Skip plates that are actual dictionary words
+                    if plate in dict_words:
+                        continue
 
+                    counts[plate] += 1
 
-# --------------------------------------------
-# Compute percentiles
-# --------------------------------------------
-counts = sorted(results.values())
-n = len(counts)
+        if (idx + 1) % 10000 == 0:
+            print(f"Processed {idx + 1} words...")
 
-def percentile(x):
-    # position of x among all counts
-    rank = counts.index(x)
-    return rank / (n - 1)
+    print(f"Computed counts for {len(counts)} distinct plates with at least one match.")
+    return counts
 
 
-difficulty = {
-    plate: {
-        "count": results[plate],
-        "percentile": percentile(results[plate])
-    }
-    for plate in plates
-}
+def main():
+    words = load_words()
+    counts = build_counts(words)
 
-# --------------------------------------------
-# Save to JSON
-# --------------------------------------------
-with open("plate_difficulty.json", "w") as f:
-    json.dump(difficulty, f, indent=2)
+    # Generate ALL 3-letter plates with distinct letters (26*25*24 = 15,600)
+    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    all_plates = []
+    for a in letters:
+        for b in letters:
+            if b == a:
+                continue
+            for c in letters:
+                if c == a or c == b:
+                    continue
+                all_plates.append(a + b + c)
 
-print("Saved plate_difficulty.json!")
+    # Build a sorted list of all counts (including zeros) to get percentiles
+    all_values = [counts.get(p, 0) for p in all_plates]
+    sorted_vals = sorted(all_values)
+    n = len(sorted_vals)
+
+    def percentile_for_count(x):
+        # Percentile based on where x falls in sorted list
+        pos = bisect.bisect_left(sorted_vals, x)
+        if n <= 1:
+            return 0.0
+        return pos / (n - 1)
+
+    data = {}
+    for p in all_plates:
+        c = counts.get(p, 0)
+        pct = percentile_for_count(c)
+        data[p] = {"count": c, "percentile": pct}
+
+    with open(OUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    print(f"Wrote {OUT_FILE} with {len(data)} plates.")
+
+
+if __name__ == "__main__":
+    main()
