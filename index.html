@@ -91,7 +91,7 @@
             cursor: default;
         }
 
-        /* hide in-page start button, we only use the modal */
+        /* hidden initially; shown after a run as "Play again" */
         #startButton {
             display: none;
         }
@@ -196,7 +196,7 @@
             font-weight: 700;
         }
 
-        /* Modal base styles (used for both game + words modals) */
+        /* Modal base styles */
         .modal-backdrop {
             position: fixed;
             inset: 0;
@@ -247,6 +247,9 @@
             padding: 8px 14px;
             border-top: 1px solid #e5e7eb;
             text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
         }
 
         .modal-close-btn {
@@ -275,7 +278,7 @@
 </head>
 <body>
 
-<h1>License Plate Game – Time Trial</h1>
+<h1>License Plate Game – Time Trial v12</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -297,7 +300,7 @@
         </div>
 
         <div class="controls">
-            <button id="startButton">Loading...</button>
+            <button id="startButton">Play again</button>
             <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
             <button id="checkButton">Check</button>
             <button id="skipButton">Skip +5s</button>
@@ -342,6 +345,7 @@
             <!-- Filled dynamically -->
         </div>
         <div class="modal-footer">
+            <button id="gameModalSecondaryBtn" style="display:none;">See results</button>
             <button id="gameModalPrimaryBtn">Start Game</button>
         </div>
     </div>
@@ -415,6 +419,7 @@
     const gameModalTitleEl = document.getElementById("gameModalTitle");
     const gameModalBodyEl = document.getElementById("gameModalBody");
     const gameModalPrimaryBtnEl = document.getElementById("gameModalPrimaryBtn");
+    const gameModalSecondaryBtnEl = document.getElementById("gameModalSecondaryBtn");
     const gameModalCloseBtnEl = document.getElementById("gameModalCloseBtn");
 
     // Words modal refs
@@ -481,7 +486,6 @@
         const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
 
         startButtonEl.disabled = !ready;
-        startButtonEl.textContent = ready ? "Start Game" : "Loading...";
 
         if (gameModalMode === "start") {
             gameModalPrimaryBtnEl.disabled = !ready;
@@ -669,6 +673,16 @@
         skipButtonEl.textContent = `Skip +${nextPenalty}s`;
     }
 
+    function showPlayAgainButton() {
+        startButtonEl.style.display = "inline-block";
+        startButtonEl.textContent = "Play again";
+        startButtonEl.disabled = false;
+    }
+
+    function hidePlayAgainButton() {
+        startButtonEl.style.display = "none";
+    }
+
     function resetGameState() {
         gameStarted = false;
         gameOver = false;
@@ -706,6 +720,7 @@
         }
 
         closeGameModal();
+        hidePlayAgainButton();
 
         resetGameState();
         gameStarted = true;
@@ -742,6 +757,7 @@
         wordInputEl.blur();
 
         openEndModal(totalSec);
+        showPlayAgainButton();
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -936,6 +952,9 @@
         gameModalPrimaryBtnEl.disabled = !ready;
         gameModalPrimaryBtnEl.textContent = ready ? "Start Game" : "Loading...";
 
+        // In start mode there is no "See results"
+        gameModalSecondaryBtnEl.style.display = "none";
+
         gameModalBackdropEl.classList.add("show");
     }
 
@@ -947,8 +966,13 @@
             <strong>${finalTimeSec.toFixed(1)} seconds</strong> (including skip penalties).</p>
             <p>Want to go again and try to beat your time?</p>
         `;
+
         gameModalPrimaryBtnEl.disabled = false;
         gameModalPrimaryBtnEl.textContent = "Play again";
+
+        // In end mode we show "See results"
+        gameModalSecondaryBtnEl.style.display = "inline-block";
+        gameModalSecondaryBtnEl.textContent = "See results";
 
         gameModalBackdropEl.classList.add("show");
     }
@@ -1040,10 +1064,10 @@
 
     // --------- INIT ---------
     startButtonEl.disabled = true;
-    startButtonEl.textContent = "Loading...";
+    hidePlayAgainButton(); // hidden until a run finishes
     updateSkipButtonLabel();
 
-    startButtonEl.addEventListener("click", startGame); // hidden but harmless
+    startButtonEl.addEventListener("click", startGame);
     checkButtonEl.addEventListener("click", checkWord);
     skipButtonEl.addEventListener("click", handleSkip);
 
@@ -1067,6 +1091,11 @@
         } else if (gameModalMode === "end") {
             startGame();
         }
+    });
+
+    gameModalSecondaryBtnEl.addEventListener("click", () => {
+        // "See results" just closes modal; results remain visible; Play again button is already on page
+        closeGameModal();
     });
 
     gameModalCloseBtnEl.addEventListener("click", () => {
