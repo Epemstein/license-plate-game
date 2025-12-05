@@ -91,6 +91,11 @@
             cursor: default;
         }
 
+        /* hide in-page start button, we only use the modal */
+        #startButton {
+            display: none;
+        }
+
         #result {
             margin-top: 10px;
             font-weight: 600;
@@ -191,7 +196,7 @@
             font-weight: 700;
         }
 
-        /* Modal for viable words */
+        /* Modal base styles (used for both game + words modals) */
         .modal-backdrop {
             position: fixed;
             inset: 0;
@@ -256,10 +261,6 @@
             white-space: normal;
         }
 
-        .words-list span {
-            /* we now use per-line wrapper, so no margin needed here */
-        }
-
         .words-list-item {
             display: block;
             margin-bottom: 2px;
@@ -274,13 +275,13 @@
 </head>
 <body>
 
-<h1>License Plate Game – Time Trial v2</h1>
+<h1>License Plate Game – Time Trial</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
     <div class="left-panel">
         <p>
-            Press <strong>Start</strong> to begin. Solve <strong>10 plates</strong> as fast as you can.<br>
+            Solve <strong>10 plates</strong> as fast as you can.<br>
             The plate letters must appear in your word in order (not necessarily consecutively).
         </p>
 
@@ -326,6 +327,22 @@
         </table>
         <div id="historyEmpty" class="history-empty">
             No solved plates yet.
+        </div>
+    </div>
+</div>
+
+<!-- GAME START / END MODAL -->
+<div id="gameModalBackdrop" class="modal-backdrop">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="gameModalTitle">License Plate Game</div>
+            <button class="modal-close-btn" id="gameModalCloseBtn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="gameModalBody">
+            <!-- Filled dynamically -->
+        </div>
+        <div class="modal-footer">
+            <button id="gameModalPrimaryBtn">Start Game</button>
         </div>
     </div>
 </div>
@@ -376,6 +393,8 @@
 
     let skipCount = 0; // track number of skips
 
+    let gameModalMode = "start"; // "start" or "end"
+
     // DOM refs
     const plateEl = document.getElementById("plate");
     const difficultyLabelEl = document.getElementById("difficultyLabel");
@@ -391,7 +410,14 @@
     const checkButtonEl = document.getElementById("checkButton");
     const skipButtonEl = document.getElementById("skipButton");
 
-    // Modal refs
+    // Game modal refs
+    const gameModalBackdropEl = document.getElementById("gameModalBackdrop");
+    const gameModalTitleEl = document.getElementById("gameModalTitle");
+    const gameModalBodyEl = document.getElementById("gameModalBody");
+    const gameModalPrimaryBtnEl = document.getElementById("gameModalPrimaryBtn");
+    const gameModalCloseBtnEl = document.getElementById("gameModalCloseBtn");
+
+    // Words modal refs
     const wordsModalBackdropEl = document.getElementById("wordsModalBackdrop");
     const wordsModalTitleEl = document.getElementById("wordsModalTitle");
     const wordsModalStatusEl = document.getElementById("wordsModalStatus");
@@ -452,12 +478,14 @@
     }
 
     function maybeEnableStart() {
-        if (dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null)) {
-            startButtonEl.disabled = false;
-            startButtonEl.textContent = "Start Game";
-        } else {
-            startButtonEl.disabled = true;
-            startButtonEl.textContent = "Loading...";
+        const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
+
+        startButtonEl.disabled = !ready;
+        startButtonEl.textContent = ready ? "Start Game" : "Loading...";
+
+        if (gameModalMode === "start") {
+            gameModalPrimaryBtnEl.disabled = !ready;
+            gameModalPrimaryBtnEl.textContent = ready ? "Start Game" : "Loading...";
         }
     }
 
@@ -496,7 +524,7 @@
         return getPlateMatchIndices(plate, word) !== null;
     }
 
-    // --------- JS-BASED VIABLE COUNT (for label and sanity) ---------
+    // --------- JS-BASED VIABLE COUNT ---------
     function computeJsViableCount(plate) {
         if (!dictionaryReady || !plate) return 0;
         let count = 0;
@@ -615,7 +643,7 @@
             }
         }
 
-        // Viable word count from JS (strict game logic)
+        // Viable word count from JS
         if (!dictionaryReady || !plate) {
             viableCountLabelEl.textContent = "";
         } else {
@@ -647,7 +675,7 @@
         solvedCount = 0;
         startTime = null;
         penaltySeconds = 0;
-        skipCount = 0; // reset skip counter
+        skipCount = 0;
         updateSkipButtonLabel();
 
         if (timerIntervalId) clearInterval(timerIntervalId);
@@ -670,16 +698,14 @@
     }
 
     function startGame() {
-        if (!dictionaryReady) {
-            resultEl.textContent = "Still loading dictionary...";
+        const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
+        if (!ready) {
+            resultEl.textContent = "Still loading…";
             resultEl.style.color = "red";
             return;
         }
-        if (!difficultyReady && PLATE_DIFFICULTY !== null) {
-            resultEl.textContent = "Still loading difficulty data...";
-            resultEl.style.color = "red";
-            return;
-        }
+
+        closeGameModal();
 
         resetGameState();
         gameStarted = true;
@@ -714,6 +740,8 @@
         resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
         resultEl.style.color = "green";
         wordInputEl.blur();
+
+        openEndModal(totalSec);
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -803,7 +831,6 @@
             historyBodyEl.removeChild(historyBodyEl.lastChild);
         }
 
-        // Make plate clickable for popup
         addPlateCellClickHandler(plateTd, plate);
 
         const plateFrom = plateEl.getBoundingClientRect();
@@ -832,7 +859,7 @@
         }, animDuration);
     }
 
-    // --------- MODAL: SHOW ALL VIABLE WORDS FOR A PLATE ---------
+    // --------- MODAL: ALL VIABLE WORDS ---------
     function openWordsModal(plate) {
         if (!dictionaryReady) return;
 
@@ -842,7 +869,6 @@
 
         wordsModalBackdropEl.classList.add("show");
 
-        // Compute matches using STRICT game logic
         const matches = [];
         for (const w of WORDS) {
             if (wordMatchesPlate(plate, w)) {
@@ -861,7 +887,6 @@
             return;
         }
 
-        // Build one line per word, with plate letters highlighted
         const frag = document.createDocumentFragment();
         for (const w of matches) {
             const line = document.createElement("div");
@@ -892,6 +917,46 @@
         wordsModalBackdropEl.classList.remove("show");
     }
 
+    // --------- GAME MODAL (START / END) ---------
+    function openStartModal() {
+        gameModalMode = "start";
+        gameModalTitleEl.textContent = "License Plate Game – Time Trial";
+        gameModalBodyEl.innerHTML = `
+            <p><strong>How it works:</strong></p>
+            <ul>
+                <li>You will get <strong>${TOTAL_PLATES}</strong> random license plates, one after another.</li>
+                <li>Your goal is to enter a word that contains the three plate letters <em>in order</em> (not necessarily consecutively).</li>
+                <li>Example: plate <strong>PMS</strong> – <strong>promise</strong> works, but <strong>spams</strong> does not (the S appears before the M).</li>
+                <li>You can press <strong>Skip</strong>, but it adds an increasing time penalty: +5s, then +10s, +15s, ...</li>
+                <li>Click any solved plate in the table to see <strong>all</strong> viable words for that plate.</li>
+            </ul>
+        `;
+
+        const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
+        gameModalPrimaryBtnEl.disabled = !ready;
+        gameModalPrimaryBtnEl.textContent = ready ? "Start Game" : "Loading...";
+
+        gameModalBackdropEl.classList.add("show");
+    }
+
+    function openEndModal(finalTimeSec) {
+        gameModalMode = "end";
+        gameModalTitleEl.textContent = "Run complete!";
+        gameModalBodyEl.innerHTML = `
+            <p>You solved <strong>${TOTAL_PLATES}</strong> plates in
+            <strong>${finalTimeSec.toFixed(1)} seconds</strong> (including skip penalties).</p>
+            <p>Want to go again and try to beat your time?</p>
+        `;
+        gameModalPrimaryBtnEl.disabled = false;
+        gameModalPrimaryBtnEl.textContent = "Play again";
+
+        gameModalBackdropEl.classList.add("show");
+    }
+
+    function closeGameModal() {
+        gameModalBackdropEl.classList.remove("show");
+    }
+
     // --------- ACTIONS ---------
     function checkWord() {
         const rawWord = wordInputEl.value.trim();
@@ -903,7 +968,7 @@
             return;
         }
         if (gameOver) {
-            resultEl.textContent = "Game over. Press Start to play again.";
+            resultEl.textContent = "Game over. Press Play again to restart.";
             resultEl.style.color = "red";
             return;
         }
@@ -947,7 +1012,7 @@
             return;
         }
         if (gameOver) {
-            resultEl.textContent = "Game over. Press Start to play again.";
+            resultEl.textContent = "Game over. Press Play again to restart.";
             resultEl.style.color = "red";
             return;
         }
@@ -970,7 +1035,6 @@
             pickRandomPlate();
         });
 
-        // Update button label for next skip
         updateSkipButtonLabel();
     }
 
@@ -979,7 +1043,7 @@
     startButtonEl.textContent = "Loading...";
     updateSkipButtonLabel();
 
-    startButtonEl.addEventListener("click", startGame);
+    startButtonEl.addEventListener("click", startGame); // hidden but harmless
     checkButtonEl.addEventListener("click", checkWord);
     skipButtonEl.addEventListener("click", handleSkip);
 
@@ -997,8 +1061,27 @@
         }
     });
 
+    gameModalPrimaryBtnEl.addEventListener("click", () => {
+        if (gameModalMode === "start") {
+            startGame();
+        } else if (gameModalMode === "end") {
+            startGame();
+        }
+    });
+
+    gameModalCloseBtnEl.addEventListener("click", () => {
+        closeGameModal();
+    });
+
+    gameModalBackdropEl.addEventListener("click", (e) => {
+        if (e.target === gameModalBackdropEl) {
+            closeGameModal();
+        }
+    });
+
     loadDictionary();
     loadDifficulty();
+    openStartModal();
 </script>
 
 </body>
