@@ -147,6 +147,16 @@
             font-weight: 700;
         }
 
+        .clickable-plate {
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+
+        .clickable-plate:hover {
+            text-decoration-style: solid;
+        }
+
         /* Floating labels */
         .float-label {
             position: fixed;
@@ -179,6 +189,77 @@
         .float-label-diff {
             font-size: 0.8rem;
             font-weight: 700;
+        }
+
+        /* Modal for viable words */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-backdrop.show {
+            display: flex;
+        }
+
+        .modal {
+            background: #ffffff;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 10px 14px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f3f4f6;
+        }
+
+        .modal-title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .modal-body {
+            padding: 10px 14px;
+            overflow-y: auto;
+            font-size: 0.95rem;
+        }
+
+        .modal-footer {
+            padding: 8px 14px;
+            border-top: 1px solid #e5e7eb;
+            text-align: right;
+        }
+
+        .modal-close-btn {
+            border: none;
+            background: transparent;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .words-list {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            white-space: normal;
+        }
+
+        .words-list span {
+            display: inline-block;
+            margin-right: 8px;
+            margin-bottom: 4px;
         }
 
         @media (max-width: 800px) {
@@ -246,6 +327,25 @@
     </div>
 </div>
 
+<!-- MODAL: Viable words for a plate -->
+<div id="wordsModalBackdrop" class="modal-backdrop">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="wordsModalTitle">Plate: ---</div>
+            <button class="modal-close-btn" id="wordsModalCloseBtn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="wordsModalStatus" style="margin-bottom:6px; color:#6b7280; font-size:0.9rem;">
+                Loading...
+            </div>
+            <div id="wordsModalList" class="words-list"></div>
+        </div>
+        <div class="modal-footer">
+            <button id="wordsModalCloseBtnBottom">Close</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
@@ -271,7 +371,7 @@
     let penaltySeconds = 0;
     let timerIntervalId = null;
 
-    let skipCount = 0; // NEW: track number of skips
+    let skipCount = 0; // track number of skips
 
     // DOM refs
     const plateEl = document.getElementById("plate");
@@ -287,6 +387,14 @@
     const startButtonEl = document.getElementById("startButton");
     const checkButtonEl = document.getElementById("checkButton");
     const skipButtonEl = document.getElementById("skipButton");
+
+    // Modal refs
+    const wordsModalBackdropEl = document.getElementById("wordsModalBackdrop");
+    const wordsModalTitleEl = document.getElementById("wordsModalTitle");
+    const wordsModalStatusEl = document.getElementById("wordsModalStatus");
+    const wordsModalListEl = document.getElementById("wordsModalList");
+    const wordsModalCloseBtnEl = document.getElementById("wordsModalCloseBtn");
+    const wordsModalCloseBtnBottomEl = document.getElementById("wordsModalCloseBtnBottom");
 
     // --------- LOADING ---------
     async function loadDictionary() {
@@ -610,6 +718,14 @@
         return el;
     }
 
+    function addPlateCellClickHandler(plateTd, plate) {
+        plateTd.classList.add("clickable-plate");
+        plateTd.title = "Click to see all viable words";
+        plateTd.addEventListener("click", () => {
+            openWordsModal(plate);
+        });
+    }
+
     function addToHistoryWithAnimation(plate, word, matchIndices, fromRectWord, diffScore, onComplete) {
         if (!plate || !word) {
             if (onComplete) onComplete();
@@ -664,6 +780,9 @@
             historyBodyEl.removeChild(historyBodyEl.lastChild);
         }
 
+        // Make plate clickable for popup
+        addPlateCellClickHandler(plateTd, plate);
+
         const plateFrom = plateEl.getBoundingClientRect();
         const wordFrom = fromRectWord || wordInputEl.getBoundingClientRect();
         const plateTo = plateTd.getBoundingClientRect();
@@ -688,6 +807,59 @@
                 onComplete();
             }
         }, animDuration);
+    }
+
+    // --------- MODAL: SHOW ALL VIABLE WORDS FOR A PLATE ---------
+    function openWordsModal(plate) {
+        if (!dictionaryReady) return;
+
+        wordsModalTitleEl.textContent = `Plate: ${plate}`;
+        wordsModalStatusEl.textContent = "Finding viable words…";
+        wordsModalListEl.textContent = "";
+
+        wordsModalBackdropEl.classList.add("show");
+
+        // Compute matches (can be heavy for very easy plates).
+        // Done synchronously for now; if it's too slow we can slice or async it later.
+        const matches = [];
+        for (const w of WORDS) {
+            if (wordMatchesPlate(plate, w)) {
+                matches.push(w);
+            }
+        }
+
+        matches.sort();
+
+        const countFromScan = matches.length;
+        let countFromJson = null;
+        if (PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate]) {
+            countFromJson = PLATE_DIFFICULTY[plate].count;
+        }
+
+        if (countFromJson !== null && countFromJson !== countFromScan) {
+            wordsModalStatusEl.textContent =
+                `${countFromScan.toLocaleString()} viable words (JSON said ${countFromJson.toLocaleString()})`;
+        } else {
+            wordsModalStatusEl.textContent =
+                `${countFromScan.toLocaleString()} viable words`;
+        }
+
+        if (matches.length === 0) {
+            wordsModalListEl.textContent = "(no viable words found)";
+        } else {
+            const frag = document.createDocumentFragment();
+            for (const w of matches) {
+                const span = document.createElement("span");
+                span.textContent = w;
+                frag.appendChild(span);
+            }
+            wordsModalListEl.innerHTML = "";
+            wordsModalListEl.appendChild(frag);
+        }
+    }
+
+    function closeWordsModal() {
+        wordsModalBackdropEl.classList.remove("show");
     }
 
     // --------- ACTIONS ---------
@@ -751,7 +923,7 @@
         }
         if (!currentPlate) return;
 
-        // NEW: escalating penalty: 5s, 10s, 15s, ...
+        // Escalating penalty: 5s, 10s, 15s, ...
         skipCount += 1;
         const added = skipCount * 5;
         penaltySeconds += added;
@@ -780,6 +952,14 @@
     wordInputEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
             checkWord();
+        }
+    });
+
+    wordsModalCloseBtnEl.addEventListener("click", closeWordsModal);
+    wordsModalCloseBtnBottomEl.addEventListener("click", closeWordsModal);
+    wordsModalBackdropEl.addEventListener("click", (e) => {
+        if (e.target === wordsModalBackdropEl) {
+            closeWordsModal();
         }
     });
 
