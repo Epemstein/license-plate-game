@@ -76,17 +76,29 @@ def main():
                     continue
                 all_plates.append(a + b + c)
 
-    # Build a sorted list of all counts (including zeros) to get percentiles
+    # Build a sorted list of POSITIVE counts only (c > 0) for percentile calc
     all_values = [counts.get(p, 0) for p in all_plates]
-    sorted_vals = sorted(all_values)
-    n = len(sorted_vals)
-
+    positive_vals = sorted(v for v in all_values if v > 0)
+    n_pos = len(positive_vals)
+    
     def percentile_for_count(x):
-        # Percentile based on where x falls in sorted list
-        pos = bisect.bisect_left(sorted_vals, x)
-        if n <= 1:
+        """
+        Difficulty percentile:
+          - 0-count plates -> 0.0 (unviable / not in distribution)
+          - Among x > 0, lower counts = harder = HIGHER percentile.
+    
+        So:
+          count = 1  -> percentile ~ 1.0 (hardest)
+          count = max -> percentile ~ 0.0 (easiest)
+        """
+        if x <= 0 or n_pos <= 1:
             return 0.0
-        return pos / (n - 1)
+    
+        # rank of x among positive counts (ascending)
+        pos = bisect.bisect_left(positive_vals, x)
+    
+        # Convert to difficulty percentile (invert: smaller count = higher difficulty)
+        return 1.0 - (pos / (n_pos - 1))
 
     data = {}
     for p in all_plates:
