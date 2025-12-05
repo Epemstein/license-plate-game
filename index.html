@@ -435,7 +435,7 @@
 
     async function loadDifficulty() {
         try {
-            const res = await fetch("plate_difficulty.json");
+            const res = await fetch("plate_difficulty.json?v=2");
             PLATE_DIFFICULTY = await res.json();
             difficultyReady = true;
             maybeEnableStart();
