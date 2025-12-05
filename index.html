@@ -190,7 +190,7 @@
 </head>
 <body>
 
-<h1>License Plate Game – Time Trial v7</h1>
+<h1>License Plate Game – Time Trial</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -215,7 +215,7 @@
             <button id="startButton">Loading...</button>
             <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
             <button id="checkButton">Check</button>
-            <button id="skipButton">Skip (+10s)</button>
+            <button id="skipButton">Skip (+5s, then +10s, ...)</button>
         </div>
 
         <div id="result"></div>
@@ -270,6 +270,8 @@
     let startTime = null;
     let penaltySeconds = 0;
     let timerIntervalId = null;
+
+    let skipCount = 0; // NEW: track number of skips
 
     // DOM refs
     const plateEl = document.getElementById("plate");
@@ -515,6 +517,8 @@
         solvedCount = 0;
         startTime = null;
         penaltySeconds = 0;
+        skipCount = 0; // reset skip counter
+
         if (timerIntervalId) clearInterval(timerIntervalId);
         timerIntervalId = null;
 
@@ -747,12 +751,16 @@
         }
         if (!currentPlate) return;
 
-        penaltySeconds += 10;
-        resultEl.textContent = `⏩ Skipped ${currentPlate}. +10s penalty.`;
+        // NEW: escalating penalty: 5s, 10s, 15s, ...
+        skipCount += 1;
+        const added = skipCount * 5;
+        penaltySeconds += added;
+
+        resultEl.textContent = `⏩ Skipped ${currentPlate}. +${added}s penalty.`;
         resultEl.style.color = "orange";
 
         const plate = currentPlate;
-        const penaltyLabel = "+10s (skipped)";
+        const penaltyLabel = `+${added}s (skipped)`;
         const diffScore = getPlateDifficultyScore(plate);
         const skipRect = skipButtonEl.getBoundingClientRect();
 
