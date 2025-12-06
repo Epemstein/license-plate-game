@@ -101,7 +101,6 @@
             cursor: default;
         }
 
-        /* hidden initially; we show this as "Start Game" if user closes the rules modal without starting */
         #startButton {
             display: none;
         }
@@ -224,7 +223,7 @@
         .modal {
             background: #ffffff;
             border-radius: 8px;
-            max-width: 600px;
+            max-width: 700px;
             width: 100%;
             max-height: 80vh;
             box-shadow: 0 10px 30px rgba(0,0,0,0.25);
@@ -279,12 +278,21 @@
             margin-bottom: 2px;
         }
 
+        /* Chart container */
+        #resultsChart {
+            width: 100%;
+            min-height: 320px;
+        }
+
         @media (max-width: 800px) {
             .layout {
                 flex-direction: column;
             }
         }
     </style>
+
+    <!-- Chart.js for the end-of-game bar chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -356,7 +364,7 @@
             <!-- Filled dynamically -->
         </div>
         <div class="modal-footer">
-            <button id="gameModalSecondaryBtn" style="display:none;">See results</button>
+            <button id="gameModalSecondaryBtn" style="display:none;">View chart</button>
             <button id="gameModalPrimaryBtn">Start Game</button>
         </div>
     </div>
@@ -381,11 +389,30 @@
     </div>
 </div>
 
+<!-- MODAL: End-of-game chart -->
+<div id="chartModalBackdrop" class="modal-backdrop">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Run breakdown</div>
+            <button class="modal-close-btn" id="chartModalCloseBtn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <canvas id="resultsChart"></canvas>
+            <div style="margin-top:8px; font-size:0.85rem; color:#6b7280;">
+                Blue = thinking time, red = skip penalty. Click a bar to see all viable words for that plate.
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="chartModalCloseBtnBottom">Close</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
 
-    // 7 difficulty bucket probabilities (your current values)
+    // Difficulty bucket probabilities (your current values)
     const VERY_EASY_PROB = 0.40; // 0–10
     const EASY_PROB      = 0.20; // 11–34
     const MEDIUM_PROB    = 0.15; // 35–49
@@ -445,6 +472,9 @@
     // per-plate timing
     let plateStartTime = null;
 
+    // per-run history for chart
+    let gameHistory = [];
+
     // DOM refs
     const plateEl = document.getElementById("plate");
     const difficultyLabelEl = document.getElementById("difficultyLabel");
@@ -475,6 +505,13 @@
     const wordsModalListEl = document.getElementById("wordsModalList");
     const wordsModalCloseBtnEl = document.getElementById("wordsModalCloseBtn");
     const wordsModalCloseBtnBottomEl = document.getElementById("wordsModalCloseBtnBottom");
+
+    // Chart modal refs
+    const chartModalBackdropEl = document.getElementById("chartModalBackdrop");
+    const chartModalCloseBtnEl = document.getElementById("chartModalCloseBtn");
+    const chartModalCloseBtnBottomEl = document.getElementById("chartModalCloseBtnBottom");
+    const resultsChartCanvas = document.getElementById("resultsChart");
+    let resultsChart = null;
 
     // --------- LOADING ---------
     async function loadDictionary() {
@@ -560,7 +597,7 @@
             // difficulty for banding
             let diff = (entry && typeof entry.difficulty === "number")
                 ? entry.difficulty
-                : 50; // default medium-ish
+                : 50;
 
             all.push(plate);
 
@@ -632,10 +669,8 @@
                     return matchedIndices;
                 }
             } else if (posInPlate > expectedPlateIndex) {
-                // later plate letter appears before earlier one
                 return null;
             } else {
-                // already passed this plate letter; ignore
                 continue;
             }
         }
@@ -703,7 +738,6 @@
         threshold += VERY_HARD_PROB;
         if (r < threshold) return "very_hard";
 
-        // Anything left falls into impossible
         return "impossible";
     }
 
@@ -723,7 +757,6 @@
 
         const primaryBand = choosePrimaryBand();
 
-        // Rotate band order so we start with primary, then fall back around the circle
         const startIndex = BAND_NAMES.indexOf(primaryBand);
         const bandOrder = [];
         for (let i = 0; i < BAND_NAMES.length; i++) {
@@ -736,7 +769,6 @@
             if (chosen) break;
         }
 
-        // Fallback just in case
         if (!chosen) {
             const remaining = ALL_PLATES.filter(p => !usedPlates.has(p));
             if (remaining.length === 0) {
@@ -762,7 +794,7 @@
         wordInputEl.disabled = false;
         wordInputEl.readOnly = false;
 
-        plateStartTime = performance.now(); // start timing this plate
+        plateStartTime = performance.now();
 
         updateDifficultyDisplay(chosen);
         wordInputEl.value = "";
@@ -844,6 +876,7 @@
         plateLocked = false;
         usedPlates = new Set();
         plateStartTime = null;
+        gameHistory = [];
         updateSkipButtonLabel();
 
         if (timerIntervalId) clearInterval(timerIntervalId);
@@ -1147,14 +1180,14 @@
         gameModalBodyEl.innerHTML = `
             <p>You solved <strong>${TOTAL_PLATES}</strong> plates in
             <strong>${finalTimeSec.toFixed(1)} seconds</strong> (including skip penalties).</p>
-            <p>Want to go again and try to beat your time?</p>
+            <p>You can view a breakdown chart of each plate's time, or close this and inspect the table.</p>
         `;
 
         gameModalPrimaryBtnEl.disabled = false;
         gameModalPrimaryBtnEl.textContent = "Play again";
 
         gameModalSecondaryBtnEl.style.display = "inline-block";
-        gameModalSecondaryBtnEl.textContent = "See results";
+        gameModalSecondaryBtnEl.textContent = "View chart";
 
         gameModalBackdropEl.classList.add("show");
     }
@@ -1168,7 +1201,7 @@
         const plateUpper = plate.toUpperCase();
         const wordUpper = word.toUpperCase();
 
-        // 1) missing letters
+        // missing letters
         const missing = [];
         for (const ch of plateUpper) {
             if (!wordUpper.includes(ch)) {
@@ -1183,7 +1216,7 @@
                    `It’s missing the ${letterWord}: <strong>${missingList}</strong>.`;
         }
 
-        // 2) all letters present, but wrong order
+        // all letters present, but wrong order
         const firstOccurrences = [];
         for (const ch of plateUpper) {
             const idx = wordUpper.indexOf(ch);
@@ -1200,6 +1233,157 @@
         return `❌ "${word}" doesn’t work for <strong>${plateUpper}</strong>.<br>` +
                `In your word, the first <strong>${lettersList}</strong> appear in this order: <strong>${wordOrder}</strong>.<br>` +
                `The plate <strong>${plateUpper}</strong> requires them in this order: <strong>${plateOrder}</strong>.`;
+    }
+
+    // --------- CHART PLUGIN: difficulty dots ---------
+    const difficultyDotsPlugin = {
+        id: "difficultyDots",
+        afterDatasetsDraw(chart, args, opts) {
+            const difficulties = chart.options.plugins.difficultyDots?.difficulties;
+            if (!difficulties) return;
+            const {ctx, chartArea} = chart;
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data) return;
+
+            meta.data.forEach((bar, index) => {
+                const diff = difficulties[index];
+                if (diff == null) return;
+
+                let color;
+                if (diff >= 80) {
+                    color = "#dc2626"; // red
+                } else if (diff >= 40) {
+                    color = "#d97706"; // orange
+                } else {
+                    color = "#16a34a"; // green
+                }
+
+                const y = bar.y;
+                const x = chartArea.left - 10;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.fillStyle = color;
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+    };
+
+    // --------- CHART BUILD / UPDATE ---------
+    function buildOrUpdateChart() {
+        if (!gameHistory.length) return;
+        const labels = [];
+        const thinkingData = [];
+        const penaltyData = [];
+        const difficulties = [];
+        const platesForChart = [];
+
+        for (const entry of gameHistory) {
+            const diff = getPlateDifficultyScore(entry.plate);
+            difficulties.push(diff);
+            platesForChart.push(entry.plate);
+
+            let labelText;
+            if (entry.skipped) {
+                labelText = `${entry.plate} — skipped`;
+            } else {
+                labelText = `${entry.plate} — "${entry.word}"`;
+            }
+            labels.push(labelText);
+
+            const think = entry.thinkingSeconds != null ? entry.thinkingSeconds : 0;
+            const pen   = entry.penaltySeconds != null ? entry.penaltySeconds : 0;
+
+            thinkingData.push(think);
+            penaltyData.push(pen);
+        }
+
+        const ctx = resultsChartCanvas.getContext("2d");
+
+        if (resultsChart) {
+            resultsChart.data.labels = labels;
+            resultsChart.data.datasets[0].data = thinkingData;
+            resultsChart.data.datasets[1].data = penaltyData;
+            resultsChart.options.plugins.difficultyDots.difficulties = difficulties;
+            resultsChart.config.data._plates = platesForChart;
+            resultsChart.update();
+        } else {
+            resultsChart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: "Thinking time (s)",
+                            data: thinkingData,
+                            backgroundColor: "rgba(59, 130, 246, 0.8)", // blue
+                            stack: "time"
+                        },
+                        {
+                            label: "Skip penalty (s)",
+                            data: penaltyData,
+                            backgroundColor: "rgba(220, 38, 38, 0.8)", // red
+                            stack: "time"
+                        }
+                    ],
+                    _plates: platesForChart
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: "bottom"
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || "";
+                                    const value = context.parsed.x;
+                                    return `${label}: ${value.toFixed(1)}s`;
+                                }
+                            }
+                        },
+                        difficultyDots: {
+                            difficulties
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: "Seconds"
+                            }
+                        },
+                        y: {
+                            stacked: true
+                        }
+                    },
+                    onClick: (evt, elements) => {
+                        if (!elements.length) return;
+                        const index = elements[0].index;
+                        const plate = resultsChart.config.data._plates[index];
+                        closeChartModal();
+                        openWordsModal(plate);
+                    }
+                },
+                plugins: [difficultyDotsPlugin]
+            });
+        }
+    }
+
+    function openChartModal() {
+        if (!gameHistory.length) return;
+        buildOrUpdateChart();
+        chartModalBackdropEl.classList.add("show");
+    }
+
+    function closeChartModal() {
+        chartModalBackdropEl.classList.remove("show");
     }
 
     // --------- ACTIONS ---------
@@ -1235,7 +1419,6 @@
             return;
         }
 
-        // Lock this plate so Enter spam can't double-submit
         plateLocked = true;
         checkButtonEl.disabled = true;
         skipButtonEl.disabled = true;
@@ -1252,10 +1435,20 @@
         const diffScore = getPlateDifficultyScore(plate);
 
         let timeLabel = "—";
+        let thinkingSeconds = 0;
         if (plateStartTime != null) {
-            const elapsedSec = (performance.now() - plateStartTime) / 1000;
-            timeLabel = `${elapsedSec.toFixed(1)}s`;
+            thinkingSeconds = (performance.now() - plateStartTime) / 1000;
+            timeLabel = `${thinkingSeconds.toFixed(1)}s`;
         }
+
+        // record for chart
+        gameHistory.push({
+            plate,
+            word,
+            skipped: false,
+            thinkingSeconds,
+            penaltySeconds: 0
+        });
 
         addToHistoryWithAnimation(
             plate,
@@ -1290,13 +1483,11 @@
             return;
         }
 
-        // Lock this plate so skip can't be spammed
         plateLocked = true;
         checkButtonEl.disabled = true;
         skipButtonEl.disabled = true;
         wordInputEl.readOnly = true;
 
-        // Escalating penalty: 5s, 10s, 15s, ...
         skipCount += 1;
         const added = skipCount * 5;
         penaltySeconds += added;
@@ -1310,10 +1501,20 @@
         const skipRect = skipButtonEl.getBoundingClientRect();
 
         let timeLabel = "—";
+        let thinkingSeconds = 0;
         if (plateStartTime != null) {
-            const elapsedSec = (performance.now() - plateStartTime) / 1000;
-            timeLabel = `${elapsedSec.toFixed(1)}s (+${added}s)`;
+            thinkingSeconds = (performance.now() - plateStartTime) / 1000;
+            timeLabel = `${thinkingSeconds.toFixed(1)}s (+${added}s)`;
         }
+
+        // record for chart
+        gameHistory.push({
+            plate,
+            word: "skipped",
+            skipped: true,
+            thinkingSeconds,
+            penaltySeconds: added
+        });
 
         addToHistoryWithAnimation(
             plate,
@@ -1360,9 +1561,10 @@
         }
     });
 
+    // "View chart" button in end modal
     gameModalSecondaryBtnEl.addEventListener("click", () => {
-        // "See results" just closes modal
         closeGameModal();
+        openChartModal();
     });
 
     gameModalCloseBtnEl.addEventListener("click", () => {
@@ -1378,6 +1580,14 @@
             if (!gameStarted && !gameOver && gameModalMode === "start") {
                 showStartGameButton();
             }
+        }
+    });
+
+    chartModalCloseBtnEl.addEventListener("click", closeChartModal);
+    chartModalCloseBtnBottomEl.addEventListener("click", closeChartModal);
+    chartModalBackdropEl.addEventListener("click", (e) => {
+        if (e.target === chartModalBackdropEl) {
+            closeChartModal();
         }
     });
 
