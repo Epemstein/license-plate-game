@@ -296,6 +296,33 @@
             margin-bottom: 2px;
         }
 
+        .words-sort-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+        }
+
+        .words-sort-label {
+            color: #6b7280;
+        }
+
+        .words-sort-button {
+            padding: 2px 8px;
+            font-size: 0.8rem;
+            border-radius: 9999px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            cursor: pointer;
+        }
+
+        .words-sort-button.active {
+            background: #111827;
+            color: #ffffff;
+            border-color: #111827;
+        }
+
         /* Chart container */
         #resultsChart {
             width: 100%;
@@ -314,7 +341,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v12</h1>
+<h1>The License Plate Game v4</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -400,6 +427,11 @@
         <div class="modal-body">
             <div id="wordsModalStatus" style="margin-bottom:6px; color:#6b7280; font-size:0.9rem;">
                 Loading...
+            </div>
+            <div id="wordsModalSortControls" class="words-sort-controls">
+                <span class="words-sort-label">Sort:</span>
+                <button id="wordsSortAlphaBtn" class="words-sort-button active">A–Z</button>
+                <button id="wordsSortLengthBtn" class="words-sort-button">Shortest → longest</button>
             </div>
             <div id="wordsModalList" class="words-list"></div>
         </div>
@@ -495,6 +527,11 @@
     // per-run history for chart
     let gameHistory = [];
 
+    // words modal sorting state
+    let currentWordsModalMatches = [];
+    let currentWordsModalPlate = null;
+    let currentWordsModalSortMode = "alpha";
+
     // DOM refs
     const plateEl = document.getElementById("plate");
     const difficultyLabelEl = document.getElementById("difficultyLabel");
@@ -526,6 +563,9 @@
     const wordsModalListEl = document.getElementById("wordsModalList");
     const wordsModalCloseBtnEl = document.getElementById("wordsModalCloseBtn");
     const wordsModalCloseBtnBottomEl = document.getElementById("wordsModalCloseBtnBottom");
+    const wordsModalSortControlsEl = document.getElementById("wordsModalSortControls");
+    const wordsSortAlphaBtnEl = document.getElementById("wordsSortAlphaBtn");
+    const wordsSortLengthBtnEl = document.getElementById("wordsSortLengthBtn");
 
     // Chart modal refs
     const chartModalBackdropEl = document.getElementById("chartModalBackdrop");
@@ -1122,36 +1162,43 @@
         }, animDuration);
     }
 
-    // --------- MODAL: ALL VIABLE WORDS ---------
-    function openWordsModal(plate) {
-        if (!dictionaryReady) return;
+    // --------- MODAL: ALL VIABLE WORDS (WITH SORT TOGGLE) ---------
+    function setWordsSortMode(mode) {
+        currentWordsModalSortMode = mode;
 
-        wordsModalTitleEl.textContent = `Plate: ${plate}`;
-        wordsModalStatusEl.textContent = "Finding viable words…";
-        wordsModalListEl.textContent = "";
-
-        wordsModalBackdropEl.classList.add("show");
-
-        const matches = [];
-        for (const w of WORDS) {
-            if (wordMatchesPlate(plate, w)) {
-                matches.push(w);
-            }
+        if (mode === "alpha") {
+            wordsSortAlphaBtnEl.classList.add("active");
+            wordsSortLengthBtnEl.classList.remove("active");
+        } else {
+            wordsSortAlphaBtnEl.classList.remove("active");
+            wordsSortLengthBtnEl.classList.add("active");
         }
 
-        matches.sort();
+        renderWordsList(mode);
+    }
 
-        const countFromScan = matches.length;
-        wordsModalStatusEl.textContent =
-            `${countFromScan.toLocaleString()} viable words`;
+    function renderWordsList(sortMode) {
+        wordsModalListEl.innerHTML = "";
 
-        if (matches.length === 0) {
+        const plate = currentWordsModalPlate;
+        if (!plate || !currentWordsModalMatches || currentWordsModalMatches.length === 0) {
             wordsModalListEl.textContent = "(no viable words found)";
             return;
         }
 
+        const arr = [...currentWordsModalMatches];
+
+        if (sortMode === "alpha") {
+            arr.sort((a, b) => a.localeCompare(b));
+        } else {
+            arr.sort((a, b) => {
+                const lenDiff = a.length - b.length;
+                return lenDiff !== 0 ? lenDiff : a.localeCompare(b);
+            });
+        }
+
         const frag = document.createDocumentFragment();
-        for (const w of matches) {
+        for (const w of arr) {
             const line = document.createElement("div");
             line.className = "words-list-item";
 
@@ -1172,8 +1219,37 @@
             frag.appendChild(line);
         }
 
-        wordsModalListEl.innerHTML = "";
         wordsModalListEl.appendChild(frag);
+    }
+
+    function openWordsModal(plate) {
+        if (!dictionaryReady) return;
+
+        wordsModalTitleEl.textContent = `Plate: ${plate}`;
+        wordsModalStatusEl.textContent = "Finding viable words…";
+
+        // Reset sort mode state
+        currentWordsModalPlate = plate;
+        currentWordsModalMatches = [];
+        setWordsSortMode("alpha");
+
+        wordsModalBackdropEl.classList.add("show");
+
+        const matches = [];
+        for (const w of WORDS) {
+            if (wordMatchesPlate(plate, w)) {
+                matches.push(w);
+            }
+        }
+
+        matches.sort(); // initial baseline; we re-sort in renderWordsList anyway
+        currentWordsModalMatches = matches;
+
+        const countFromScan = matches.length;
+        wordsModalStatusEl.textContent =
+            `${countFromScan.toLocaleString()} viable words`;
+
+        renderWordsList(currentWordsModalSortMode);
     }
 
     function closeWordsModal() {
@@ -1274,8 +1350,6 @@
             const meta = chart.getDatasetMeta(0);
             if (!meta || !meta.data) return;
 
-            const yScale = chart.scales.y;
-            // Place dot just inside the chart area, near the left side of each bar
             const xDot = chart.chartArea.left + 8;
 
             meta.data.forEach((bar, index) => {
@@ -1381,19 +1455,26 @@
                         title: {
                             display: true,
                             text: "Seconds"
+                        },
+                        grid: {
+                            display: false,
+                            drawBorder: false
                         }
                     },
                     y: {
                         stacked: true,
                         categoryPercentage: 0.7,
-                        barPercentage: 0.7
+                        barPercentage: 0.7,
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        }
                     }
                 },
                 onClick: (evt, elements) => {
                     if (!elements.length) return;
                     const index = elements[0].index;
                     const plate = resultsChart.config.data._plates[index];
-                    // Chart stays open; words modal appears above it
                     openWordsModal(plate);
                 }
             },
@@ -1583,6 +1664,14 @@
         if (e.target === wordsModalBackdropEl) {
             closeWordsModal();
         }
+    });
+
+    wordsSortAlphaBtnEl.addEventListener("click", () => {
+        setWordsSortMode("alpha");
+    });
+
+    wordsSortLengthBtnEl.addEventListener("click", () => {
+        setWordsSortMode("length");
     });
 
     gameModalPrimaryBtnEl.addEventListener("click", () => {
