@@ -341,7 +341,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v40</h1>
+<h1>The License Plate Game v4</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -491,11 +491,10 @@
     let PLATE_DIFFICULTY = null;
     let difficultyReady = false;
 
-    // All viable plates according to rules
+    // Plate lists
     let ALL_PLATES = [];
     let platesReady = false;
 
-    // Difficulty-banded lists
     let VERY_EASY_PLATES = [];
     let EASY_PLATES      = [];
     let MEDIUM_PLATES    = [];
@@ -563,7 +562,6 @@
     const wordsModalListEl = document.getElementById("wordsModalList");
     const wordsModalCloseBtnEl = document.getElementById("wordsModalCloseBtn");
     const wordsModalCloseBtnBottomEl = document.getElementById("wordsModalCloseBtnBottom");
-    const wordsModalSortControlsEl = document.getElementById("wordsModalSortControls");
     const wordsSortAlphaBtnEl = document.getElementById("wordsSortAlphaBtn");
     const wordsSortLengthBtnEl = document.getElementById("wordsSortLengthBtn");
 
@@ -637,22 +635,10 @@
         for (const plate of Object.keys(PLATE_DIFFICULTY)) {
             const entry = PLATE_DIFFICULTY[plate];
 
+            // Exclude if plate itself is a word in the dictionary
             if (DICTIONARY.has(plate)) continue;
 
-            let viableCount = null;
-            if (entry && typeof entry.viableCount === "number") {
-                viableCount = entry.viableCount;
-            } else if (entry && typeof entry.viable_count === "number") {
-                viableCount = entry.viable_count;
-            } else if (entry && typeof entry.count === "number") {
-                viableCount = entry.count;
-            }
-
-            if (viableCount === null) {
-                viableCount = computeJsViableCount(plate);
-            }
-            if (viableCount <= 0) continue;
-
+            // Difficulty score from JSON
             let diff = (entry && typeof entry.difficulty === "number")
                 ? entry.difficulty
                 : 50;
@@ -688,7 +674,7 @@
         platesReady = true;
 
         debugEl.textContent +=
-            ` | ${ALL_PLATES.length.toLocaleString()} viable plates` +
+            ` | ${ALL_PLATES.length.toLocaleString()} plates` +
             ` (VE: ${VERY_EASY_PLATES.length}, E: ${EASY_PLATES.length}, M: ${MEDIUM_PLATES.length}, ` +
             `D: ${DIFFICULT_PLATES.length}, H: ${HARD_PLATES.length}, VH: ${VERY_HARD_PLATES.length}, IMP: ${IMPOSSIBLE_PLATES.length})`;
 
@@ -739,7 +725,7 @@
         return getPlateMatchIndices(plate, word) !== null;
     }
 
-    // --------- JS-BASED VIABLE COUNT ---------
+    // --------- JS-BASED VIABLE COUNT (used on-demand) ---------
     function computeJsViableCount(plate) {
         if (!dictionaryReady || !plate) return 0;
         let count = 0;
@@ -751,7 +737,7 @@
         return count;
     }
 
-    // --------- PER-GAME RANDOM PLATE (7 BANDS, NO REPEATS) ---------
+    // --------- PER-GAME RANDOM PLATE (7 BANDS, NO REPEATS, JS viability check) ---------
     function getBandPool(bandName) {
         switch (bandName) {
             case "very_easy":   return VERY_EASY_PLATES;
@@ -839,7 +825,23 @@
             chosen = remaining[idx];
         }
 
+        // Mark as used for this run
         usedPlates.add(chosen);
+
+        // JS check: if this plate has 0 viable words according to current dictionary, skip it
+        const jsCount = computeJsViableCount(chosen);
+        if (jsCount <= 0) {
+            if (usedPlates.size === ALL_PLATES.length) {
+                resultEl.textContent = "No plates with viable words available. Ending this run.";
+                resultEl.style.color = "red";
+                endGame();
+                return;
+            }
+            // Re-roll for another plate
+            pickRandomPlate();
+            return;
+        }
+
         currentPlate = chosen;
 
         plateEl.textContent = chosen;
@@ -1228,7 +1230,6 @@
         wordsModalTitleEl.textContent = `Plate: ${plate}`;
         wordsModalStatusEl.textContent = "Finding viable words…";
 
-        // Reset sort mode state
         currentWordsModalPlate = plate;
         currentWordsModalMatches = [];
         setWordsSortMode("alpha");
@@ -1242,7 +1243,7 @@
             }
         }
 
-        matches.sort(); // initial baseline; we re-sort in renderWordsList anyway
+        matches.sort();
         currentWordsModalMatches = matches;
 
         const countFromScan = matches.length;
@@ -1485,7 +1486,6 @@
     function openChartModal() {
         if (!gameHistory.length) return;
 
-        // Destroy any existing chart instance so we always recreate fresh
         if (resultsChart) {
             resultsChart.destroy();
             resultsChart = null;
