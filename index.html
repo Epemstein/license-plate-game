@@ -58,14 +58,13 @@
         
             font-family: "RoadgeekUS", sans-serif;
             font-size: 3rem;
-            letter-spacing: 0.33em;   /* Roadgeek letters are wide */
+            letter-spacing: 0.33em;
             color: #222;
-            font-weight: 400;         /* Plate fonts look best without bold */
+            font-weight: 400;
             text-transform: uppercase;
             text-shadow: 0 1px 2px rgba(0,0,0,0.35);
             pointer-events: none;
         }
-
 
         .difficulty {
             margin-top: 8px;
@@ -73,9 +72,9 @@
             font-weight: 600;
         }
 
-        .diff-easy { color: #16a34a; }   /* green */
-        .diff-med  { color: #d97706; }   /* orange */
-        .diff-hard { color: #dc2626; }   /* red */
+        .diff-easy { color: #16a34a; }
+        .diff-med  { color: #d97706; }
+        .diff-hard { color: #dc2626; }
 
         .controls {
             margin: 24px 0 12px;
@@ -482,7 +481,6 @@
 
     async function loadDifficulty() {
         try {
-            // cache-busted JSON fetch
             const res = await fetch("plate_difficulty.json?v=2");
             PLATE_DIFFICULTY = await res.json();
             difficultyReady = true;
@@ -498,7 +496,6 @@
     function maybeEnableStart() {
         const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
 
-        // Only matters if the main start button is currently visible
         startButtonEl.disabled = !ready;
 
         if (gameModalMode === "start") {
@@ -574,9 +571,7 @@
 
             const plate = a + b + c;
 
-            // skip plates that are exact words
             if (DICTIONARY.has(plate)) continue;
-
             if (!wordMatchesPlate(plate, upper)) continue;
 
             return plate;
@@ -626,7 +621,7 @@
             resultEl.textContent = "";
             resultEl.style.color = "";
 
-            plateLocked = false; // unlock for this new plate
+            plateLocked = false;
             checkButtonEl.disabled = false;
             skipButtonEl.disabled = false;
             wordInputEl.disabled = false;
@@ -651,7 +646,6 @@
     }
 
     function updateDifficultyDisplay(plate) {
-        // Difficulty from JSON
         if (!PLATE_DIFFICULTY || !PLATE_DIFFICULTY[plate]) {
             difficultyLabelEl.textContent = "Difficulty: —";
             difficultyLabelEl.className = "difficulty diff-med";
@@ -667,7 +661,6 @@
             }
         }
 
-        // Viable word count from JS
         if (!dictionaryReady || !plate) {
             viableCountLabelEl.textContent = "";
         } else {
@@ -693,10 +686,6 @@
         skipButtonEl.textContent = `Skip +${nextPenalty}s`;
     }
 
-    // Main-page button helpers:
-    // - before game: "Start Game"
-    // - after game: "Play again"
-    // - during game: hidden
     function showStartGameButton() {
         startButtonEl.style.display = "inline-block";
         startButtonEl.textContent = "Start Game";
@@ -757,7 +746,7 @@
         }
 
         closeGameModal();
-        hideMainStartButton(); // hide the main button while game is in progress
+        hideMainStartButton();
 
         resetGameState();
         gameStarted = true;
@@ -795,14 +784,13 @@
         resultEl.style.color = "green";
         wordInputEl.blur();
 
-        // disable controls at end of run
         checkButtonEl.disabled = true;
         skipButtonEl.disabled = true;
         wordInputEl.disabled = true;
         wordInputEl.readOnly = true;
 
         openEndModal(totalSec);
-        showPlayAgainButton(); // main-page button becomes "Play again"
+        showPlayAgainButton();
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -905,7 +893,6 @@
         const diffText = (diffScore === null || diffScore <= 0) ? "—" : String(diffScore);
         const diffClone = createFloatingLabel(diffText, plateFrom, diffTo, "float-label-diff");
 
-        // Next plate appears immediately (logic not blocked by animation)
         if (typeof onComplete === "function") {
             onComplete();
         }
@@ -998,7 +985,6 @@
         gameModalPrimaryBtnEl.disabled = !ready;
         gameModalPrimaryBtnEl.textContent = ready ? "Start Game" : "Loading...";
 
-        // In start mode there is no "See results"
         gameModalSecondaryBtnEl.style.display = "none";
 
         gameModalBackdropEl.classList.add("show");
@@ -1016,7 +1002,6 @@
         gameModalPrimaryBtnEl.disabled = false;
         gameModalPrimaryBtnEl.textContent = "Play again";
 
-        // In end mode we show "See results"
         gameModalSecondaryBtnEl.style.display = "inline-block";
         gameModalSecondaryBtnEl.textContent = "See results";
 
@@ -1025,6 +1010,45 @@
 
     function closeGameModal() {
         gameModalBackdropEl.classList.remove("show");
+    }
+
+    // --------- MISMATCH EXPLANATION ---------
+    function explainPlateMismatch(plate, word) {
+        const plateUpper = plate.toUpperCase();
+        const wordUpper = word.toUpperCase();
+
+        // 1) Check for missing letters
+        const missing = [];
+        for (const ch of plateUpper) {
+            if (!wordUpper.includes(ch)) {
+                if (!missing.includes(ch)) missing.push(ch);
+            }
+        }
+
+        if (missing.length > 0) {
+            const missingList = missing.join(", ");
+            const letterWord = missing.length === 1 ? "letter" : "letters";
+            return `❌ "${word}" doesn’t work for <strong>${plateUpper}</strong>.<br>` +
+                   `It’s missing the ${letterWord}: <strong>${missingList}</strong>.`;
+        }
+
+        // 2) All letters present, but order is wrong
+        const firstOccurrences = [];
+        for (const ch of plateUpper) {
+            const idx = wordUpper.indexOf(ch);
+            if (idx !== -1) {
+                firstOccurrences.push({ ch, idx });
+            }
+        }
+
+        firstOccurrences.sort((a, b) => a.idx - b.idx);
+        const wordOrder = firstOccurrences.map(x => x.ch).join(" \u2192 ");
+        const plateOrder = plateUpper.split("").join(" \u2192 ");
+        const lettersList = plateUpper.split("").join(", ");
+
+        return `❌ "${word}" doesn’t work for <strong>${plateUpper}</strong>.<br>` +
+               `In your word, the first <strong>${lettersList}</strong> appear in this order: <strong>${wordOrder}</strong>.<br>` +
+               `The plate <strong>${plateUpper}</strong> requires them in this order: <strong>${plateOrder}</strong>.`;
     }
 
     // --------- ACTIONS ---------
@@ -1054,7 +1078,9 @@
 
         const matchIndices = getPlateMatchIndices(currentPlate, rawWord);
         if (!matchIndices) {
-            resultEl.textContent = `❌ "${rawWord}" does not match ${currentPlate}.`;
+            // More detailed explanation of why it failed
+            const html = explainPlateMismatch(currentPlate, rawWord);
+            resultEl.innerHTML = html;
             resultEl.style.color = "red";
             return;
         }
@@ -1079,7 +1105,7 @@
             if (solvedCount >= TOTAL_PLATES) {
                 endGame();
             } else {
-                pickRandomPlate(); // next plate appears immediately
+                pickRandomPlate();
             }
         });
     }
@@ -1100,13 +1126,11 @@
             return;
         }
 
-        // Lock this plate so skip can't be spammed
         plateLocked = true;
         checkButtonEl.disabled = true;
         skipButtonEl.disabled = true;
         wordInputEl.readOnly = true;
 
-        // Escalating penalty: 5s, 10s, 15s, ...
         skipCount += 1;
         const added = skipCount * 5;
         penaltySeconds += added;
@@ -1121,13 +1145,13 @@
 
         addToHistoryWithAnimation(plate, penaltyLabel, null, skipRect, diffScore, () => {
             updateSkipButtonLabel();
-            pickRandomPlate(); // next plate appears immediately
+            pickRandomPlate();
         });
     }
 
     // --------- INIT ---------
     startButtonEl.disabled = true;
-    hideMainStartButton(); // hidden at first; appears as needed
+    hideMainStartButton();
     updateSkipButtonLabel();
 
     startButtonEl.addEventListener("click", startGame);
@@ -1157,13 +1181,11 @@
     });
 
     gameModalSecondaryBtnEl.addEventListener("click", () => {
-        // "See results" just closes modal; results remain visible; Play again button is already on page
         closeGameModal();
     });
 
     gameModalCloseBtnEl.addEventListener("click", () => {
         closeGameModal();
-        // If user closes the start modal without starting, show main "Start Game" button
         if (!gameStarted && !gameOver && gameModalMode === "start") {
             showStartGameButton();
         }
@@ -1172,7 +1194,6 @@
     gameModalBackdropEl.addEventListener("click", (e) => {
         if (e.target === gameModalBackdropEl) {
             closeGameModal();
-            // Same behavior when clicking outside to dismiss the start modal
             if (!gameStarted && !gameOver && gameModalMode === "start") {
                 showStartGameButton();
             }
