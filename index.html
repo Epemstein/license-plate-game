@@ -91,7 +91,7 @@
             cursor: default;
         }
 
-        /* hidden initially; shown after a run as "Play again" */
+        /* hidden initially; we show this as "Start Game" if user closes the rules modal without starting */
         #startButton {
             display: none;
         }
@@ -278,7 +278,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game</h1>
+<h1>The License Plate Game v2</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -486,6 +486,7 @@
     function maybeEnableStart() {
         const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
 
+        // Only matters if the main start button is currently visible
         startButtonEl.disabled = !ready;
 
         if (gameModalMode === "start") {
@@ -680,13 +681,24 @@
         skipButtonEl.textContent = `Skip +${nextPenalty}s`;
     }
 
+    // Main-page button helpers:
+    // - before game: "Start Game"
+    // - after game: "Play again"
+    // - during game: hidden
+    function showStartGameButton() {
+        startButtonEl.style.display = "inline-block";
+        startButtonEl.textContent = "Start Game";
+        const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
+        startButtonEl.disabled = !ready;
+    }
+
     function showPlayAgainButton() {
         startButtonEl.style.display = "inline-block";
         startButtonEl.textContent = "Play again";
         startButtonEl.disabled = false;
     }
 
-    function hidePlayAgainButton() {
+    function hideMainStartButton() {
         startButtonEl.style.display = "none";
     }
 
@@ -733,7 +745,7 @@
         }
 
         closeGameModal();
-        hidePlayAgainButton();
+        hideMainStartButton(); // hide the main button while game is in progress
 
         resetGameState();
         gameStarted = true;
@@ -778,7 +790,7 @@
         wordInputEl.readOnly = true;
 
         openEndModal(totalSec);
-        showPlayAgainButton();
+        showPlayAgainButton(); // main-page button becomes "Play again"
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -881,12 +893,11 @@
         const diffText = (diffScore === null || diffScore <= 0) ? "—" : String(diffScore);
         const diffClone = createFloatingLabel(diffText, plateFrom, diffTo, "float-label-diff");
 
-        // ✅ Call onComplete immediately so the next plate appears right away
+        // Next plate appears immediately (logic not blocked by animation)
         if (typeof onComplete === "function") {
             onComplete();
         }
 
-        // Animation just finishes visually in the background
         const animDuration = 400;
         setTimeout(() => {
             row.style.opacity = "1";
@@ -1104,7 +1115,7 @@
 
     // --------- INIT ---------
     startButtonEl.disabled = true;
-    hidePlayAgainButton(); // hidden until a run finishes
+    hideMainStartButton(); // hidden at first; appears as needed
     updateSkipButtonLabel();
 
     startButtonEl.addEventListener("click", startGame);
@@ -1140,11 +1151,19 @@
 
     gameModalCloseBtnEl.addEventListener("click", () => {
         closeGameModal();
+        // If user closes the start modal without starting, show main "Start Game" button
+        if (!gameStarted && !gameOver && gameModalMode === "start") {
+            showStartGameButton();
+        }
     });
 
     gameModalBackdropEl.addEventListener("click", (e) => {
         if (e.target === gameModalBackdropEl) {
             closeGameModal();
+            // Same behavior when clicking outside to dismiss the start modal
+            if (!gameStarted && !gameOver && gameModalMode === "start") {
+                showStartGameButton();
+            }
         }
     });
 
