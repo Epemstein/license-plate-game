@@ -105,6 +105,13 @@
             display: none;
         }
 
+        #chartButton {
+            margin-top: 8px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            display: none;
+        }
+
         #result {
             margin-top: 10px;
             font-weight: 600;
@@ -296,7 +303,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v20</h1>
+<h1>The License Plate Game v4</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -325,6 +332,8 @@
         </div>
 
         <div id="result"></div>
+        <button id="chartButton">View run chart</button>
+
         <div id="debug"></div>
     </div>
 
@@ -412,7 +421,7 @@
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
 
-    // Difficulty bucket probabilities (your current values)
+    // Difficulty bucket probabilities
     const VERY_EASY_PROB = 0.40; // 0–10
     const EASY_PROB      = 0.20; // 11–34
     const MEDIUM_PROB    = 0.15; // 35–49
@@ -489,6 +498,7 @@
     const startButtonEl = document.getElementById("startButton");
     const checkButtonEl = document.getElementById("checkButton");
     const skipButtonEl = document.getElementById("skipButton");
+    const chartButtonEl = document.getElementById("chartButton");
 
     // Game modal refs
     const gameModalBackdropEl = document.getElementById("gameModalBackdrop");
@@ -866,6 +876,16 @@
         startButtonEl.style.display = "none";
     }
 
+    function showChartButton() {
+        if (gameHistory.length > 0) {
+            chartButtonEl.style.display = "inline-block";
+        }
+    }
+
+    function hideChartButton() {
+        chartButtonEl.style.display = "none";
+    }
+
     function resetGameState() {
         gameStarted = false;
         gameOver = false;
@@ -878,6 +898,7 @@
         plateStartTime = null;
         gameHistory = [];
         updateSkipButtonLabel();
+        hideChartButton();
 
         if (timerIntervalId) clearInterval(timerIntervalId);
         timerIntervalId = null;
@@ -919,6 +940,7 @@
 
         closeGameModal();
         hideMainStartButton();
+        hideChartButton();
 
         resetGameState();
         gameStarted = true;
@@ -963,6 +985,7 @@
 
         openEndModal(totalSec);
         showPlayAgainButton();
+        showChartButton();
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -1235,15 +1258,18 @@
                `The plate <strong>${plateUpper}</strong> requires them in this order: <strong>${plateOrder}</strong>.`;
     }
 
-    // --------- CHART PLUGIN: difficulty dots ---------
+    // --------- CHART PLUGIN: difficulty dots (left of the plate label) ---------
     const difficultyDotsPlugin = {
         id: "difficultyDots",
         afterDatasetsDraw(chart, args, opts) {
             const difficulties = chart.options.plugins.difficultyDots?.difficulties;
             if (!difficulties) return;
-            const {ctx, chartArea} = chart;
+            const { ctx } = chart;
             const meta = chart.getDatasetMeta(0);
             if (!meta || !meta.data) return;
+
+            const yScale = chart.scales.y;
+            const xDot = yScale.left - 14; // dot slightly to the left of the plate label
 
             meta.data.forEach((bar, index) => {
                 const diff = difficulties[index];
@@ -1259,12 +1285,11 @@
                 }
 
                 const y = bar.y;
-                const x = chartArea.left - 10;
 
                 ctx.save();
                 ctx.beginPath();
                 ctx.fillStyle = color;
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.arc(xDot, y, 4, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
             });
@@ -1367,7 +1392,7 @@
                         if (!elements.length) return;
                         const index = elements[0].index;
                         const plate = resultsChart.config.data._plates[index];
-                        closeChartModal();
+                        // Keep the chart modal open; open words modal on top so you can return to chart
                         openWordsModal(plate);
                     }
                 },
@@ -1533,11 +1558,13 @@
     // --------- INIT ---------
     startButtonEl.disabled = true;
     hideMainStartButton();
+    hideChartButton();
     updateSkipButtonLabel();
 
     startButtonEl.addEventListener("click", startGame);
     checkButtonEl.addEventListener("click", checkWord);
     skipButtonEl.addEventListener("click", handleSkip);
+    chartButtonEl.addEventListener("click", openChartModal);
 
     wordInputEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
