@@ -55,7 +55,6 @@
             left: 52%;
             bottom: 26%;
             transform: translateX(-50%);
-        
             font-family: "RoadgeekUS", sans-serif;
             font-size: 3rem;
             letter-spacing: 0.33em;
@@ -289,7 +288,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v2</h1>
+<h1>The License Plate Game v10</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -385,10 +384,24 @@
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
 
-    // Probability split per plate shown
-    const EASY_PROB = 0.65;
-    const MED_PROB  = 0.20;
-    const HARD_PROB = 0.15; // (implicitly 1 - EASY_PROB - MED_PROB)
+    // 7 difficulty bucket probabilities
+    const VERY_EASY_PROB = 0.40; // 0–10
+    const EASY_PROB      = 0.20; // 11–34
+    const MEDIUM_PROB    = 0.15; // 35–49
+    const DIFFICULT_PROB = 0.10; // 50–79
+    const HARD_PROB      = 0.07; // 80–88
+    const VERY_HARD_PROB = 0.05; // 89–96
+    const IMPOSSIBLE_PROB= 0.03; // 97–100
+
+    const BAND_NAMES = [
+        "very_easy",
+        "easy",
+        "medium",
+        "difficult",
+        "hard",
+        "very_hard",
+        "impossible"
+    ];
 
     // --------- GLOBAL STATE ---------
     let WORDS = [];
@@ -403,9 +416,13 @@
     let platesReady = false;
 
     // Difficulty-banded lists
-    let EASY_PLATES = [];
-    let MEDIUM_PLATES = [];
-    let HARD_PLATES = [];
+    let VERY_EASY_PLATES = [];
+    let EASY_PLATES      = [];
+    let MEDIUM_PLATES    = [];
+    let DIFFICULT_PLATES = [];
+    let HARD_PLATES      = [];
+    let VERY_HARD_PLATES = [];
+    let IMPOSSIBLE_PLATES= [];
 
     // Plates already used in this run (no repeats)
     let usedPlates = new Set();
@@ -419,10 +436,10 @@
     let penaltySeconds = 0;
     let timerIntervalId = null;
 
-    let skipCount = 0; // track number of skips
-    let plateLocked = false; // prevent double submit / double skip on same plate
+    let skipCount = 0;
+    let plateLocked = false;
 
-    let gameModalMode = "start"; // "start" or "end"
+    let gameModalMode = "start";
 
     // DOM refs
     const plateEl = document.getElementById("plate");
@@ -506,17 +523,22 @@
         if (!dictionaryReady || !PLATE_DIFFICULTY || platesReady) return;
 
         const all = [];
-        const easy = [];
-        const med  = [];
-        const hard = [];
+
+        const ve = [];
+        const e  = [];
+        const m  = [];
+        const d  = [];
+        const h  = [];
+        const vh = [];
+        const im = [];
 
         for (const plate of Object.keys(PLATE_DIFFICULTY)) {
             const entry = PLATE_DIFFICULTY[plate];
 
-            // Skip if plate itself is a dictionary word (CAT, DOG, BUT, etc.)
+            // plate is a real word? skip.
             if (DICTIONARY.has(plate)) continue;
 
-            // Require viable word count > 0
+            // require viable word count > 0
             let viableCount = null;
             if (entry && typeof entry.viableCount === "number") {
                 viableCount = entry.viableCount;
@@ -531,31 +553,45 @@
             }
             if (viableCount <= 0) continue;
 
-            // Difficulty for banding
+            // difficulty for banding
             let diff = (entry && typeof entry.difficulty === "number")
                 ? entry.difficulty
-                : 50; // treat missing as medium-ish
+                : 50; // default medium-ish
 
             all.push(plate);
 
-            if (diff <= 20) {
-                easy.push(plate);
+            if (diff <= 10) {
+                ve.push(plate);                 // Very easy (0–10)
+            } else if (diff <= 34) {
+                e.push(plate);                  // Easy (11–34)
+            } else if (diff <= 49) {
+                m.push(plate);                  // Medium (35–49)
             } else if (diff <= 79) {
-                med.push(plate);
+                d.push(plate);                  // Difficult (50–79)
+            } else if (diff <= 88) {
+                h.push(plate);                  // Hard (80–88)
+            } else if (diff <= 96) {
+                vh.push(plate);                 // Very hard (89–96)
             } else {
-                hard.push(plate);
+                im.push(plate);                 // Impossible (97–100)
             }
         }
 
-        ALL_PLATES     = all;
-        EASY_PLATES    = easy;
-        MEDIUM_PLATES  = med;
-        HARD_PLATES    = hard;
-        platesReady    = true;
+        ALL_PLATES        = all;
+        VERY_EASY_PLATES  = ve;
+        EASY_PLATES       = e;
+        MEDIUM_PLATES     = m;
+        DIFFICULT_PLATES  = d;
+        HARD_PLATES       = h;
+        VERY_HARD_PLATES  = vh;
+        IMPOSSIBLE_PLATES = im;
+
+        platesReady = true;
 
         debugEl.textContent +=
             ` | ${ALL_PLATES.length.toLocaleString()} viable plates` +
-            ` (Easy: ${EASY_PLATES.length}, Med: ${MEDIUM_PLATES.length}, Hard: ${HARD_PLATES.length})`;
+            ` (VE: ${VERY_EASY_PLATES.length}, E: ${EASY_PLATES.length}, M: ${MEDIUM_PLATES.length}, ` +
+            `D: ${DIFFICULT_PLATES.length}, H: ${HARD_PLATES.length}, VH: ${VERY_HARD_PLATES.length}, IMP: ${IMPOSSIBLE_PLATES.length})`;
 
         maybeEnableStart();
     }
@@ -618,22 +654,53 @@
         return count;
     }
 
-    // --------- PER-GAME RANDOM PLATE (BANDED, NO REPEATS) ---------
-    function pickRandomPlateFromBand(bandName) {
-        let poolRef;
-        if (bandName === "easy") {
-            poolRef = EASY_PLATES;
-        } else if (bandName === "medium") {
-            poolRef = MEDIUM_PLATES;
-        } else {
-            poolRef = HARD_PLATES;
+    // --------- PER-GAME RANDOM PLATE (7 BANDS, NO REPEATS) ---------
+    function getBandPool(bandName) {
+        switch (bandName) {
+            case "very_easy":   return VERY_EASY_PLATES;
+            case "easy":        return EASY_PLATES;
+            case "medium":      return MEDIUM_PLATES;
+            case "difficult":   return DIFFICULT_PLATES;
+            case "hard":        return HARD_PLATES;
+            case "very_hard":   return VERY_HARD_PLATES;
+            case "impossible":  return IMPOSSIBLE_PLATES;
+            default:            return [];
         }
+    }
 
+    function pickRandomPlateFromBand(bandName) {
+        const poolRef = getBandPool(bandName);
         const remaining = poolRef.filter(p => !usedPlates.has(p));
         if (remaining.length === 0) return null;
 
         const idx = Math.floor(Math.random() * remaining.length);
         return remaining[idx];
+    }
+
+    function choosePrimaryBand() {
+        const r = Math.random();
+        let threshold = 0;
+
+        threshold += VERY_EASY_PROB;
+        if (r < threshold) return "very_easy";
+
+        threshold += EASY_PROB;
+        if (r < threshold) return "easy";
+
+        threshold += MEDIUM_PROB;
+        if (r < threshold) return "medium";
+
+        threshold += DIFFICULT_PROB;
+        if (r < threshold) return "difficult";
+
+        threshold += HARD_PROB;
+        if (r < threshold) return "hard";
+
+        threshold += VERY_HARD_PROB;
+        if (r < threshold) return "very_hard";
+
+        // Anything left falls into impossible
+        return "impossible";
     }
 
     function pickRandomPlate() {
@@ -643,7 +710,6 @@
             return;
         }
 
-        // If we've used all plates, we can't show a new one
         if (usedPlates.size === ALL_PLATES.length) {
             resultEl.textContent = "You’ve seen all available plates! Ending this run.";
             resultEl.style.color = "red";
@@ -651,22 +717,14 @@
             return;
         }
 
-        // Step 1: pick a band based on probabilities
-        const r = Math.random();
-        let primaryBand;
-        if (r < EASY_PROB) {
-            primaryBand = "easy";
-        } else if (r < EASY_PROB + MED_PROB) {
-            primaryBand = "medium";
-        } else {
-            primaryBand = "hard";
-        }
+        const primaryBand = choosePrimaryBand();
 
-        // Step 2: attempt to pick from primary band, then fall back to others
-        const bandOrder =
-            primaryBand === "easy"   ? ["easy", "medium", "hard"] :
-            primaryBand === "medium" ? ["medium", "easy", "hard"] :
-                                       ["hard", "medium", "easy"];
+        // Rotate band order so we start with primary, then fall back around the circle
+        const startIndex = BAND_NAMES.indexOf(primaryBand);
+        const bandOrder = [];
+        for (let i = 0; i < BAND_NAMES.length; i++) {
+            bandOrder.push(BAND_NAMES[(startIndex + i) % BAND_NAMES.length]);
+        }
 
         let chosen = null;
         for (const band of bandOrder) {
@@ -674,8 +732,7 @@
             if (chosen) break;
         }
 
-        // If for some reason all bands are exhausted (should only happen if ALL_PLATES are used),
-        // fall back to any remaining plate (defensive)
+        // Fallback just in case
         if (!chosen) {
             const remaining = ALL_PLATES.filter(p => !usedPlates.has(p));
             if (remaining.length === 0) {
@@ -779,7 +836,7 @@
         penaltySeconds = 0;
         skipCount = 0;
         plateLocked = false;
-        usedPlates = new Set(); // reset used plates for this run
+        usedPlates = new Set();
         updateSkipButtonLabel();
 
         if (timerIntervalId) clearInterval(timerIntervalId);
@@ -1092,7 +1149,7 @@
         const plateUpper = plate.toUpperCase();
         const wordUpper = word.toUpperCase();
 
-        // 1) Check for missing letters
+        // 1) missing letters
         const missing = [];
         for (const ch of plateUpper) {
             if (!wordUpper.includes(ch)) {
@@ -1107,7 +1164,7 @@
                    `It’s missing the ${letterWord}: <strong>${missingList}</strong>.`;
         }
 
-        // 2) All letters present, but order is wrong
+        // 2) all letters present, but wrong order
         const firstOccurrences = [];
         for (const ch of plateUpper) {
             const idx = wordUpper.indexOf(ch);
@@ -1263,7 +1320,6 @@
 
     gameModalCloseBtnEl.addEventListener("click", () => {
         closeGameModal();
-        // If user closes the start modal without starting, show main "Start Game" button
         if (!gameStarted && !gameOver && gameModalMode === "start") {
             showStartGameButton();
         }
