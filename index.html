@@ -289,7 +289,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v5</h1>
+<h1>The License Plate Game v2</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -385,6 +385,11 @@
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
 
+    // Probability split per plate shown
+    const EASY_PROB = 0.65;
+    const MED_PROB  = 0.20;
+    const HARD_PROB = 0.15; // (implicitly 1 - EASY_PROB - MED_PROB)
+
     // --------- GLOBAL STATE ---------
     let WORDS = [];
     let DICTIONARY = new Set();
@@ -393,9 +398,14 @@
     let PLATE_DIFFICULTY = null;
     let difficultyReady = false;
 
-    // All viable plates according to your rules
+    // All viable plates according to rules
     let ALL_PLATES = [];
     let platesReady = false;
+
+    // Difficulty-banded lists
+    let EASY_PLATES = [];
+    let MEDIUM_PLATES = [];
+    let HARD_PLATES = [];
 
     // Plates already used in this run (no repeats)
     let usedPlates = new Set();
@@ -491,19 +501,22 @@
         }
     }
 
-    // Build ALL_PLATES once both dictionary + difficulty are ready
+    // Build ALL_PLATES + difficulty bands once both dictionary + difficulty are ready
     function tryBuildPlateList() {
         if (!dictionaryReady || !PLATE_DIFFICULTY || platesReady) return;
 
-        const plates = [];
+        const all = [];
+        const easy = [];
+        const med  = [];
+        const hard = [];
 
         for (const plate of Object.keys(PLATE_DIFFICULTY)) {
             const entry = PLATE_DIFFICULTY[plate];
 
-            // (1) skip if plate itself is a dictionary word (CAT, DOG, BUT, etc.)
+            // Skip if plate itself is a dictionary word (CAT, DOG, BUT, etc.)
             if (DICTIONARY.has(plate)) continue;
 
-            // (2) require viable word count > 0
+            // Require viable word count > 0
             let viableCount = null;
             if (entry && typeof entry.viableCount === "number") {
                 viableCount = entry.viableCount;
@@ -513,20 +526,37 @@
                 viableCount = entry.count;
             }
 
-            // If JSON doesn't store count, compute from dictionary as fallback
             if (viableCount === null) {
                 viableCount = computeJsViableCount(plate);
             }
-
             if (viableCount <= 0) continue;
 
-            plates.push(plate);
+            // Difficulty for banding
+            let diff = (entry && typeof entry.difficulty === "number")
+                ? entry.difficulty
+                : 50; // treat missing as medium-ish
+
+            all.push(plate);
+
+            if (diff <= 20) {
+                easy.push(plate);
+            } else if (diff <= 79) {
+                med.push(plate);
+            } else {
+                hard.push(plate);
+            }
         }
 
-        ALL_PLATES = plates;
-        platesReady = true;
+        ALL_PLATES     = all;
+        EASY_PLATES    = easy;
+        MEDIUM_PLATES  = med;
+        HARD_PLATES    = hard;
+        platesReady    = true;
 
-        debugEl.textContent += ` | Loaded ${ALL_PLATES.length.toLocaleString()} viable plates.`;
+        debugEl.textContent +=
+            ` | ${ALL_PLATES.length.toLocaleString()} viable plates` +
+            ` (Easy: ${EASY_PLATES.length}, Med: ${MEDIUM_PLATES.length}, Hard: ${HARD_PLATES.length})`;
+
         maybeEnableStart();
     }
 
@@ -588,7 +618,24 @@
         return count;
     }
 
-    // --------- PER-GAME RANDOM PLATE (NO REPEATS) ---------
+    // --------- PER-GAME RANDOM PLATE (BANDED, NO REPEATS) ---------
+    function pickRandomPlateFromBand(bandName) {
+        let poolRef;
+        if (bandName === "easy") {
+            poolRef = EASY_PLATES;
+        } else if (bandName === "medium") {
+            poolRef = MEDIUM_PLATES;
+        } else {
+            poolRef = HARD_PLATES;
+        }
+
+        const remaining = poolRef.filter(p => !usedPlates.has(p));
+        if (remaining.length === 0) return null;
+
+        const idx = Math.floor(Math.random() * remaining.length);
+        return remaining[idx];
+    }
+
     function pickRandomPlate() {
         if (!platesReady || ALL_PLATES.length === 0) {
             resultEl.textContent = "No viable plates available.";
@@ -604,15 +651,47 @@
             return;
         }
 
-        // Build a list of remaining plates (not used yet in this run)
-        const remaining = ALL_PLATES.filter(p => !usedPlates.has(p));
-        const idx = Math.floor(Math.random() * remaining.length);
-        const plate = remaining[idx];
+        // Step 1: pick a band based on probabilities
+        const r = Math.random();
+        let primaryBand;
+        if (r < EASY_PROB) {
+            primaryBand = "easy";
+        } else if (r < EASY_PROB + MED_PROB) {
+            primaryBand = "medium";
+        } else {
+            primaryBand = "hard";
+        }
 
-        usedPlates.add(plate);
-        currentPlate = plate;
+        // Step 2: attempt to pick from primary band, then fall back to others
+        const bandOrder =
+            primaryBand === "easy"   ? ["easy", "medium", "hard"] :
+            primaryBand === "medium" ? ["medium", "easy", "hard"] :
+                                       ["hard", "medium", "easy"];
 
-        plateEl.textContent = plate;
+        let chosen = null;
+        for (const band of bandOrder) {
+            chosen = pickRandomPlateFromBand(band);
+            if (chosen) break;
+        }
+
+        // If for some reason all bands are exhausted (should only happen if ALL_PLATES are used),
+        // fall back to any remaining plate (defensive)
+        if (!chosen) {
+            const remaining = ALL_PLATES.filter(p => !usedPlates.has(p));
+            if (remaining.length === 0) {
+                resultEl.textContent = "No unused plates left. Ending this run.";
+                resultEl.style.color = "red";
+                endGame();
+                return;
+            }
+            const idx = Math.floor(Math.random() * remaining.length);
+            chosen = remaining[idx];
+        }
+
+        usedPlates.add(chosen);
+        currentPlate = chosen;
+
+        plateEl.textContent = chosen;
         resultEl.textContent = "";
         resultEl.style.color = "";
 
@@ -622,7 +701,7 @@
         wordInputEl.disabled = false;
         wordInputEl.readOnly = false;
 
-        updateDifficultyDisplay(plate);
+        updateDifficultyDisplay(chosen);
         wordInputEl.value = "";
         wordInputEl.focus();
     }
