@@ -341,7 +341,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v4</h1>
+<h1>The License Plate Game v40</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -637,17 +637,22 @@
         for (const plate of Object.keys(PLATE_DIFFICULTY)) {
             const entry = PLATE_DIFFICULTY[plate];
 
-            // Exclude if plate itself is a word in the dictionary
             if (DICTIONARY.has(plate)) continue;
 
-            // Always recompute viable count from the *current* JS dictionary
-            const viableCountJs = computeJsViableCount(plate);
-            if (viableCountJs <= 0) {
-                // No viable words in the current words.txt; never include this plate in gameplay
-                continue;
+            let viableCount = null;
+            if (entry && typeof entry.viableCount === "number") {
+                viableCount = entry.viableCount;
+            } else if (entry && typeof entry.viable_count === "number") {
+                viableCount = entry.viable_count;
+            } else if (entry && typeof entry.count === "number") {
+                viableCount = entry.count;
             }
 
-            // Difficulty score still comes from JSON
+            if (viableCount === null) {
+                viableCount = computeJsViableCount(plate);
+            }
+            if (viableCount <= 0) continue;
+
             let diff = (entry && typeof entry.difficulty === "number")
                 ? entry.difficulty
                 : 50;
@@ -1237,7 +1242,7 @@
             }
         }
 
-        matches.sort(); // baseline
+        matches.sort(); // initial baseline; we re-sort in renderWordsList anyway
         currentWordsModalMatches = matches;
 
         const countFromScan = matches.length;
