@@ -962,9 +962,10 @@
         gameModalBodyEl.innerHTML = `
             <p><strong>How it works:</strong></p>
             <ul>
-                <li>You will get <strong>${TOTAL_PLATES}</strong> random license plates, one after another.</li>
-                <li>Your goal is to enter a word that contains the three plate letters <em>in order</em> (not necessarily consecutively).</li>
-                <li>Example: plate <strong>PMS</strong> – <strong>promise</strong> works, but <strong>spams</strong> does not (the S appears before the M).</li>
+                <li>You will see <strong>${TOTAL_PLATES}</strong> random license plates, one after another.</li>
+                <li>Enter a word that contains the three plate letters <em>in order</em> (not necessarily consecutively).</li>
+                <li>The first instance of each letter must come in order. If your plate is <strong>ABC</strong>, then the first A must appear before the first B or C.</li>
+                <li>Example: plate <strong>PMS</strong> – <strong>"promise"</strong> works, but <strong>"spams"</strong> does not ("spams" contains PMS, but the first S appears before the the first M).</li>
                 <li>You can press <strong>Skip</strong>, but it adds an increasing time penalty: +5s, then +10s, +15s, ...</li>
                 <li>Click any solved plate in the table to see <strong>all</strong> viable words for that plate.</li>
             </ul>
