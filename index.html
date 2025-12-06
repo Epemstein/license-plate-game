@@ -384,18 +384,21 @@
 <script>
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
-    const TARGET_FUNKY_SHARE = 0.3; // ~30% plates with J/Q/X/Z
 
     // --------- GLOBAL STATE ---------
     let WORDS = [];
     let DICTIONARY = new Set();
     let dictionaryReady = false;
 
-    let FUNKY_WORDS = [];
-    let NORMAL_WORDS = [];
-
     let PLATE_DIFFICULTY = null;
     let difficultyReady = false;
+
+    // All viable plates according to your rules
+    let ALL_PLATES = [];
+    let platesReady = false;
+
+    // Plates already used in this run (no repeats)
+    let usedPlates = new Set();
 
     let currentPlate = null;
 
@@ -449,8 +452,6 @@
             const text = await res.text();
 
             WORDS = [];
-            FUNKY_WORDS = [];
-            NORMAL_WORDS = [];
             DICTIONARY = new Set();
 
             for (const line of text.split(/\r?\n/)) {
@@ -461,17 +462,12 @@
 
                 WORDS.push(w);
                 DICTIONARY.add(w.toUpperCase());
-
-                if (/[jqxz]/.test(w)) {
-                    FUNKY_WORDS.push(w);
-                } else {
-                    NORMAL_WORDS.push(w);
-                }
             }
 
             dictionaryReady = true;
             debugEl.textContent = `Loaded ${WORDS.length.toLocaleString()} words.`;
-            maybeEnableStart();
+
+            tryBuildPlateList();
         } catch (err) {
             console.error(err);
             resultEl.textContent = "Failed to load words.txt.";
@@ -484,17 +480,58 @@
             const res = await fetch("plate_difficulty.json?v=2");
             PLATE_DIFFICULTY = await res.json();
             difficultyReady = true;
-            maybeEnableStart();
+
+            tryBuildPlateList();
         } catch (err) {
             console.warn("Difficulty JSON not loaded:", err);
             PLATE_DIFFICULTY = null;
             difficultyReady = false;
+        } finally {
             maybeEnableStart();
         }
     }
 
+    // Build ALL_PLATES once both dictionary + difficulty are ready
+    function tryBuildPlateList() {
+        if (!dictionaryReady || !PLATE_DIFFICULTY || platesReady) return;
+
+        const plates = [];
+
+        for (const plate of Object.keys(PLATE_DIFFICULTY)) {
+            const entry = PLATE_DIFFICULTY[plate];
+
+            // (1) skip if plate itself is a dictionary word (CAT, DOG, BUT, etc.)
+            if (DICTIONARY.has(plate)) continue;
+
+            // (2) require viable word count > 0
+            let viableCount = null;
+            if (entry && typeof entry.viableCount === "number") {
+                viableCount = entry.viableCount;
+            } else if (entry && typeof entry.viable_count === "number") {
+                viableCount = entry.viable_count;
+            } else if (entry && typeof entry.count === "number") {
+                viableCount = entry.count;
+            }
+
+            // If JSON doesn't store count, compute from dictionary as fallback
+            if (viableCount === null) {
+                viableCount = computeJsViableCount(plate);
+            }
+
+            if (viableCount <= 0) continue;
+
+            plates.push(plate);
+        }
+
+        ALL_PLATES = plates;
+        platesReady = true;
+
+        debugEl.textContent += ` | Loaded ${ALL_PLATES.length.toLocaleString()} viable plates.`;
+        maybeEnableStart();
+    }
+
     function maybeEnableStart() {
-        const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
+        const ready = dictionaryReady && difficultyReady && platesReady;
 
         startButtonEl.disabled = !ready;
 
@@ -551,91 +588,43 @@
         return count;
     }
 
-    // --------- PLATE GENERATION ---------
-    function plateHasFunkyLetter(plate) {
-        return /[JQXZ]/.test(plate);
-    }
-
-    function generatePlateFromWord(word) {
-        const upper = word.toUpperCase();
-        const len = upper.length;
-        if (len < 3) return null;
-
-        for (let attempt = 0; attempt < 40; attempt++) {
-            const i = Math.floor(Math.random() * (len - 2));
-            const j = i + 1 + Math.floor(Math.random() * (len - i - 2));
-            const k = j + 1 + Math.floor(Math.random() * (len - j - 1));
-
-            const a = upper[i], b = upper[j], c = upper[k];
-            if (a === b || a === c || b === c) continue;
-
-            const plate = a + b + c;
-
-            if (DICTIONARY.has(plate)) continue;
-            if (!wordMatchesPlate(plate, upper)) continue;
-
-            return plate;
-        }
-        return null;
-    }
-
+    // --------- PER-GAME RANDOM PLATE (NO REPEATS) ---------
     function pickRandomPlate() {
-        if (!dictionaryReady) {
-            resultEl.textContent = "Dictionary still loading...";
-            resultEl.style.color = "red";
-            return;
-        }
-        if (gameOver || !gameStarted) {
-            return;
-        }
-
-        if (WORDS.length === 0) {
-            plateEl.textContent = "ERR";
-            resultEl.textContent = "No words available.";
+        if (!platesReady || ALL_PLATES.length === 0) {
+            resultEl.textContent = "No viable plates available.";
             resultEl.style.color = "red";
             return;
         }
 
-        const wantFunky = Math.random() < TARGET_FUNKY_SHARE;
-        let sourceWords;
-
-        if (wantFunky && FUNKY_WORDS.length > 0) {
-            sourceWords = FUNKY_WORDS;
-        } else if (!wantFunky && NORMAL_WORDS.length > 0) {
-            sourceWords = NORMAL_WORDS;
-        } else {
-            sourceWords = WORDS;
-        }
-
-        for (let attempts = 0; attempts < 500; attempts++) {
-            const word = sourceWords[Math.floor(Math.random() * sourceWords.length)];
-            const plate = generatePlateFromWord(word);
-            if (!plate) continue;
-
-            const isFunky = plateHasFunkyLetter(plate);
-            if (wantFunky && !isFunky) continue;
-            if (!wantFunky && isFunky) continue;
-
-            currentPlate = plate;
-            plateEl.textContent = plate;
-            resultEl.textContent = "";
-            resultEl.style.color = "";
-
-            plateLocked = false;
-            checkButtonEl.disabled = false;
-            skipButtonEl.disabled = false;
-            wordInputEl.disabled = false;
-            wordInputEl.readOnly = false;
-
-            updateDifficultyDisplay(plate);
-            wordInputEl.value = "";
-            wordInputEl.focus();
+        // If we've used all plates, we can't show a new one
+        if (usedPlates.size === ALL_PLATES.length) {
+            resultEl.textContent = "You’ve seen all available plates! Ending this run.";
+            resultEl.style.color = "red";
+            endGame();
             return;
         }
 
-        plateEl.textContent = "ERR";
-        resultEl.textContent = "Could not generate plate.";
-        resultEl.style.color = "red";
+        // Build a list of remaining plates (not used yet in this run)
+        const remaining = ALL_PLATES.filter(p => !usedPlates.has(p));
+        const idx = Math.floor(Math.random() * remaining.length);
+        const plate = remaining[idx];
+
+        usedPlates.add(plate);
+        currentPlate = plate;
+
+        plateEl.textContent = plate;
+        resultEl.textContent = "";
+        resultEl.style.color = "";
+
+        plateLocked = false;
+        checkButtonEl.disabled = false;
+        skipButtonEl.disabled = false;
+        wordInputEl.disabled = false;
+        wordInputEl.readOnly = false;
+
+        updateDifficultyDisplay(plate);
+        wordInputEl.value = "";
+        wordInputEl.focus();
     }
 
     // --------- DIFFICULTY DISPLAY ---------
@@ -689,7 +678,7 @@
     function showStartGameButton() {
         startButtonEl.style.display = "inline-block";
         startButtonEl.textContent = "Start Game";
-        const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
+        const ready = dictionaryReady && difficultyReady && platesReady;
         startButtonEl.disabled = !ready;
     }
 
@@ -711,6 +700,7 @@
         penaltySeconds = 0;
         skipCount = 0;
         plateLocked = false;
+        usedPlates = new Set(); // reset used plates for this run
         updateSkipButtonLabel();
 
         if (timerIntervalId) clearInterval(timerIntervalId);
@@ -738,9 +728,15 @@
     }
 
     function startGame() {
-        const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
+        const ready = dictionaryReady && difficultyReady && platesReady;
         if (!ready) {
             resultEl.textContent = "Still loading…";
+            resultEl.style.color = "red";
+            return;
+        }
+
+        if (ALL_PLATES.length === 0) {
+            resultEl.textContent = "No viable plates to start the game.";
             resultEl.style.color = "red";
             return;
         }
@@ -972,16 +968,16 @@
         gameModalBodyEl.innerHTML = `
             <p><strong>How it works:</strong></p>
             <ul>
-                <li>You will see <strong>${TOTAL_PLATES}</strong> random license plates, one after another.</li>
+                <li>You will see plates one after another until you correctly solve <strong>${TOTAL_PLATES}</strong>.</li>
                 <li>Enter a word that contains the three plate letters <em>in order</em> (not necessarily consecutively).</li>
                 <li>The first instance of each letter must come in order. If your plate is <strong>ABC</strong>, then the first A must appear before the first B or C.</li>
-                <li>Example: plate <strong>PMS</strong> – <strong>"promise"</strong> works, but <strong>"spams"</strong> does not ("spams" contains PMS, but the first S appears before the the first M).</li>
+                <li>Example: plate <strong>PMS</strong> – <strong>"promise"</strong> works, but <strong>"spams"</strong> does not ("spams" contains PMS, but the first S appears before the first M).</li>
                 <li>You can press <strong>Skip</strong>, but it adds an increasing time penalty: +5s, then +10s, +15s, ...</li>
                 <li>Click any solved plate in the table to see <strong>all</strong> viable words for that plate.</li>
             </ul>
         `;
 
-        const ready = dictionaryReady && (difficultyReady || PLATE_DIFFICULTY === null);
+        const ready = dictionaryReady && difficultyReady && platesReady;
         gameModalPrimaryBtnEl.disabled = !ready;
         gameModalPrimaryBtnEl.textContent = ready ? "Start Game" : "Loading...";
 
@@ -1078,7 +1074,6 @@
 
         const matchIndices = getPlateMatchIndices(currentPlate, rawWord);
         if (!matchIndices) {
-            // More detailed explanation of why it failed
             const html = explainPlateMismatch(currentPlate, rawWord);
             resultEl.innerHTML = html;
             resultEl.style.color = "red";
@@ -1126,11 +1121,13 @@
             return;
         }
 
+        // Lock this plate so skip can't be spammed
         plateLocked = true;
         checkButtonEl.disabled = true;
         skipButtonEl.disabled = true;
         wordInputEl.readOnly = true;
 
+        // Escalating penalty: 5s, 10s, 15s, ...
         skipCount += 1;
         const added = skipCount * 5;
         penaltySeconds += added;
@@ -1181,11 +1178,13 @@
     });
 
     gameModalSecondaryBtnEl.addEventListener("click", () => {
+        // "See results" just closes modal
         closeGameModal();
     });
 
     gameModalCloseBtnEl.addEventListener("click", () => {
         closeGameModal();
+        // If user closes the start modal without starting, show main "Start Game" button
         if (!gameStarted && !gameOver && gameModalMode === "start") {
             showStartGameButton();
         }
