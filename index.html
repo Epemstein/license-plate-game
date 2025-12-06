@@ -288,7 +288,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v11</h1>
+<h1>The License Plate Game v4</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -333,6 +333,7 @@
             <tr>
                 <th>Plate</th>
                 <th>Word / Penalty</th>
+                <th>Time</th>
                 <th>Difficulty</th>
             </tr>
             </thead>
@@ -384,7 +385,7 @@
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
 
-    // 7 difficulty bucket probabilities
+    // 7 difficulty bucket probabilities (your current values)
     const VERY_EASY_PROB = 0.40; // 0–10
     const EASY_PROB      = 0.20; // 11–34
     const MEDIUM_PROB    = 0.15; // 35–49
@@ -440,6 +441,9 @@
     let plateLocked = false;
 
     let gameModalMode = "start";
+
+    // per-plate timing
+    let plateStartTime = null;
 
     // DOM refs
     const plateEl = document.getElementById("plate");
@@ -758,6 +762,8 @@
         wordInputEl.disabled = false;
         wordInputEl.readOnly = false;
 
+        plateStartTime = performance.now(); // start timing this plate
+
         updateDifficultyDisplay(chosen);
         wordInputEl.value = "";
         wordInputEl.focus();
@@ -837,6 +843,7 @@
         skipCount = 0;
         plateLocked = false;
         usedPlates = new Set();
+        plateStartTime = null;
         updateSkipButtonLabel();
 
         if (timerIntervalId) clearInterval(timerIntervalId);
@@ -958,7 +965,15 @@
         });
     }
 
-    function addToHistoryWithAnimation(plate, word, matchIndices, fromRectWord, diffScore, onComplete) {
+    function addToHistoryWithAnimation(
+        plate,
+        word,
+        matchIndices,
+        fromRectWord,
+        diffScore,
+        timeLabel,
+        onComplete
+    ) {
         if (!plate || !word) {
             if (onComplete) onComplete();
             return;
@@ -971,6 +986,7 @@
 
         const plateTd = document.createElement("td");
         const wordTd = document.createElement("td");
+        const timeTd = document.createElement("td");
         const diffTd = document.createElement("td");
 
         plateTd.textContent = plate;
@@ -991,6 +1007,8 @@
             wordTd.textContent = word;
         }
 
+        timeTd.textContent = timeLabel || "—";
+
         if (diffScore === null || diffScore <= 0) {
             diffTd.textContent = "—";
         } else {
@@ -1000,6 +1018,7 @@
 
         row.appendChild(plateTd);
         row.appendChild(wordTd);
+        row.appendChild(timeTd);
         row.appendChild(diffTd);
 
         if (historyBodyEl.firstChild) {
@@ -1232,13 +1251,27 @@
         const word = rawWord.toLowerCase();
         const diffScore = getPlateDifficultyScore(plate);
 
-        addToHistoryWithAnimation(plate, word, matchIndices, null, diffScore, () => {
-            if (solvedCount >= TOTAL_PLATES) {
-                endGame();
-            } else {
-                pickRandomPlate();
+        let timeLabel = "—";
+        if (plateStartTime != null) {
+            const elapsedSec = (performance.now() - plateStartTime) / 1000;
+            timeLabel = `${elapsedSec.toFixed(1)}s`;
+        }
+
+        addToHistoryWithAnimation(
+            plate,
+            word,
+            matchIndices,
+            null,
+            diffScore,
+            timeLabel,
+            () => {
+                if (solvedCount >= TOTAL_PLATES) {
+                    endGame();
+                } else {
+                    pickRandomPlate();
+                }
             }
-        });
+        );
     }
 
     function handleSkip() {
@@ -1276,10 +1309,24 @@
         const diffScore = getPlateDifficultyScore(plate);
         const skipRect = skipButtonEl.getBoundingClientRect();
 
-        addToHistoryWithAnimation(plate, penaltyLabel, null, skipRect, diffScore, () => {
-            updateSkipButtonLabel();
-            pickRandomPlate();
-        });
+        let timeLabel = "—";
+        if (plateStartTime != null) {
+            const elapsedSec = (performance.now() - plateStartTime) / 1000;
+            timeLabel = `${elapsedSec.toFixed(1)}s (+${added}s)`;
+        }
+
+        addToHistoryWithAnimation(
+            plate,
+            penaltyLabel,
+            null,
+            skipRect,
+            diffScore,
+            timeLabel,
+            () => {
+                updateSkipButtonLabel();
+                pickRandomPlate();
+            }
+        );
     }
 
     // --------- INIT ---------
