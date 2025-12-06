@@ -323,7 +323,6 @@
             border-color: #111827;
         }
 
-        /* Chart container */
         #resultsChart {
             width: 100%;
             min-height: 320px;
@@ -336,12 +335,11 @@
         }
     </style>
 
-    <!-- Chart.js for the end-of-game chart -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-<h1>The License Plate Game v41</h1>
+<h1>The License Plate Game v4</h1>
 
 <div class="layout">
     <!-- LEFT PANEL -->
@@ -464,7 +462,6 @@
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
 
-    // Difficulty bucket probabilities
     const VERY_EASY_PROB = 0.40; // 0–10
     const EASY_PROB      = 0.20; // 11–34
     const MEDIUM_PROB    = 0.15; // 35–49
@@ -491,7 +488,6 @@
     let PLATE_DIFFICULTY = null;
     let difficultyReady = false;
 
-    // Plate lists
     let ALL_PLATES = [];
     let platesReady = false;
 
@@ -503,9 +499,7 @@
     let VERY_HARD_PLATES = [];
     let IMPOSSIBLE_PLATES= [];
 
-    // Plates already used in this run (no repeats)
     let usedPlates = new Set();
-
     let currentPlate = null;
 
     let gameStarted = false;
@@ -519,14 +513,11 @@
     let plateLocked = false;
 
     let gameModalMode = "start";
+    let hasStartedOnce = false;
 
-    // per-plate timing
     let plateStartTime = null;
-
-    // per-run history for chart
     let gameHistory = [];
 
-    // words modal sorting state
     let currentWordsModalMatches = [];
     let currentWordsModalPlate = null;
     let currentWordsModalSortMode = "alpha";
@@ -547,7 +538,6 @@
     const skipButtonEl = document.getElementById("skipButton");
     const chartButtonEl = document.getElementById("chartButton");
 
-    // Game modal refs
     const gameModalBackdropEl = document.getElementById("gameModalBackdrop");
     const gameModalTitleEl = document.getElementById("gameModalTitle");
     const gameModalBodyEl = document.getElementById("gameModalBody");
@@ -555,7 +545,6 @@
     const gameModalSecondaryBtnEl = document.getElementById("gameModalSecondaryBtn");
     const gameModalCloseBtnEl = document.getElementById("gameModalCloseBtn");
 
-    // Words modal refs
     const wordsModalBackdropEl = document.getElementById("wordsModalBackdrop");
     const wordsModalTitleEl = document.getElementById("wordsModalTitle");
     const wordsModalStatusEl = document.getElementById("wordsModalStatus");
@@ -565,7 +554,6 @@
     const wordsSortAlphaBtnEl = document.getElementById("wordsSortAlphaBtn");
     const wordsSortLengthBtnEl = document.getElementById("wordsSortLengthBtn");
 
-    // Chart modal refs
     const chartModalBackdropEl = document.getElementById("chartModalBackdrop");
     const chartModalCloseBtnEl = document.getElementById("chartModalCloseBtn");
     const chartModalCloseBtnBottomEl = document.getElementById("chartModalCloseBtnBottom");
@@ -618,7 +606,6 @@
         }
     }
 
-    // Build ALL_PLATES + difficulty bands once both dictionary + difficulty are ready
     function tryBuildPlateList() {
         if (!dictionaryReady || !PLATE_DIFFICULTY || platesReady) return;
 
@@ -635,7 +622,6 @@
         for (const plate of Object.keys(PLATE_DIFFICULTY)) {
             const entry = PLATE_DIFFICULTY[plate];
 
-            // Exclude if plate itself is a word in the dictionary
             if (DICTIONARY.has(plate)) continue;
 
             let diff = (entry && typeof entry.difficulty === "number")
@@ -724,7 +710,6 @@
         return getPlateMatchIndices(plate, word) !== null;
     }
 
-    // --------- JS-BASED VIABLE COUNT (used on-demand) ---------
     function computeJsViableCount(plate) {
         if (!dictionaryReady || !plate) return 0;
         let count = 0;
@@ -736,7 +721,7 @@
         return count;
     }
 
-    // --------- PER-GAME RANDOM PLATE (7 BANDS, NO REPEATS, JS viability check) ---------
+    // --------- PLATE SELECTION ---------
     function getBandPool(bandName) {
         switch (bandName) {
             case "very_easy":   return VERY_EASY_PLATES;
@@ -799,7 +784,6 @@
         }
 
         const primaryBand = choosePrimaryBand();
-
         const startIndex = BAND_NAMES.indexOf(primaryBand);
         const bandOrder = [];
         for (let i = 0; i < BAND_NAMES.length; i++) {
@@ -824,10 +808,8 @@
             chosen = remaining[idx];
         }
 
-        // Mark as used for this run
         usedPlates.add(chosen);
 
-        // JS check: if this plate has 0 viable words according to current dictionary, skip it
         const jsCount = computeJsViableCount(chosen);
         if (jsCount <= 0) {
             if (usedPlates.size === ALL_PLATES.length) {
@@ -836,7 +818,6 @@
                 endGame();
                 return;
             }
-            // Re-roll for another plate
             pickRandomPlate();
             return;
         }
@@ -860,7 +841,7 @@
         wordInputEl.focus();
     }
 
-    // --------- DIFFICULTY DISPLAY ---------
+    // --------- DIFFICULTY ---------
     function classifyDifficulty(score) {
         if (score >= 80) return "diff-hard";
         if (score >= 40) return "diff-med";
@@ -915,9 +896,9 @@
         startButtonEl.disabled = !ready;
     }
 
-    function showPlayAgainButton() {
+    function showRestartGameButton() {
         startButtonEl.style.display = "inline-block";
-        startButtonEl.textContent = "Play again";
+        startButtonEl.textContent = "Restart game";
         startButtonEl.disabled = false;
     }
 
@@ -973,7 +954,17 @@
         historyEmptyEl.style.display = "block";
     }
 
-    function startGame() {
+    function beginNewRun() {
+        resetGameState();
+        gameStarted = true;
+        gameOver = false;
+        startTime = performance.now();
+        timerIntervalId = setInterval(updateTimer, 100);
+        updateProgressDisplay();
+        pickRandomPlate();
+    }
+
+    function startGameFromModal() {
         const ready = dictionaryReady && difficultyReady && platesReady;
         if (!ready) {
             resultEl.textContent = "Still loading…";
@@ -988,16 +979,33 @@
         }
 
         closeGameModal();
-        hideMainStartButton();
         hideChartButton();
 
-        resetGameState();
-        gameStarted = true;
-        gameOver = false;
-        startTime = performance.now();
-        timerIntervalId = setInterval(updateTimer, 100);
-        updateProgressDisplay();
-        pickRandomPlate();
+        hasStartedOnce = true;
+        showRestartGameButton();
+
+        beginNewRun();
+    }
+
+    function startOrRestartFromMain() {
+        const ready = dictionaryReady && difficultyReady && platesReady;
+        if (!ready) {
+            resultEl.textContent = "Still loading…";
+            resultEl.style.color = "red";
+            return;
+        }
+
+        if (ALL_PLATES.length === 0) {
+            resultEl.textContent = "No viable plates to start the game.";
+            resultEl.style.color = "red";
+            return;
+        }
+
+        hasStartedOnce = true;
+        showRestartGameButton();
+        hideChartButton();
+
+        beginNewRun();
     }
 
     function updateTimer() {
@@ -1033,7 +1041,7 @@
         wordInputEl.readOnly = true;
 
         openEndModal(totalSec);
-        showPlayAgainButton();
+        showRestartGameButton();
         showChartButton();
     }
 
@@ -1163,7 +1171,7 @@
         }, animDuration);
     }
 
-    // --------- MODAL: ALL VIABLE WORDS (WITH SORT TOGGLE) ---------
+    // --------- WORDS MODAL (SORTING) ---------
     function setWordsSortMode(mode) {
         currentWordsModalSortMode = mode;
 
@@ -1256,7 +1264,7 @@
         wordsModalBackdropEl.classList.remove("show");
     }
 
-    // --------- GAME MODAL (START / END) ---------
+    // --------- GAME MODAL ---------
     function openStartModal() {
         gameModalMode = "start";
         gameModalTitleEl.textContent = "License Plate Game – Time Trial";
@@ -1340,7 +1348,7 @@
                `The plate <strong>${plateUpper}</strong> requires them in this order: <strong>${plateOrder}</strong>.`;
     }
 
-    // --------- CHART BUILD / UPDATE (bars + line) ---------
+    // --------- CHART ---------
     function buildChart() {
         if (!gameHistory.length) return;
 
@@ -1385,14 +1393,14 @@
                         type: "bar",
                         label: "Thinking time (s)",
                         data: thinkingData,
-                        backgroundColor: "rgba(59, 130, 246, 0.8)", // blue
+                        backgroundColor: "rgba(59, 130, 246, 0.8)",
                         stack: "time"
                     },
                     {
                         type: "bar",
                         label: "Skip penalty (s)",
                         data: penaltyData,
-                        backgroundColor: "rgba(220, 38, 38, 0.8)", // red
+                        backgroundColor: "rgba(220, 38, 38, 0.8)",
                         stack: "time"
                     },
                     {
@@ -1420,7 +1428,6 @@
                     tooltip: {
                         callbacks: {
                             title: function(items) {
-                                // Show plate prominently in tooltip title
                                 if (!items || !items.length) return "";
                                 const idx = items[0].dataIndex;
                                 const plate = resultsChart.config.data._plates[idx];
@@ -1500,7 +1507,7 @@
             return;
         }
         if (gameOver) {
-            resultEl.textContent = "Game over. Press Play again to restart.";
+            resultEl.textContent = "Game over. Press Restart game to play again.";
             resultEl.style.color = "red";
             return;
         }
@@ -1576,7 +1583,7 @@
             return;
         }
         if (gameOver) {
-            resultEl.textContent = "Game over. Press Play again to restart.";
+            resultEl.textContent = "Game over. Press Restart game to play again.";
             resultEl.style.color = "red";
             return;
         }
@@ -1637,7 +1644,7 @@
     hideChartButton();
     updateSkipButtonLabel();
 
-    startButtonEl.addEventListener("click", startGame);
+    startButtonEl.addEventListener("click", startOrRestartFromMain);
     checkButtonEl.addEventListener("click", checkWord);
     skipButtonEl.addEventListener("click", handleSkip);
     chartButtonEl.addEventListener("click", openChartModal);
@@ -1666,9 +1673,9 @@
 
     gameModalPrimaryBtnEl.addEventListener("click", () => {
         if (gameModalMode === "start") {
-            startGame();
+            startGameFromModal();
         } else if (gameModalMode === "end") {
-            startGame();
+            startGameFromModal();
         }
     });
 
