@@ -373,18 +373,17 @@
         openStartModal();
     });
 
-    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
+    async function displayLeaderboard(dateString) {
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        backdrop.classList.add('show');
-        const today = getTodayString();
-        dateEl.textContent = `Daily Challenge - ${today}`;
+        
+        dateEl.textContent = `Daily Challenge - ${dateString}`;
         contentEl.innerHTML = 'Loading scores...';
+        
         try {
-            const scores = await loadLeaderboard(today);
+            const scores = await loadLeaderboard(dateString);
             if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
                 return;
             }
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
@@ -405,6 +404,23 @@
         } catch (error) {
             console.error('Error loading leaderboard:', error);
             contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    }
+
+    document.getElementById('leaderboardBtn').addEventListener('click', () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        const today = getTodayString();
+        datePicker.value = today;
+        datePicker.max = today; // Can't select future dates
+        backdrop.classList.add('show');
+        displayLeaderboard(today);
+    });
+    
+    document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        if (datePicker.value) {
+            displayLeaderboard(datePicker.value);
         }
     });
 
@@ -459,18 +475,17 @@
         openStartModal();
     });
 
-    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
+    async function displayLeaderboard(dateString) {
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        backdrop.classList.add('show');
-        const today = getTodayString();
-        dateEl.textContent = `Daily Challenge - ${today}`;
+        
+        dateEl.textContent = `Daily Challenge - ${dateString}`;
         contentEl.innerHTML = 'Loading scores...';
+        
         try {
-            const scores = await loadLeaderboard(today);
+            const scores = await loadLeaderboard(dateString);
             if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
                 return;
             }
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
@@ -491,6 +506,23 @@
         } catch (error) {
             console.error('Error loading leaderboard:', error);
             contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    }
+
+    document.getElementById('leaderboardBtn').addEventListener('click', () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        const today = getTodayString();
+        datePicker.value = today;
+        datePicker.max = today; // Can't select future dates
+        backdrop.classList.add('show');
+        displayLeaderboard(today);
+    });
+    
+    document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        if (datePicker.value) {
+            displayLeaderboard(datePicker.value);
         }
     });
 
@@ -544,18 +576,17 @@
         openStartModal();
     });
 
-    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
+    async function displayLeaderboard(dateString) {
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        backdrop.classList.add('show');
-        const today = getTodayString();
-        dateEl.textContent = `Daily Challenge - ${today}`;
+        
+        dateEl.textContent = `Daily Challenge - ${dateString}`;
         contentEl.innerHTML = 'Loading scores...';
+        
         try {
-            const scores = await loadLeaderboard(today);
+            const scores = await loadLeaderboard(dateString);
             if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
                 return;
             }
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
@@ -576,6 +607,23 @@
         } catch (error) {
             console.error('Error loading leaderboard:', error);
             contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    }
+
+    document.getElementById('leaderboardBtn').addEventListener('click', () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        const today = getTodayString();
+        datePicker.value = today;
+        datePicker.max = today; // Can't select future dates
+        backdrop.classList.add('show');
+        displayLeaderboard(today);
+    });
+    
+    document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        if (datePicker.value) {
+            displayLeaderboard(datePicker.value);
         }
     });
 
@@ -629,18 +677,17 @@
         openStartModal();
     });
 
-    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
+    async function displayLeaderboard(dateString) {
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        backdrop.classList.add('show');
-        const today = getTodayString();
-        dateEl.textContent = `Daily Challenge - ${today}`;
+        
+        dateEl.textContent = `Daily Challenge - ${dateString}`;
         contentEl.innerHTML = 'Loading scores...';
+        
         try {
-            const scores = await loadLeaderboard(today);
+            const scores = await loadLeaderboard(dateString);
             if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
                 return;
             }
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
@@ -661,6 +708,23 @@
         } catch (error) {
             console.error('Error loading leaderboard:', error);
             contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    }
+
+    document.getElementById('leaderboardBtn').addEventListener('click', () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        const today = getTodayString();
+        datePicker.value = today;
+        datePicker.max = today; // Can't select future dates
+        backdrop.classList.add('show');
+        displayLeaderboard(today);
+    });
+    
+    document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        if (datePicker.value) {
+            displayLeaderboard(datePicker.value);
         }
     });
 
@@ -2260,18 +2324,17 @@
         openStartModal();
     });
 
-    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
+    async function displayLeaderboard(dateString) {
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        backdrop.classList.add('show');
-        const today = getTodayString();
-        dateEl.textContent = `Daily Challenge - ${today}`;
+        
+        dateEl.textContent = `Daily Challenge - ${dateString}`;
         contentEl.innerHTML = 'Loading scores...';
+        
         try {
-            const scores = await loadLeaderboard(today);
+            const scores = await loadLeaderboard(dateString);
             if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
                 return;
             }
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
@@ -2292,6 +2355,23 @@
         } catch (error) {
             console.error('Error loading leaderboard:', error);
             contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    }
+
+    document.getElementById('leaderboardBtn').addEventListener('click', () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        const today = getTodayString();
+        datePicker.value = today;
+        datePicker.max = today; // Can't select future dates
+        backdrop.classList.add('show');
+        displayLeaderboard(today);
+    });
+    
+    document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
+        const datePicker = document.getElementById('leaderboardDatePicker');
+        if (datePicker.value) {
+            displayLeaderboard(datePicker.value);
         }
     });
 
@@ -2320,7 +2400,12 @@
             <button class="modal-close-btn" id="leaderboardModalCloseBtn" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-            <div id="leaderboardDate" style="text-align: center; margin-bottom: 16px; font-size: 1.1rem; color: #6b7280;"></div>
+            <div style="text-align: center; margin-bottom: 16px;">
+                <label for="leaderboardDatePicker" style="margin-right: 8px; font-weight: 600;">Select Date:</label>
+                <input type="date" id="leaderboardDatePicker" style="padding: 6px; font-size: 1rem; border: 1px solid #d1d5db; border-radius: 4px;">
+                <button id="loadLeaderboardBtn" style="margin-left: 8px; padding: 6px 12px; cursor: pointer;">Load</button>
+            </div>
+            <div id="leaderboardDate" style="text-align: center; margin-bottom: 12px; font-size: 1.1rem; color: #6b7280;"></div>
             <div id="leaderboardContent" style="max-height: 400px; overflow-y: auto;">Loading scores...</div>
         </div>
         <div class="modal-footer">
