@@ -335,30 +335,448 @@
         }
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js">
+    // ========== FIREBASE EVENT HANDLERS ==========
+
+    document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
+        if (!currentUser) {
+            const signedIn = await signInWithGoogle();
+            if (!signedIn) return;
+        }
+        
+        const played = await checkIfPlayedToday();
+        if (played) {
+            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
+            return;
+        }
+        
+        gameMode = 'daily';
+        dailyPlateSequence = generateDailyPlates(getTodayString());
+        
+        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
+            alert('Failed to generate daily plates. Please wait for data to load.');
+            return;
+        }
+        
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
+        document.getElementById('modeIndicator').style.background = '#fef3c7';
+        document.getElementById('modeIndicator').style.color = '#92400e';
+        
+        openStartModal();
+    });
+
+    document.getElementById('practiceBtn').addEventListener('click', () => {
+        gameMode = 'practice';
+        dailyPlateSequence = null;
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
+        document.getElementById('modeIndicator').style.background = '#e0e7ff';
+        document.getElementById('modeIndicator').style.color = '#3730a3';
+        
+        openStartModal();
+    });
+
+    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const dateEl = document.getElementById('leaderboardDate');
+        const contentEl = document.getElementById('leaderboardContent');
+        
+        backdrop.classList.add('show');
+        
+        const today = getTodayString();
+        dateEl.textContent = `Daily Challenge - ${today}`;
+        contentEl.innerHTML = 'Loading scores...';
+        
+        try {
+            const scores = await loadLeaderboard(today);
+            
+            if (scores.length === 0) {
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
+            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
+            html += '<th style="padding: 8px; text-align: left;">Player</th>';
+            html += '<th style="padding: 8px; text-align: right;">Time</th>';
+            html += '</tr></thead><tbody>';
+            
+            scores.forEach((score, index) => {
+                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
+                html += `<tr style="background: ${bgColor};">`;
+                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
+                html += `<td style="padding: 8px;">${score.userName}</td>`;
+                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading leaderboard:', error);
+            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', () => {
+        auth.signOut();
+    });
+
+    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
+        if (e.target.id === 'leaderboardModalBackdrop') {
+            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+        }
+    });
+
+    // ========== END FIREBASE EVENT HANDLERS ==========
+
+</script>
 
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
+    // ========== FIREBASE EVENT HANDLERS ==========
+
+    document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
+        if (!currentUser) {
+            const signedIn = await signInWithGoogle();
+            if (!signedIn) return;
+        }
+        
+        const played = await checkIfPlayedToday();
+        if (played) {
+            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
+            return;
+        }
+        
+        gameMode = 'daily';
+        dailyPlateSequence = generateDailyPlates(getTodayString());
+        
+        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
+            alert('Failed to generate daily plates. Please wait for data to load.');
+            return;
+        }
+        
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
+        document.getElementById('modeIndicator').style.background = '#fef3c7';
+        document.getElementById('modeIndicator').style.color = '#92400e';
+        
+        openStartModal();
+    });
+
+    document.getElementById('practiceBtn').addEventListener('click', () => {
+        gameMode = 'practice';
+        dailyPlateSequence = null;
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
+        document.getElementById('modeIndicator').style.background = '#e0e7ff';
+        document.getElementById('modeIndicator').style.color = '#3730a3';
+        
+        openStartModal();
+    });
+
+    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const dateEl = document.getElementById('leaderboardDate');
+        const contentEl = document.getElementById('leaderboardContent');
+        
+        backdrop.classList.add('show');
+        
+        const today = getTodayString();
+        dateEl.textContent = `Daily Challenge - ${today}`;
+        contentEl.innerHTML = 'Loading scores...';
+        
+        try {
+            const scores = await loadLeaderboard(today);
+            
+            if (scores.length === 0) {
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
+            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
+            html += '<th style="padding: 8px; text-align: left;">Player</th>';
+            html += '<th style="padding: 8px; text-align: right;">Time</th>';
+            html += '</tr></thead><tbody>';
+            
+            scores.forEach((score, index) => {
+                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
+                html += `<tr style="background: ${bgColor};">`;
+                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
+                html += `<td style="padding: 8px;">${score.userName}</td>`;
+                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading leaderboard:', error);
+            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', () => {
+        auth.signOut();
+    });
+
+    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
+        if (e.target.id === 'leaderboardModalBackdrop') {
+            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+        }
+    });
+
+    // ========== END FIREBASE EVENT HANDLERS ==========
+
+</script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js">
+    // ========== FIREBASE EVENT HANDLERS ==========
+
+    document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
+        if (!currentUser) {
+            const signedIn = await signInWithGoogle();
+            if (!signedIn) return;
+        }
+        
+        const played = await checkIfPlayedToday();
+        if (played) {
+            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
+            return;
+        }
+        
+        gameMode = 'daily';
+        dailyPlateSequence = generateDailyPlates(getTodayString());
+        
+        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
+            alert('Failed to generate daily plates. Please wait for data to load.');
+            return;
+        }
+        
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
+        document.getElementById('modeIndicator').style.background = '#fef3c7';
+        document.getElementById('modeIndicator').style.color = '#92400e';
+        
+        openStartModal();
+    });
+
+    document.getElementById('practiceBtn').addEventListener('click', () => {
+        gameMode = 'practice';
+        dailyPlateSequence = null;
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
+        document.getElementById('modeIndicator').style.background = '#e0e7ff';
+        document.getElementById('modeIndicator').style.color = '#3730a3';
+        
+        openStartModal();
+    });
+
+    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const dateEl = document.getElementById('leaderboardDate');
+        const contentEl = document.getElementById('leaderboardContent');
+        
+        backdrop.classList.add('show');
+        
+        const today = getTodayString();
+        dateEl.textContent = `Daily Challenge - ${today}`;
+        contentEl.innerHTML = 'Loading scores...';
+        
+        try {
+            const scores = await loadLeaderboard(today);
+            
+            if (scores.length === 0) {
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
+            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
+            html += '<th style="padding: 8px; text-align: left;">Player</th>';
+            html += '<th style="padding: 8px; text-align: right;">Time</th>';
+            html += '</tr></thead><tbody>';
+            
+            scores.forEach((score, index) => {
+                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
+                html += `<tr style="background: ${bgColor};">`;
+                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
+                html += `<td style="padding: 8px;">${score.userName}</td>`;
+                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading leaderboard:', error);
+            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', () => {
+        auth.signOut();
+    });
+
+    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
+        if (e.target.id === 'leaderboardModalBackdrop') {
+            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+        }
+    });
+
+    // ========== END FIREBASE EVENT HANDLERS ==========
+
+</script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
+    // ========== FIREBASE EVENT HANDLERS ==========
+
+    document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
+        if (!currentUser) {
+            const signedIn = await signInWithGoogle();
+            if (!signedIn) return;
+        }
+        
+        const played = await checkIfPlayedToday();
+        if (played) {
+            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
+            return;
+        }
+        
+        gameMode = 'daily';
+        dailyPlateSequence = generateDailyPlates(getTodayString());
+        
+        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
+            alert('Failed to generate daily plates. Please wait for data to load.');
+            return;
+        }
+        
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
+        document.getElementById('modeIndicator').style.background = '#fef3c7';
+        document.getElementById('modeIndicator').style.color = '#92400e';
+        
+        openStartModal();
+    });
+
+    document.getElementById('practiceBtn').addEventListener('click', () => {
+        gameMode = 'practice';
+        dailyPlateSequence = null;
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
+        document.getElementById('modeIndicator').style.background = '#e0e7ff';
+        document.getElementById('modeIndicator').style.color = '#3730a3';
+        
+        openStartModal();
+    });
+
+    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const dateEl = document.getElementById('leaderboardDate');
+        const contentEl = document.getElementById('leaderboardContent');
+        
+        backdrop.classList.add('show');
+        
+        const today = getTodayString();
+        dateEl.textContent = `Daily Challenge - ${today}`;
+        contentEl.innerHTML = 'Loading scores...';
+        
+        try {
+            const scores = await loadLeaderboard(today);
+            
+            if (scores.length === 0) {
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
+            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
+            html += '<th style="padding: 8px; text-align: left;">Player</th>';
+            html += '<th style="padding: 8px; text-align: right;">Time</th>';
+            html += '</tr></thead><tbody>';
+            
+            scores.forEach((score, index) => {
+                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
+                html += `<tr style="background: ${bgColor};">`;
+                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
+                html += `<td style="padding: 8px;">${score.userName}</td>`;
+                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading leaderboard:', error);
+            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', () => {
+        auth.signOut();
+    });
+
+    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
+        if (e.target.id === 'leaderboardModalBackdrop') {
+            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+        }
+    });
+
+    // ========== END FIREBASE EVENT HANDLERS ==========
+
+</script>
+
 </head>
 <body>
 
 <h1>The License Plate Game v4</h1>
 
 <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-    <button id="dailyChallengeBtn" style="padding: 10px 20px; font-size: 1rem; background: #fbbf24; border: 2px solid #f59e0b; font-weight: bold;">Daily Challenge</button>
-    <button id="practiceBtn" style="padding: 10px 20px; font-size: 1rem;">Practice Mode</button>
-    <button id="leaderboardBtn" style="padding: 10px 20px; font-size: 1rem;">View Leaderboard</button>
+    <button id="dailyChallengeBtn" style="padding: 10px 20px; font-size: 1rem; background: #fbbf24; border: 2px solid #f59e0b; font-weight: bold; cursor: pointer;">🏆 Daily Challenge</button>
+    <button id="practiceBtn" style="padding: 10px 20px; font-size: 1rem; cursor: pointer;">🎮 Practice Mode</button>
+    <button id="leaderboardBtn" style="padding: 10px 20px; font-size: 1rem; cursor: pointer;">📊 View Leaderboard</button>
     <div id="userInfo" style="display: none; margin-left: auto; padding: 10px; background: #f3f4f6; border-radius: 4px;">
         Signed in as: <strong id="userName"></strong>
-        <button id="signOutBtn" style="margin-left: 10px; padding: 4px 8px;">Sign Out</button>
+        <button id="signOutBtn" style="margin-left: 10px; padding: 4px 8px; cursor: pointer;">Sign Out</button>
     </div>
 </div>
 
 <div id="modeIndicator" style="display: none; padding: 8px; background: #e5e7eb; border-radius: 4px; margin-bottom: 10px; font-weight: 600;">
-    🎮 PRACTICE MODE
+    <!-- Mode will appear here -->
 </div>
+
 
 
 <div class="layout">
@@ -496,11 +914,10 @@
     const database = firebase.database();
 
     // Game mode state
-    let gameMode = 'practice'; // 'daily' or 'practice'
+    let gameMode = 'practice';
     let currentUser = null;
     let dailyPlateSequence = null;
 
-    // Auth state listener
     auth.onAuthStateChanged((user) => {
         currentUser = user;
         const userInfoEl = document.getElementById('userInfo');
@@ -514,7 +931,6 @@
         }
     });
 
-    // Helper functions
     function getTodayString() {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -586,7 +1002,6 @@
         
         return scores;
     }
-
     // ========== END FIREBASE CONFIGURATION ==========
 
     // --------- CONFIG ---------
@@ -906,7 +1321,7 @@
             return;
         }
 
-        // DAILY CHALLENGE MODE: Use predetermined sequence
+        // DAILY CHALLENGE MODE
         if (gameMode === 'daily' && dailyPlateSequence && dailyPlateSequence.length > 0) {
             const plateIndex = usedPlates.size;
             if (plateIndex >= dailyPlateSequence.length) {
@@ -934,838 +1349,9 @@
             return;
         }
 
-        // PRACTICE MODE: Original random logic
+        // PRACTICE MODE - Original logic
         if (usedPlates.size === ALL_PLATES.length) {
             resultEl.textContent = "You've seen all available plates! Ending this run.";
-            resultEl.style.color = "red";
-            endGame();
-            return;
-        }
-
-        const primaryBand = choosePrimaryBand();
-        const startIndex = BAND_NAMES.indexOf(primaryBand);
-        const bandOrder = [];
-        for (let i = 0; i < BAND_NAMES.length; i++) {
-            bandOrder.push(BAND_NAMES[(startIndex + i) % BAND_NAMES.length]);
-        }
-
-        let chosen = null;
-        for (const band of bandOrder) {
-            chosen = pickRandomPlateFromBand(band);
-            if (chosen) break;
-        }
-
-        if (!chosen) {
-            const remaining = ALL_PLATES.filter(p => !usedPlates.has(p));
-            if (remaining.length === 0) {
-                resultEl.textContent = "No unused plates left. Ending this run.";
-                resultEl.style.color = "red";
-                endGame();
-                return;
-            }
-            const idx = Math.floor(Math.random() * remaining.length);
-            chosen = remaining[idx];
-        }
-
-        usedPlates.add(chosen);
-
-        const jsCount = computeJsViableCount(chosen);
-        if (jsCount <= 0) {
-            if (usedPlates.size === ALL_PLATES.length) {
-                resultEl.textContent = "No plates with viable words available. Ending this run.";
-                resultEl.style.color = "red";
-                endGame();
-                return;
-            }
-            pickRandomPlate();
-            return;
-        }
-
-        currentPlate = chosen;
-
-        plateEl.textContent = chosen;
-        resultEl.textContent = "";
-        resultEl.style.color = "";
-
-        plateLocked = false;
-        checkButtonEl.disabled = false;
-        skipButtonEl.disabled = false;
-        wordInputEl.disabled = false;
-        wordInputEl.readOnly = false;
-
-        plateStartTime = performance.now();
-
-        updateDifficultyDisplay(chosen);
-        wordInputEl.value = "";
-        wordInputEl.focus();
-    }
-
-    function classifyDifficulty(score) {
-        if (score >= 80) return "diff-hard";
-        if (score >= 40) return "diff-med";
-        return "diff-easy";
-    }
-
-    function updateDifficultyDisplay(plate) {
-        if (!PLATE_DIFFICULTY || !PLATE_DIFFICULTY[plate]) {
-            difficultyLabelEl.textContent = "Difficulty: —";
-            difficultyLabelEl.className = "difficulty diff-med";
-        } else {
-            const entry = PLATE_DIFFICULTY[plate];
-            const diff = entry.difficulty;
-            if (!diff || diff <= 0) {
-                difficultyLabelEl.textContent = "Difficulty: —";
-                difficultyLabelEl.className = "difficulty diff-med";
-            } else {
-                difficultyLabelEl.textContent = `Difficulty: ${diff} / 100`;
-                difficultyLabelEl.className = "difficulty " + classifyDifficulty(diff);
-            }
-        }
-
-        if (!dictionaryReady || !plate) {
-            viableCountLabelEl.textContent = "";
-        } else {
-            const jsCount = computeJsViableCount(plate);
-            viableCountLabelEl.textContent = `${jsCount.toLocaleString()} viable words`;
-        }
-    }
-
-    function getPlateDifficultyScore(plate) {
-        if (!PLATE_DIFFICULTY || !PLATE_DIFFICULTY[plate]) return null;
-        const d = PLATE_DIFFICULTY[plate].difficulty;
-        if (!d || d <= 0) return null;
-        return d;
-    }
-
-    // --------- TIMER / GAME STATE ---------
-    function updateProgressDisplay() {
-        progressDisplayEl.textContent = `Solved: ${solvedCount} / ${TOTAL_PLATES}`;
-    }
-
-    function updateSkipButtonLabel() {
-        const nextPenalty = (skipCount + 1) * 5;
-        skipButtonEl.textContent = `Skip +${nextPenalty}s`;
-    }
-
-    function showStartGameButton() {
-        startButtonEl.style.display = "inline-block";
-        startButtonEl.textContent = "Start Game";
-        const ready = dictionaryReady && difficultyReady && platesReady;
-        startButtonEl.disabled = !ready;
-    }
-
-    function showRestartGameButton() {
-        startButtonEl.style.display = "inline-block";
-        startButtonEl.textContent = "Restart game";
-        startButtonEl.disabled = false;
-    }
-
-    function hideMainStartButton() {
-        startButtonEl.style.display = "none";
-    }
-
-    function showChartButton() {
-        if (gameHistory.length > 0) {
-            chartButtonEl.style.display = "inline-block";
-        }
-    }
-
-    function hideChartButton() {
-        chartButtonEl.style.display = "none";
-    }
-
-    function resetGameState() {
-        gameStarted = false;
-        gameOver = false;
-        solvedCount = 0;
-        startTime = null;
-        penaltySeconds = 0;
-        skipCount = 0;
-        plateLocked = false;
-        usedPlates = new Set();
-        plateStartTime = null;
-        gameHistory = [];
-        updateSkipButtonLabel();
-        hideChartButton();
-
-        if (timerIntervalId) clearInterval(timerIntervalId);
-        timerIntervalId = null;
-
-        plateEl.textContent = "---";
-        difficultyLabelEl.textContent = "Difficulty: —";
-        difficultyLabelEl.className = "difficulty diff-med";
-        viableCountLabelEl.textContent = "";
-        timerDisplayEl.textContent = "Time: 0.0 s";
-        updateProgressDisplay();
-        resultEl.textContent = "";
-        resultEl.style.color = "";
-        wordInputEl.value = "";
-
-        checkButtonEl.disabled = false;
-        skipButtonEl.disabled = false;
-        wordInputEl.disabled = false;
-        wordInputEl.readOnly = false;
-
-        while (historyBodyEl.firstChild) {
-            historyBodyEl.removeChild(historyBodyEl.firstChild);
-        }
-        historyEmptyEl.style.display = "block";
-    }
-
-    function beginNewRun() {
-        resetGameState();
-        gameStarted = true;
-        gameOver = false;
-        startTime = performance.now();
-        timerIntervalId = setInterval(updateTimer, 100);
-        updateProgressDisplay();
-        pickRandomPlate();
-    }
-
-    function startGameFromModal() {
-        const ready = dictionaryReady && difficultyReady && platesReady;
-        if (!ready) {
-            resultEl.textContent = "Still loading…";
-            resultEl.style.color = "red";
-            return;
-        }
-
-        if (ALL_PLATES.length === 0) {
-            resultEl.textContent = "No viable plates to start the game.";
-            resultEl.style.color = "red";
-            return;
-        }
-
-        closeGameModal();
-        hideChartButton();
-
-        hasStartedOnce = true;
-        showRestartGameButton();
-
-        beginNewRun();
-    }
-
-    function startOrRestartFromMain() {
-        const ready = dictionaryReady && difficultyReady && platesReady;
-        if (!ready) {
-            resultEl.textContent = "Still loading…";
-            resultEl.style.color = "red";
-            return;
-        }
-
-        if (ALL_PLATES.length === 0) {
-            resultEl.textContent = "No viable plates to start the game.";
-            resultEl.style.color = "red";
-            return;
-        }
-
-        hasStartedOnce = true;
-        showRestartGameButton();
-        hideChartButton();
-
-        beginNewRun();
-    }
-
-    function updateTimer() {
-        if (!gameStarted || !startTime) return;
-        const baseElapsedSec = (performance.now() - startTime) / 1000;
-        const totalSec = baseElapsedSec + penaltySeconds;
-        timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
-    }
-
-    function endGame() {
-        if (gameOver) return;
-        gameOver = true;
-        gameStarted = false;
-        plateLocked = true;
-
-        if (!startTime) return;
-
-        const baseElapsedSec = (performance.now() - startTime) / 1000;
-        const totalSec = baseElapsedSec + penaltySeconds;
-
-        if (timerIntervalId) {
-            clearInterval(timerIntervalId);
-            timerIntervalId = null;
-        }
-
-        resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
-        resultEl.style.color = "green";
-        wordInputEl.blur();
-
-        checkButtonEl.disabled = true;
-        skipButtonEl.disabled = true;
-        wordInputEl.disabled = true;
-        wordInputEl.readOnly = true;
-
-        openEndModal(totalSec);
-        showRestartGameButton();
-        showChartButton();
-
-        // Save score if daily challenge
-        if (gameMode === 'daily' && currentUser) {
-            saveScore(totalSec, solvedCount, skipCount).then(() => {
-                console.log('Score saved to leaderboard!');
-            }).catch(err => {
-                console.error('Failed to save score:', err);
-            });
-        }
-    }
-
-    // ========== FIREBASE EVENT HANDLERS ==========
-
-    document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
-        if (!currentUser) {
-            const signedIn = await signInWithGoogle();
-            if (!signedIn) return;
-        }
-        
-        const played = await checkIfPlayedToday();
-        if (played) {
-            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
-            return;
-        }
-        
-        gameMode = 'daily';
-        dailyPlateSequence = generateDailyPlates(getTodayString());
-        
-        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
-            alert('Failed to generate daily plates. Please refresh the page.');
-            return;
-        }
-        
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
-        document.getElementById('modeIndicator').style.background = '#fef3c7';
-        document.getElementById('modeIndicator').style.color = '#92400e';
-        
-        if (!hasStartedOnce) {
-            openStartModal();
-        } else {
-            startOrRestartFromMain();
-        }
-    });
-
-    document.getElementById('practiceBtn').addEventListener('click', () => {
-        gameMode = 'practice';
-        dailyPlateSequence = null;
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
-        document.getElementById('modeIndicator').style.background = '#e0e7ff';
-        document.getElementById('modeIndicator').style.color = '#3730a3';
-        
-        if (!hasStartedOnce) {
-            openStartModal();
-        } else {
-            startOrRestartFromMain();
-        }
-    });
-
-    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
-        const dateEl = document.getElementById('leaderboardDate');
-        const contentEl = document.getElementById('leaderboardContent');
-        
-        backdrop.classList.add('show');
-        
-        const today = getTodayString();
-        dateEl.textContent = `Daily Challenge - ${today}`;
-        contentEl.innerHTML = 'Loading scores...';
-        
-        try {
-            const scores = await loadLeaderboard(today);
-            
-            if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
-                return;
-            }
-            
-            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
-            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
-            html += '<th style="padding: 8px; text-align: left;">Player</th>';
-            html += '<th style="padding: 8px; text-align: right;">Time</th>';
-            html += '</tr></thead><tbody>';
-            
-            scores.forEach((score, index) => {
-                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
-                html += `<tr style="background: ${bgColor};">`;
-                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
-                html += `<td style="padding: 8px;">${score.userName}</td>`;
-                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
-                html += '</tr>';
-            });
-            
-            html += '</tbody></table>';
-            contentEl.innerHTML = html;
-        } catch (error) {
-            console.error('Error loading leaderboard:', error);
-            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
-        }
-    });
-
-    document.getElementById('signOutBtn').addEventListener('click', () => {
-        auth.signOut();
-    });
-
-    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
-        if (e.target.id === 'leaderboardModalBackdrop') {
-            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-        }
-    });
-
-    // ========== END FIREBASE EVENT HANDLERS ==========
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-
-<h1>The License Plate Game v4</h1>
-
-<div class="layout">
-    <!-- LEFT PANEL -->
-    <div class="left-panel">
-        <p>
-            Solve <strong>10 plates</strong> as fast as you can.<br>
-            The plate letters must appear in your word in order (not necessarily consecutively).
-        </p>
-
-        <div class="car-wrapper">
-            <img src="car.png" alt="Car with license plate" class="car-image">
-            <div id="plate" class="plate-text">---</div>
-        </div>
-
-        <div id="difficultyLabel" class="difficulty diff-med">
-            Difficulty: —
-        </div>
-        <div id="viableCountLabel" style="color:#6b7280; font-size:0.9rem; margin-top:2px;">
-        </div>
-
-        <div class="controls">
-            <button id="startButton">Play again</button>
-            <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
-            <button id="checkButton">Check</button>
-            <button id="skipButton">Skip +5s</button>
-        </div>
-
-        <div id="result"></div>
-        <button id="chartButton">View run chart</button>
-
-        <div id="debug"></div>
-    </div>
-
-    <!-- RIGHT PANEL -->
-    <div class="right-panel">
-        <div id="timerRow">
-            <span id="timerDisplay">Time: 0.0 s</span>
-            <span id="progressDisplay">Solved: 0 / 10</span>
-        </div>
-
-        <h2>Solved Plates</h2>
-        <table>
-            <thead>
-            <tr>
-                <th>Plate</th>
-                <th>Word / Penalty</th>
-                <th>Time</th>
-                <th>Difficulty</th>
-            </tr>
-            </thead>
-            <tbody id="historyBody"></tbody>
-        </table>
-        <div id="historyEmpty" class="history-empty">
-            No solved plates yet.
-        </div>
-    </div>
-</div>
-
-<!-- GAME START / END MODAL -->
-<div id="gameModalBackdrop" class="modal-backdrop">
-    <div class="modal">
-        <div class="modal-header">
-            <div class="modal-title" id="gameModalTitle">License Plate Game</div>
-            <button class="modal-close-btn" id="gameModalCloseBtn" aria-label="Close">&times;</button>
-        </div>
-        <div class="modal-body" id="gameModalBody">
-            <!-- Filled dynamically -->
-        </div>
-        <div class="modal-footer">
-            <button id="gameModalSecondaryBtn" style="display:none;">View chart</button>
-            <button id="gameModalPrimaryBtn">Start Game</button>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL: Viable words for a plate -->
-<div id="wordsModalBackdrop" class="modal-backdrop">
-    <div class="modal">
-        <div class="modal-header">
-            <div class="modal-title" id="wordsModalTitle">Plate: ---</div>
-            <button class="modal-close-btn" id="wordsModalCloseBtn" aria-label="Close">&times;</button>
-        </div>
-        <div class="modal-body">
-            <div id="wordsModalStatus" style="margin-bottom:6px; color:#6b7280; font-size:0.9rem;">
-                Loading...
-            </div>
-            <div id="wordsModalSortControls" class="words-sort-controls">
-                <span class="words-sort-label">Sort:</span>
-                <button id="wordsSortAlphaBtn" class="words-sort-button active">A–Z</button>
-                <button id="wordsSortLengthBtn" class="words-sort-button">Shortest → longest</button>
-            </div>
-            <div id="wordsModalList" class="words-list"></div>
-        </div>
-        <div class="modal-footer">
-            <button id="wordsModalCloseBtnBottom">Close</button>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL: End-of-game chart -->
-<div id="chartModalBackdrop" class="modal-backdrop">
-    <div class="modal">
-        <div class="modal-header">
-            <div class="modal-title">Run breakdown</div>
-            <button class="modal-close-btn" id="chartModalCloseBtn" aria-label="Close">&times;</button>
-        </div>
-        <div class="modal-body">
-            <canvas id="resultsChart"></canvas>
-            <div style="margin-top:8px; font-size:0.85rem; color:#6b7280;">
-                Blue = thinking time, red = skip penalty. Click a bar or point to see all viable words for that plate.
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button id="chartModalCloseBtnBottom">Close</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    // --------- CONFIG ---------
-    const TOTAL_PLATES = 10;
-
-    const VERY_EASY_PROB = 0.40; // 0–10
-    const EASY_PROB      = 0.20; // 11–34
-    const MEDIUM_PROB    = 0.15; // 35–49
-    const DIFFICULT_PROB = 0.15; // 50–79
-    const HARD_PROB      = 0.05; // 80–88
-    const VERY_HARD_PROB = 0.03; // 89–96
-    const IMPOSSIBLE_PROB= 0.01; // 97–100
-
-    const BAND_NAMES = [
-        "very_easy",
-        "easy",
-        "medium",
-        "difficult",
-        "hard",
-        "very_hard",
-        "impossible"
-    ];
-
-    // --------- GLOBAL STATE ---------
-    let WORDS = [];
-    let DICTIONARY = new Set();
-    let dictionaryReady = false;
-
-    let PLATE_DIFFICULTY = null;
-    let difficultyReady = false;
-
-    let ALL_PLATES = [];
-    let platesReady = false;
-
-    let VERY_EASY_PLATES = [];
-    let EASY_PLATES      = [];
-    let MEDIUM_PLATES    = [];
-    let DIFFICULT_PLATES = [];
-    let HARD_PLATES      = [];
-    let VERY_HARD_PLATES = [];
-    let IMPOSSIBLE_PLATES= [];
-
-    let usedPlates = new Set();
-    let currentPlate = null;
-
-    let gameStarted = false;
-    let gameOver = false;
-    let solvedCount = 0;
-    let startTime = null;
-    let penaltySeconds = 0;
-    let timerIntervalId = null;
-
-    let skipCount = 0;
-    let plateLocked = false;
-
-    let gameModalMode = "start";
-    let hasStartedOnce = false;
-
-    let plateStartTime = null;
-    let gameHistory = [];
-
-    let currentWordsModalMatches = [];
-    let currentWordsModalPlate = null;
-    let currentWordsModalSortMode = "alpha";
-
-    // DOM refs
-    const plateEl = document.getElementById("plate");
-    const difficultyLabelEl = document.getElementById("difficultyLabel");
-    const viableCountLabelEl = document.getElementById("viableCountLabel");
-    const wordInputEl = document.getElementById("wordInput");
-    const resultEl = document.getElementById("result");
-    const debugEl = document.getElementById("debug");
-    const timerDisplayEl = document.getElementById("timerDisplay");
-    const progressDisplayEl = document.getElementById("progressDisplay");
-    const historyBodyEl = document.getElementById("historyBody");
-    const historyEmptyEl = document.getElementById("historyEmpty");
-    const startButtonEl = document.getElementById("startButton");
-    const checkButtonEl = document.getElementById("checkButton");
-    const skipButtonEl = document.getElementById("skipButton");
-    const chartButtonEl = document.getElementById("chartButton");
-
-    const gameModalBackdropEl = document.getElementById("gameModalBackdrop");
-    const gameModalTitleEl = document.getElementById("gameModalTitle");
-    const gameModalBodyEl = document.getElementById("gameModalBody");
-    const gameModalPrimaryBtnEl = document.getElementById("gameModalPrimaryBtn");
-    const gameModalSecondaryBtnEl = document.getElementById("gameModalSecondaryBtn");
-    const gameModalCloseBtnEl = document.getElementById("gameModalCloseBtn");
-
-    const wordsModalBackdropEl = document.getElementById("wordsModalBackdrop");
-    const wordsModalTitleEl = document.getElementById("wordsModalTitle");
-    const wordsModalStatusEl = document.getElementById("wordsModalStatus");
-    const wordsModalListEl = document.getElementById("wordsModalList");
-    const wordsModalCloseBtnEl = document.getElementById("wordsModalCloseBtn");
-    const wordsModalCloseBtnBottomEl = document.getElementById("wordsModalCloseBtnBottom");
-    const wordsSortAlphaBtnEl = document.getElementById("wordsSortAlphaBtn");
-    const wordsSortLengthBtnEl = document.getElementById("wordsSortLengthBtn");
-
-    const chartModalBackdropEl = document.getElementById("chartModalBackdrop");
-    const chartModalCloseBtnEl = document.getElementById("chartModalCloseBtn");
-    const chartModalCloseBtnBottomEl = document.getElementById("chartModalCloseBtnBottom");
-    const resultsChartCanvas = document.getElementById("resultsChart");
-    let resultsChart = null;
-
-    // --------- LOADING ---------
-    async function loadDictionary() {
-        try {
-            const res = await fetch("words.txt");
-            const text = await res.text();
-
-            WORDS = [];
-            DICTIONARY = new Set();
-
-            for (const line of text.split(/\r?\n/)) {
-                const w = line.trim().toLowerCase();
-                if (!w) continue;
-                if (!/^[a-z]+$/.test(w)) continue;
-                if (w.length < 3) continue;
-
-                WORDS.push(w);
-                DICTIONARY.add(w.toUpperCase());
-            }
-
-            dictionaryReady = true;
-            debugEl.textContent = `Loaded ${WORDS.length.toLocaleString()} words.`;
-
-            tryBuildPlateList();
-        } catch (err) {
-            console.error(err);
-            resultEl.textContent = "Failed to load words.txt.";
-            resultEl.style.color = "red";
-        }
-    }
-
-    async function loadDifficulty() {
-        try {
-            const res = await fetch("plate_difficulty.json?v=2");
-            PLATE_DIFFICULTY = await res.json();
-            difficultyReady = true;
-
-            tryBuildPlateList();
-        } catch (err) {
-            console.warn("Difficulty JSON not loaded:", err);
-            PLATE_DIFFICULTY = null;
-            difficultyReady = false;
-        } finally {
-            maybeEnableStart();
-        }
-    }
-
-    function tryBuildPlateList() {
-        if (!dictionaryReady || !PLATE_DIFFICULTY || platesReady) return;
-
-        const all = [];
-
-        const ve = [];
-        const e  = [];
-        const m  = [];
-        const d  = [];
-        const h  = [];
-        const vh = [];
-        const im = [];
-
-        for (const plate of Object.keys(PLATE_DIFFICULTY)) {
-            const entry = PLATE_DIFFICULTY[plate];
-
-            if (DICTIONARY.has(plate)) continue;
-
-            let diff = (entry && typeof entry.difficulty === "number")
-                ? entry.difficulty
-                : 50;
-
-            all.push(plate);
-
-            if (diff <= 10) {
-                ve.push(plate);
-            } else if (diff <= 34) {
-                e.push(plate);
-            } else if (diff <= 49) {
-                m.push(plate);
-            } else if (diff <= 79) {
-                d.push(plate);
-            } else if (diff <= 88) {
-                h.push(plate);
-            } else if (diff <= 96) {
-                vh.push(plate);
-            } else {
-                im.push(plate);
-            }
-        }
-
-        ALL_PLATES        = all;
-        VERY_EASY_PLATES  = ve;
-        EASY_PLATES       = e;
-        MEDIUM_PLATES     = m;
-        DIFFICULT_PLATES  = d;
-        HARD_PLATES       = h;
-        VERY_HARD_PLATES  = vh;
-        IMPOSSIBLE_PLATES = im;
-
-        platesReady = true;
-
-        debugEl.textContent +=
-            ` | ${ALL_PLATES.length.toLocaleString()} plates` +
-            ` (VE: ${VERY_EASY_PLATES.length}, E: ${EASY_PLATES.length}, M: ${MEDIUM_PLATES.length}, ` +
-            `D: ${DIFFICULT_PLATES.length}, H: ${HARD_PLATES.length}, VH: ${VERY_HARD_PLATES.length}, IMP: ${IMPOSSIBLE_PLATES.length})`;
-
-        maybeEnableStart();
-    }
-
-    function maybeEnableStart() {
-        const ready = dictionaryReady && difficultyReady && platesReady;
-
-        startButtonEl.disabled = !ready;
-
-        if (gameModalMode === "start") {
-            gameModalPrimaryBtnEl.disabled = !ready;
-            gameModalPrimaryBtnEl.textContent = ready ? "Start Game" : "Loading...";
-        }
-    }
-
-    // --------- PLATE MATCHING ---------
-    function getPlateMatchIndices(plate, word) {
-        plate = plate.toUpperCase();
-        const upperWord = word.toUpperCase();
-
-        let expectedPlateIndex = 0;
-        const matchedIndices = [];
-
-        for (let i = 0; i < upperWord.length; i++) {
-            const ch = upperWord[i];
-            const posInPlate = plate.indexOf(ch);
-
-            if (posInPlate === -1) continue;
-
-            if (posInPlate === expectedPlateIndex) {
-                matchedIndices.push(i);
-                expectedPlateIndex++;
-                if (expectedPlateIndex === plate.length) {
-                    return matchedIndices;
-                }
-            } else if (posInPlate > expectedPlateIndex) {
-                return null;
-            } else {
-                continue;
-            }
-        }
-        return null;
-    }
-
-    function wordMatchesPlate(plate, word) {
-        return getPlateMatchIndices(plate, word) !== null;
-    }
-
-    function computeJsViableCount(plate) {
-        if (!dictionaryReady || !plate) return 0;
-        let count = 0;
-        for (const w of WORDS) {
-            if (wordMatchesPlate(plate, w)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    // --------- PLATE SELECTION ---------
-    function getBandPool(bandName) {
-        switch (bandName) {
-            case "very_easy":   return VERY_EASY_PLATES;
-            case "easy":        return EASY_PLATES;
-            case "medium":      return MEDIUM_PLATES;
-            case "difficult":   return DIFFICULT_PLATES;
-            case "hard":        return HARD_PLATES;
-            case "very_hard":   return VERY_HARD_PLATES;
-            case "impossible":  return IMPOSSIBLE_PLATES;
-            default:            return [];
-        }
-    }
-
-    function pickRandomPlateFromBand(bandName) {
-        const poolRef = getBandPool(bandName);
-        const remaining = poolRef.filter(p => !usedPlates.has(p));
-        if (remaining.length === 0) return null;
-
-        const idx = Math.floor(Math.random() * remaining.length);
-        return remaining[idx];
-    }
-
-    function choosePrimaryBand() {
-        const r = Math.random();
-        let threshold = 0;
-
-        threshold += VERY_EASY_PROB;
-        if (r < threshold) return "very_easy";
-
-        threshold += EASY_PROB;
-        if (r < threshold) return "easy";
-
-        threshold += MEDIUM_PROB;
-        if (r < threshold) return "medium";
-
-        threshold += DIFFICULT_PROB;
-        if (r < threshold) return "difficult";
-
-        threshold += HARD_PROB;
-        if (r < threshold) return "hard";
-
-        threshold += VERY_HARD_PROB;
-        if (r < threshold) return "very_hard";
-
-        return "impossible";
-    }
-
-    function pickRandomPlate() {
-        if (!platesReady || ALL_PLATES.length === 0) {
-            resultEl.textContent = "No viable plates available.";
-            resultEl.style.color = "red";
-            return;
-        }
-
-        if (usedPlates.size === ALL_PLATES.length) {
-            resultEl.textContent = "You’ve seen all available plates! Ending this run.";
             resultEl.style.color = "red";
             endGame();
             return;
@@ -2031,6 +1617,15 @@
         openEndModal(totalSec);
         showRestartGameButton();
         showChartButton();
+        
+        // Save score if daily challenge
+        if (gameMode === 'daily' && currentUser) {
+            saveScore(totalSec, solvedCount, skipCount).then(() => {
+                console.log('Score saved!');
+            }).catch(err => {
+                console.error('Failed to save score:', err);
+            });
+        }
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -2257,6 +1852,12 @@
         gameModalMode = "start";
         gameModalTitleEl.textContent = "License Plate Game – Time Trial";
         gameModalBodyEl.innerHTML = `
+            <p style="margin-bottom:1rem;">
+                ${gameMode === 'daily' 
+                    ? '<strong>🏆 Daily Challenge:</strong> Everyone gets the same 10 plates today. Compete for the best time!' 
+                    : '<strong>🎮 Practice Mode:</strong> Random plates, play as much as you want!'
+                }
+            </p>
             <p><strong>How it works:</strong></p>
             <ul>
                 <li>You will see plates one after another until you correctly solve <strong>${TOTAL_PLATES}</strong>.</li>
@@ -2698,7 +2299,111 @@
 
     loadDictionary();
     loadDifficulty();
-    openStartModal();
+    // Don't auto-start - wait for user to choose mode
+
+    // ========== FIREBASE EVENT HANDLERS ==========
+
+    document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
+        if (!currentUser) {
+            const signedIn = await signInWithGoogle();
+            if (!signedIn) return;
+        }
+        
+        const played = await checkIfPlayedToday();
+        if (played) {
+            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
+            return;
+        }
+        
+        gameMode = 'daily';
+        dailyPlateSequence = generateDailyPlates(getTodayString());
+        
+        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
+            alert('Failed to generate daily plates. Please wait for data to load.');
+            return;
+        }
+        
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
+        document.getElementById('modeIndicator').style.background = '#fef3c7';
+        document.getElementById('modeIndicator').style.color = '#92400e';
+        
+        openStartModal();
+    });
+
+    document.getElementById('practiceBtn').addEventListener('click', () => {
+        gameMode = 'practice';
+        dailyPlateSequence = null;
+        document.getElementById('modeIndicator').style.display = 'block';
+        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
+        document.getElementById('modeIndicator').style.background = '#e0e7ff';
+        document.getElementById('modeIndicator').style.color = '#3730a3';
+        
+        openStartModal();
+    });
+
+    document.getElementById('leaderboardBtn').addEventListener('click', async () => {
+        const backdrop = document.getElementById('leaderboardModalBackdrop');
+        const dateEl = document.getElementById('leaderboardDate');
+        const contentEl = document.getElementById('leaderboardContent');
+        
+        backdrop.classList.add('show');
+        
+        const today = getTodayString();
+        dateEl.textContent = `Daily Challenge - ${today}`;
+        contentEl.innerHTML = 'Loading scores...';
+        
+        try {
+            const scores = await loadLeaderboard(today);
+            
+            if (scores.length === 0) {
+                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
+            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
+            html += '<th style="padding: 8px; text-align: left;">Player</th>';
+            html += '<th style="padding: 8px; text-align: right;">Time</th>';
+            html += '</tr></thead><tbody>';
+            
+            scores.forEach((score, index) => {
+                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
+                html += `<tr style="background: ${bgColor};">`;
+                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
+                html += `<td style="padding: 8px;">${score.userName}</td>`;
+                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading leaderboard:', error);
+            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
+        }
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', () => {
+        auth.signOut();
+    });
+
+    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
+        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+    });
+
+    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
+        if (e.target.id === 'leaderboardModalBackdrop') {
+            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
+        }
+    });
+
+    // ========== END FIREBASE EVENT HANDLERS ==========
+
 </script>
 
 
@@ -2711,7 +2416,6 @@
         </div>
         <div class="modal-body">
             <div id="leaderboardDate" style="text-align: center; margin-bottom: 16px; font-size: 1.1rem; color: #6b7280;">
-                <!-- Date will appear here -->
             </div>
             <div id="leaderboardContent" style="max-height: 400px; overflow-y: auto;">
                 Loading scores...
