@@ -223,7 +223,7 @@
             z-index: 900;
         }
 
-        /* Explicit stacking order so words > chart > game > leaderboard */
+        /* Explicit stacking order so words > chart > game */
         #gameModalBackdrop {
             z-index: 900;
         }
@@ -340,32 +340,26 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js">
     // ========== FIREBASE EVENT HANDLERS ==========
-
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         if (!currentUser) {
             const signedIn = await signInWithGoogle();
             if (!signedIn) return;
         }
-        
         const played = await checkIfPlayedToday();
         if (played) {
             alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
             return;
         }
-        
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        
         if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
             alert('Failed to generate daily plates. Please wait for data to load.');
             return;
         }
-        
         document.getElementById('modeIndicator').style.display = 'block';
         document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
         document.getElementById('modeIndicator').style.background = '#fef3c7';
         document.getElementById('modeIndicator').style.color = '#92400e';
-        
         openStartModal();
     });
 
@@ -376,7 +370,6 @@
         document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
         document.getElementById('modeIndicator').style.background = '#e0e7ff';
         document.getElementById('modeIndicator').style.color = '#3730a3';
-        
         openStartModal();
     });
 
@@ -384,27 +377,21 @@
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        
         backdrop.classList.add('show');
-        
         const today = getTodayString();
         dateEl.textContent = `Daily Challenge - ${today}`;
         contentEl.innerHTML = 'Loading scores...';
-        
         try {
             const scores = await loadLeaderboard(today);
-            
             if (scores.length === 0) {
                 contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
                 return;
             }
-            
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
             html += '<th style="padding: 8px; text-align: left;">Rank</th>';
             html += '<th style="padding: 8px; text-align: left;">Player</th>';
             html += '<th style="padding: 8px; text-align: right;">Time</th>';
             html += '</tr></thead><tbody>';
-            
             scores.forEach((score, index) => {
                 const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
                 html += `<tr style="background: ${bgColor};">`;
@@ -413,7 +400,6 @@
                 html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
                 html += '</tr>';
             });
-            
             html += '</tbody></table>';
             contentEl.innerHTML = html;
         } catch (error) {
@@ -422,57 +408,44 @@
         }
     });
 
-    document.getElementById('signOutBtn').addEventListener('click', () => {
-        auth.signOut();
-    });
-
+    document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-
-    // ========== END FIREBASE EVENT HANDLERS ==========
+    // ========== END HANDLERS ==========
 
 </script>
-
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
     // ========== FIREBASE EVENT HANDLERS ==========
-
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         if (!currentUser) {
             const signedIn = await signInWithGoogle();
             if (!signedIn) return;
         }
-        
         const played = await checkIfPlayedToday();
         if (played) {
             alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
             return;
         }
-        
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        
         if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
             alert('Failed to generate daily plates. Please wait for data to load.');
             return;
         }
-        
         document.getElementById('modeIndicator').style.display = 'block';
         document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
         document.getElementById('modeIndicator').style.background = '#fef3c7';
         document.getElementById('modeIndicator').style.color = '#92400e';
-        
         openStartModal();
     });
 
@@ -483,7 +456,6 @@
         document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
         document.getElementById('modeIndicator').style.background = '#e0e7ff';
         document.getElementById('modeIndicator').style.color = '#3730a3';
-        
         openStartModal();
     });
 
@@ -491,27 +463,21 @@
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        
         backdrop.classList.add('show');
-        
         const today = getTodayString();
         dateEl.textContent = `Daily Challenge - ${today}`;
         contentEl.innerHTML = 'Loading scores...';
-        
         try {
             const scores = await loadLeaderboard(today);
-            
             if (scores.length === 0) {
                 contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
                 return;
             }
-            
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
             html += '<th style="padding: 8px; text-align: left;">Rank</th>';
             html += '<th style="padding: 8px; text-align: left;">Player</th>';
             html += '<th style="padding: 8px; text-align: right;">Time</th>';
             html += '</tr></thead><tbody>';
-            
             scores.forEach((score, index) => {
                 const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
                 html += `<tr style="background: ${bgColor};">`;
@@ -520,7 +486,6 @@
                 html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
                 html += '</tr>';
             });
-            
             html += '</tbody></table>';
             contentEl.innerHTML = html;
         } catch (error) {
@@ -529,55 +494,43 @@
         }
     });
 
-    document.getElementById('signOutBtn').addEventListener('click', () => {
-        auth.signOut();
-    });
-
+    document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-
-    // ========== END FIREBASE EVENT HANDLERS ==========
+    // ========== END HANDLERS ==========
 
 </script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js">
     // ========== FIREBASE EVENT HANDLERS ==========
-
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         if (!currentUser) {
             const signedIn = await signInWithGoogle();
             if (!signedIn) return;
         }
-        
         const played = await checkIfPlayedToday();
         if (played) {
             alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
             return;
         }
-        
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        
         if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
             alert('Failed to generate daily plates. Please wait for data to load.');
             return;
         }
-        
         document.getElementById('modeIndicator').style.display = 'block';
         document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
         document.getElementById('modeIndicator').style.background = '#fef3c7';
         document.getElementById('modeIndicator').style.color = '#92400e';
-        
         openStartModal();
     });
 
@@ -588,7 +541,6 @@
         document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
         document.getElementById('modeIndicator').style.background = '#e0e7ff';
         document.getElementById('modeIndicator').style.color = '#3730a3';
-        
         openStartModal();
     });
 
@@ -596,27 +548,21 @@
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        
         backdrop.classList.add('show');
-        
         const today = getTodayString();
         dateEl.textContent = `Daily Challenge - ${today}`;
         contentEl.innerHTML = 'Loading scores...';
-        
         try {
             const scores = await loadLeaderboard(today);
-            
             if (scores.length === 0) {
                 contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
                 return;
             }
-            
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
             html += '<th style="padding: 8px; text-align: left;">Rank</th>';
             html += '<th style="padding: 8px; text-align: left;">Player</th>';
             html += '<th style="padding: 8px; text-align: right;">Time</th>';
             html += '</tr></thead><tbody>';
-            
             scores.forEach((score, index) => {
                 const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
                 html += `<tr style="background: ${bgColor};">`;
@@ -625,7 +571,6 @@
                 html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
                 html += '</tr>';
             });
-            
             html += '</tbody></table>';
             contentEl.innerHTML = html;
         } catch (error) {
@@ -634,55 +579,43 @@
         }
     });
 
-    document.getElementById('signOutBtn').addEventListener('click', () => {
-        auth.signOut();
-    });
-
+    document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-
-    // ========== END FIREBASE EVENT HANDLERS ==========
+    // ========== END HANDLERS ==========
 
 </script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
     // ========== FIREBASE EVENT HANDLERS ==========
-
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         if (!currentUser) {
             const signedIn = await signInWithGoogle();
             if (!signedIn) return;
         }
-        
         const played = await checkIfPlayedToday();
         if (played) {
             alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
             return;
         }
-        
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        
         if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
             alert('Failed to generate daily plates. Please wait for data to load.');
             return;
         }
-        
         document.getElementById('modeIndicator').style.display = 'block';
         document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
         document.getElementById('modeIndicator').style.background = '#fef3c7';
         document.getElementById('modeIndicator').style.color = '#92400e';
-        
         openStartModal();
     });
 
@@ -693,7 +626,6 @@
         document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
         document.getElementById('modeIndicator').style.background = '#e0e7ff';
         document.getElementById('modeIndicator').style.color = '#3730a3';
-        
         openStartModal();
     });
 
@@ -701,27 +633,21 @@
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        
         backdrop.classList.add('show');
-        
         const today = getTodayString();
         dateEl.textContent = `Daily Challenge - ${today}`;
         contentEl.innerHTML = 'Loading scores...';
-        
         try {
             const scores = await loadLeaderboard(today);
-            
             if (scores.length === 0) {
                 contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
                 return;
             }
-            
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
             html += '<th style="padding: 8px; text-align: left;">Rank</th>';
             html += '<th style="padding: 8px; text-align: left;">Player</th>';
             html += '<th style="padding: 8px; text-align: right;">Time</th>';
             html += '</tr></thead><tbody>';
-            
             scores.forEach((score, index) => {
                 const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
                 html += `<tr style="background: ${bgColor};">`;
@@ -730,7 +656,6 @@
                 html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
                 html += '</tr>';
             });
-            
             html += '</tbody></table>';
             contentEl.innerHTML = html;
         } catch (error) {
@@ -739,32 +664,25 @@
         }
     });
 
-    document.getElementById('signOutBtn').addEventListener('click', () => {
-        auth.signOut();
-    });
-
+    document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-
-    // ========== END FIREBASE EVENT HANDLERS ==========
+    // ========== END HANDLERS ==========
 
 </script>
-
 </head>
 <body>
 
-<h1>The License Plate Game</h1>
+<h1>The License Plate Game v4</h1>
 
 <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
     <button id="dailyChallengeBtn" style="padding: 10px 20px; font-size: 1rem; background: #fbbf24; border: 2px solid #f59e0b; font-weight: bold; cursor: pointer;">🏆 Daily Challenge</button>
@@ -776,9 +694,7 @@
     </div>
 </div>
 
-<div id="modeIndicator" style="display: none; padding: 8px; background: #e5e7eb; border-radius: 4px; margin-bottom: 10px; font-weight: 600;">
-    <!-- Mode will appear here -->
-</div>
+<div id="modeIndicator" style="display: none; padding: 8px; background: #e5e7eb; border-radius: 4px; margin-bottom: 10px; font-weight: 600;"></div>
 
 
 
@@ -916,7 +832,6 @@
     const auth = firebase.auth();
     const database = firebase.database();
 
-    // Game mode state
     let gameMode = 'practice';
     let currentUser = null;
     let dailyPlateSequence = null;
@@ -925,7 +840,6 @@
         currentUser = user;
         const userInfoEl = document.getElementById('userInfo');
         const userNameEl = document.getElementById('userName');
-        
         if (user) {
             userInfoEl.style.display = 'block';
             userNameEl.textContent = user.displayName || user.email;
@@ -950,9 +864,7 @@
     function generateDailyPlates(dateString) {
         const seed = dateString.split('-').reduce((acc, val) => acc + parseInt(val), 0);
         const rng = seededRandom(seed);
-        
         if (!platesReady || ALL_PLATES.length === 0) return [];
-        
         const availablePlates = [...ALL_PLATES];
         const shuffled = availablePlates.sort(() => rng() - 0.5);
         return shuffled.slice(0, TOTAL_PLATES);
@@ -973,21 +885,15 @@
     async function checkIfPlayedToday() {
         if (!currentUser) return false;
         const today = getTodayString();
-        
-        // Check if they've completed (score exists)
         const scoreSnapshot = await database.ref(`scores/${today}/${currentUser.uid}`).once('value');
         if (scoreSnapshot.exists()) return true;
-        
-        // Check if they've started (started flag exists)
         const startedSnapshot = await database.ref(`started/${today}/${currentUser.uid}`).once('value');
         if (startedSnapshot.exists()) return true;
-        
         return false;
     }
 
     async function saveScore(totalTime, solvedCount, skippedCount) {
         if (!currentUser || gameMode !== 'daily') return;
-        
         const today = getTodayString();
         const score = {
             userId: currentUser.uid,
@@ -997,23 +903,17 @@
             skipped: skippedCount,
             timestamp: Date.now()
         };
-        
         await database.ref(`scores/${today}/${currentUser.uid}`).set(score);
     }
 
     async function loadLeaderboard(dateString) {
         const snapshot = await database.ref(`scores/${dateString}`).once('value');
         const scores = [];
-        
-        snapshot.forEach((child) => {
-            scores.push(child.val());
-        });
-        
+        snapshot.forEach((child) => scores.push(child.val()));
         scores.sort((a, b) => a.totalTime - b.totalTime);
-        
         return scores;
     }
-    // ========== END FIREBASE CONFIGURATION ==========
+    // ========== END FIREBASE ==========
 
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
@@ -1342,17 +1242,14 @@
             const chosen = dailyPlateSequence[plateIndex];
             usedPlates.add(chosen);
             currentPlate = chosen;
-            
             plateEl.textContent = chosen;
             resultEl.textContent = "";
             resultEl.style.color = "";
-            
             plateLocked = false;
             checkButtonEl.disabled = false;
             skipButtonEl.disabled = false;
             wordInputEl.disabled = false;
             wordInputEl.readOnly = false;
-            
             plateStartTime = performance.now();
             updateDifficultyDisplay(chosen);
             wordInputEl.value = "";
@@ -1360,7 +1257,7 @@
             return;
         }
 
-        // PRACTICE MODE - Original logic
+        // PRACTICE MODE
         if (usedPlates.size === ALL_PLATES.length) {
             resultEl.textContent = "You've seen all available plates! Ending this run.";
             resultEl.style.color = "red";
@@ -1394,7 +1291,6 @@
         }
 
         usedPlates.add(chosen);
-
         const jsCount = computeJsViableCount(chosen);
         if (jsCount <= 0) {
             if (usedPlates.size === ALL_PLATES.length) {
@@ -1408,19 +1304,15 @@
         }
 
         currentPlate = chosen;
-
         plateEl.textContent = chosen;
         resultEl.textContent = "";
         resultEl.style.color = "";
-
         plateLocked = false;
         checkButtonEl.disabled = false;
         skipButtonEl.disabled = false;
         wordInputEl.disabled = false;
         wordInputEl.readOnly = false;
-
         plateStartTime = performance.now();
-
         updateDifficultyDisplay(chosen);
         wordInputEl.value = "";
         wordInputEl.focus();
@@ -1547,11 +1439,9 @@
         timerIntervalId = setInterval(updateTimer, 100);
         updateProgressDisplay();
         
-        // Disable mode buttons during game
         document.getElementById('dailyChallengeBtn').disabled = true;
         document.getElementById('practiceBtn').disabled = true;
         
-        // Save "started" flag for daily challenge
         if (gameMode === 'daily' && currentUser) {
             const today = getTodayString();
             database.ref(`started/${today}/${currentUser.uid}`).set({
@@ -1559,11 +1449,10 @@
                 started: true
             }).catch(err => console.error('Failed to save started flag:', err));
             
-            // Add warning when user tries to leave/refresh
             window.onbeforeunload = function(e) {
                 if (gameStarted && !gameOver && gameMode === 'daily') {
                     e.preventDefault();
-                    return 'Are you sure you want to leave? Your daily challenge attempt will be used up and you won't be on the leaderboard!';
+                    return 'Are you sure you want to leave? Your daily challenge attempt will be used up and you won\'t be on the leaderboard!';
                 }
             };
         }
@@ -1648,17 +1537,11 @@
         wordInputEl.readOnly = true;
 
         openEndModal(totalSec);
-        showRestartGameButton();
-        showChartButton();
         
-        // Re-enable mode buttons
         document.getElementById('dailyChallengeBtn').disabled = false;
         document.getElementById('practiceBtn').disabled = false;
-        
-        // Remove leave warning
         window.onbeforeunload = null;
         
-        // Save score if daily challenge
         if (gameMode === 'daily' && currentUser) {
             saveScore(totalSec, solvedCount, skipCount).then(() => {
                 console.log('Score saved!');
@@ -1666,6 +1549,9 @@
                 console.error('Failed to save score:', err);
             });
         }
+        
+        showRestartGameButton();
+        showChartButton();
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -2339,35 +2225,28 @@
 
     loadDictionary();
     loadDifficulty();
-    // Don't auto-start - wait for user to choose mode
 
     // ========== FIREBASE EVENT HANDLERS ==========
-
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         if (!currentUser) {
             const signedIn = await signInWithGoogle();
             if (!signedIn) return;
         }
-        
         const played = await checkIfPlayedToday();
         if (played) {
             alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
             return;
         }
-        
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        
         if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
             alert('Failed to generate daily plates. Please wait for data to load.');
             return;
         }
-        
         document.getElementById('modeIndicator').style.display = 'block';
         document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
         document.getElementById('modeIndicator').style.background = '#fef3c7';
         document.getElementById('modeIndicator').style.color = '#92400e';
-        
         openStartModal();
     });
 
@@ -2378,7 +2257,6 @@
         document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
         document.getElementById('modeIndicator').style.background = '#e0e7ff';
         document.getElementById('modeIndicator').style.color = '#3730a3';
-        
         openStartModal();
     });
 
@@ -2386,27 +2264,21 @@
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const dateEl = document.getElementById('leaderboardDate');
         const contentEl = document.getElementById('leaderboardContent');
-        
         backdrop.classList.add('show');
-        
         const today = getTodayString();
         dateEl.textContent = `Daily Challenge - ${today}`;
         contentEl.innerHTML = 'Loading scores...';
-        
         try {
             const scores = await loadLeaderboard(today);
-            
             if (scores.length === 0) {
                 contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores yet today. Be the first!</p>';
                 return;
             }
-            
             let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
             html += '<th style="padding: 8px; text-align: left;">Rank</th>';
             html += '<th style="padding: 8px; text-align: left;">Player</th>';
             html += '<th style="padding: 8px; text-align: right;">Time</th>';
             html += '</tr></thead><tbody>';
-            
             scores.forEach((score, index) => {
                 const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
                 html += `<tr style="background: ${bgColor};">`;
@@ -2415,7 +2287,6 @@
                 html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
                 html += '</tr>';
             });
-            
             html += '</tbody></table>';
             contentEl.innerHTML = html;
         } catch (error) {
@@ -2424,25 +2295,19 @@
         }
     });
 
-    document.getElementById('signOutBtn').addEventListener('click', () => {
-        auth.signOut();
-    });
-
+    document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
-
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-
-    // ========== END FIREBASE EVENT HANDLERS ==========
+    // ========== END HANDLERS ==========
 
 </script>
 
@@ -2455,11 +2320,8 @@
             <button class="modal-close-btn" id="leaderboardModalCloseBtn" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-            <div id="leaderboardDate" style="text-align: center; margin-bottom: 16px; font-size: 1.1rem; color: #6b7280;">
-            </div>
-            <div id="leaderboardContent" style="max-height: 400px; overflow-y: auto;">
-                Loading scores...
-            </div>
+            <div id="leaderboardDate" style="text-align: center; margin-bottom: 16px; font-size: 1.1rem; color: #6b7280;"></div>
+            <div id="leaderboardContent" style="max-height: 400px; overflow-y: auto;">Loading scores...</div>
         </div>
         <div class="modal-footer">
             <button id="leaderboardModalCloseBtnBottom">Close</button>
