@@ -223,7 +223,7 @@
             z-index: 900;
         }
 
-        /* Explicit stacking order so words > chart > game */
+        /* Explicit stacking order so words > chart > game > leaderboard */
         #gameModalBackdrop {
             z-index: 900;
         }
@@ -232,6 +232,9 @@
         }
         #wordsModalBackdrop {
             z-index: 1000;
+        }
+        #leaderboardModalBackdrop {
+            z-index: 1050;
         }
 
         .modal-backdrop.show {
@@ -970,8 +973,16 @@
     async function checkIfPlayedToday() {
         if (!currentUser) return false;
         const today = getTodayString();
-        const snapshot = await database.ref(`scores/${today}/${currentUser.uid}`).once('value');
-        return snapshot.exists();
+        
+        // Check if they've completed (score exists)
+        const scoreSnapshot = await database.ref(`scores/${today}/${currentUser.uid}`).once('value');
+        if (scoreSnapshot.exists()) return true;
+        
+        // Check if they've started (started flag exists)
+        const startedSnapshot = await database.ref(`started/${today}/${currentUser.uid}`).once('value');
+        if (startedSnapshot.exists()) return true;
+        
+        return false;
     }
 
     async function saveScore(totalTime, solvedCount, skippedCount) {
@@ -1535,6 +1546,28 @@
         startTime = performance.now();
         timerIntervalId = setInterval(updateTimer, 100);
         updateProgressDisplay();
+        
+        // Disable mode buttons during game
+        document.getElementById('dailyChallengeBtn').disabled = true;
+        document.getElementById('practiceBtn').disabled = true;
+        
+        // Save "started" flag for daily challenge
+        if (gameMode === 'daily' && currentUser) {
+            const today = getTodayString();
+            database.ref(`started/${today}/${currentUser.uid}`).set({
+                timestamp: Date.now(),
+                started: true
+            }).catch(err => console.error('Failed to save started flag:', err));
+            
+            // Add warning when user tries to leave/refresh
+            window.onbeforeunload = function(e) {
+                if (gameStarted && !gameOver && gameMode === 'daily') {
+                    e.preventDefault();
+                    return 'Are you sure you want to leave? Your daily challenge attempt will be used up and you won't be on the leaderboard!';
+                }
+            };
+        }
+        
         pickRandomPlate();
     }
 
@@ -1617,6 +1650,13 @@
         openEndModal(totalSec);
         showRestartGameButton();
         showChartButton();
+        
+        // Re-enable mode buttons
+        document.getElementById('dailyChallengeBtn').disabled = false;
+        document.getElementById('practiceBtn').disabled = false;
+        
+        // Remove leave warning
+        window.onbeforeunload = null;
         
         // Save score if daily challenge
         if (gameMode === 'daily' && currentUser) {
