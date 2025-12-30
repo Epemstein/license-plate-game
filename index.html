@@ -233,9 +233,6 @@
         #wordsModalBackdrop {
             z-index: 1000;
         }
-        #leaderboardModalBackdrop {
-            z-index: 1050;
-        }
 
         .modal-backdrop.show {
             display: flex;
@@ -365,12 +362,18 @@
     });
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
         datePicker.max = today;
-        backdrop.classList.add('show');
+        displayLeaderboard(today);
+        // Scroll to leaderboard
+        document.getElementById('leaderboardContent').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    
+    document.getElementById('todayLeaderboardBtn').addEventListener('click', () => {
+        const today = getTodayString();
+        document.getElementById('leaderboardDatePicker').value = today;
         displayLeaderboard(today);
     });
 
@@ -380,20 +383,6 @@
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
-
-    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
-        if (e.target.id === 'leaderboardModalBackdrop') {
-            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-        }
-    });
 
 </script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
@@ -423,12 +412,18 @@
     });
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
         datePicker.max = today;
-        backdrop.classList.add('show');
+        displayLeaderboard(today);
+        // Scroll to leaderboard
+        document.getElementById('leaderboardContent').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    
+    document.getElementById('todayLeaderboardBtn').addEventListener('click', () => {
+        const today = getTodayString();
+        document.getElementById('leaderboardDatePicker').value = today;
         displayLeaderboard(today);
     });
 
@@ -438,20 +433,6 @@
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
-
-    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
-        if (e.target.id === 'leaderboardModalBackdrop') {
-            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-        }
-    });
 
 </script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js">
@@ -481,12 +462,18 @@
     });
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
         datePicker.max = today;
-        backdrop.classList.add('show');
+        displayLeaderboard(today);
+        // Scroll to leaderboard
+        document.getElementById('leaderboardContent').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    
+    document.getElementById('todayLeaderboardBtn').addEventListener('click', () => {
+        const today = getTodayString();
+        document.getElementById('leaderboardDatePicker').value = today;
         displayLeaderboard(today);
     });
 
@@ -496,20 +483,6 @@
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
-
-    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
-        if (e.target.id === 'leaderboardModalBackdrop') {
-            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-        }
-    });
 
 </script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
@@ -539,12 +512,18 @@
     });
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
         datePicker.max = today;
-        backdrop.classList.add('show');
+        displayLeaderboard(today);
+        // Scroll to leaderboard
+        document.getElementById('leaderboardContent').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    
+    document.getElementById('todayLeaderboardBtn').addEventListener('click', () => {
+        const today = getTodayString();
+        document.getElementById('leaderboardDatePicker').value = today;
         displayLeaderboard(today);
     });
 
@@ -554,20 +533,6 @@
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
-
-    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
-        if (e.target.id === 'leaderboardModalBackdrop') {
-            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-        }
-    });
 
 </script>
 </head>
@@ -2107,12 +2072,18 @@
     });
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
-        const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
         datePicker.max = today;
-        backdrop.classList.add('show');
+        displayLeaderboard(today);
+        // Scroll to leaderboard
+        document.getElementById('leaderboardContent').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    
+    document.getElementById('todayLeaderboardBtn').addEventListener('click', () => {
+        const today = getTodayString();
+        document.getElementById('leaderboardDatePicker').value = today;
         displayLeaderboard(today);
     });
 
@@ -2122,20 +2093,6 @@
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
-
-    document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
-        document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-    });
-
-    document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
-        if (e.target.id === 'leaderboardModalBackdrop') {
-            document.getElementById('leaderboardModalBackdrop').classList.remove('show');
-        }
-    });
 
 </script>
 
@@ -2158,6 +2115,24 @@
         <div class="modal-footer">
             <button id="leaderboardModalCloseBtnBottom">Close</button>
         </div>
+    </div>
+</div>
+
+
+<div style="margin-top: 40px; padding: 20px; background: #f9fafb; border-radius: 8px;">
+    <h2 style="margin-top: 0;">🏆 Daily Leaderboard</h2>
+    
+    <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <label for="leaderboardDatePicker" style="font-weight: 600;">Select Date:</label>
+        <input type="date" id="leaderboardDatePicker" style="padding: 8px; font-size: 1rem; border: 1px solid #d1d5db; border-radius: 4px;">
+        <button id="loadLeaderboardBtn" style="padding: 8px 16px; cursor: pointer;">Load Scores</button>
+        <button id="todayLeaderboardBtn" style="padding: 8px 16px; cursor: pointer;">Today's Scores</button>
+    </div>
+    
+    <div id="leaderboardDate" style="text-align: center; margin-bottom: 16px; font-size: 1.1rem; color: #6b7280; font-weight: 600;"></div>
+    
+    <div id="leaderboardContent" style="background: white; padding: 20px; border-radius: 8px; min-height: 200px;">
+        <p style="text-align: center; color: #6b7280;">Click a button above to view scores</p>
     </div>
 </div>
 
