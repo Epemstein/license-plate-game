@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v6</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -889,6 +889,8 @@
     }
 
     function pickRandomPlate() {
+        console.log('=== pickRandomPlate called ===');
+        console.log('gameMode:', gameMode, 'solvedCount:', solvedCount, 'usedPlates.size:', usedPlates ? usedPlates.size : 'null');
         if (!platesReady || !ALL_PLATES.length) {
             resultEl.textContent = "No plates available.";
             resultEl.style.color = "red";
@@ -908,7 +910,9 @@
             }
             
             // Check if we've SOLVED enough (this is the real end condition)
+            console.log('Daily mode - solvedCount:', solvedCount, 'TOTAL_PLATES:', TOTAL_PLATES);
             if (solvedCount >= TOTAL_PLATES) {
+                console.log('Ending game - solved 10!');
                 endGame();
                 return;
             }
@@ -1723,6 +1727,8 @@
     }
 
     function handleSkip() {
+        console.log('=== SKIP CLICKED ===');
+        console.log('gameStarted:', gameStarted, 'gameOver:', gameOver, 'solvedCount:', solvedCount);
         if (!gameStarted) {
             resultEl.textContent = "Press Start to begin the game.";
             resultEl.style.color = "red";
@@ -1778,6 +1784,7 @@
             diffScore,
             timeLabel,
             () => {
+                console.log('After skip - solvedCount:', solvedCount, 'skipCount:', skipCount);
                 updateSkipButtonLabel();
                 pickRandomPlate();
             }
