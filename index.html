@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v5</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -1836,10 +1836,6 @@
 
 
 
-    loadDictionary();
-    loadDifficulty();
-</script>
-
     // === FIREBASE EVENT HANDLERS ===
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         console.log('Daily Challenge clicked!');
@@ -1913,6 +1909,11 @@
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
     // === END FIREBASE HANDLERS ===
+
+    loadDictionary();
+    loadDifficulty();
+</script>
+
 
 
 <div style="margin-top:40px;padding:20px;background:#f9fafb;border-radius:8px;">
