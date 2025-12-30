@@ -1419,7 +1419,7 @@
         }
         
         if (gameMode==='daily' && currentUser) {
-            database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({userName:currentUser.displayName||currentUser.email,timestamp:Date.now(),started:true});
+// Started flag will be saved when game actually begins
             window.onbeforeunload = e => {
                 if (gameStarted && !gameOver && gameMode==='daily') {
                     e.preventDefault();
