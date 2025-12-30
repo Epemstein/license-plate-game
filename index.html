@@ -1838,16 +1838,39 @@
     // === FIREBASE EVENT HANDLERS ===
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         console.log('Daily Challenge clicked!');
+        
+        // Check if game data is loaded
+        if (!platesReady || !dictionaryReady || !ALL_PLATES || ALL_PLATES.length === 0) {
+            alert('Game data is still loading... Please wait a moment and try again.');
+            return;
+        }
+        
+        // Sign in if needed
         if (!currentUser && !await signInWithGoogle()) return;
-        if (await checkIfPlayedToday()) { alert('Already played today! Try Practice Mode.'); return; }
+        
+        // Check if already played today
+        if (await checkIfPlayedToday()) { 
+            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.'); 
+            return; 
+        }
+        
+        // Generate daily plates
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        if (!dailyPlateSequence || !dailyPlateSequence.length) { alert('Plates not ready. Wait for data to load.'); return; }
+        
+        if (!dailyPlateSequence || !dailyPlateSequence.length) { 
+            alert('Failed to generate daily plates. Please try again.'); 
+            return; 
+        }
+        
+        // Show mode indicator
         const mi = document.getElementById('modeIndicator');
         mi.style.display = 'block';
         mi.textContent = '🏆 DAILY CHALLENGE MODE';
         mi.style.background = '#fef3c7';
         mi.style.color = '#92400e';
+        
+        // Start the game
         openStartModal();
     });
 
