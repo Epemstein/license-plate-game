@@ -342,14 +342,17 @@
 </head>
 <body>
 
-<h1>The License Plate Game v14</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
-    <button id="leaderboardBtn" style="padding:10px 20px;cursor:pointer;">📊 View Leaderboard</button>
-    <div id="userInfo" style="display:none;margin-left:auto;padding:10px;background:#f3f4f6;border-radius:4px;">
-        Signed in: <strong id="userName"></strong>
-        <button id="signOutBtn" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
+
+    <div id="authSection" style="margin-left:auto;">
+        <button id="signInBtn" onclick="signInWithGoogle()" style="display:none;padding:8px 16px;cursor:pointer;background:#4285f4;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Google</button>
+        <div id="userInfo" style="display:none;padding:10px;background:#f3f4f6;border-radius:4px;">
+            Signed in: <strong id="userName"></strong>
+            <button id="signOutBtn" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
+        </div>
     </div>
 </div>
 <div id="modeIndicator" style="padding:8px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:4px;margin-bottom:10px;font-weight:600;text-align:left;color:#000000;">👆 Select a game mode above to begin</div>
@@ -494,11 +497,15 @@
 
     auth.onAuthStateChanged((user) => {
         currentUser = user;
+        const signInBtn = document.getElementById('signInBtn');
+        const userInfo = document.getElementById('userInfo');
         if (user) {
-            document.getElementById('userInfo').style.display = 'block';
+            signInBtn.style.display = 'none';
+            userInfo.style.display = 'block';
             document.getElementById('userName').textContent = user.displayName || user.email;
         } else {
-            document.getElementById('userInfo').style.display = 'none';
+            signInBtn.style.display = 'inline-block';
+            userInfo.style.display = 'none';
         }
     });
 
@@ -633,11 +640,11 @@
         const container = document.getElementById('comparisonTableContainer');
         if (container.style.display === 'none') {
             container.style.display = 'block';
-            btn.textContent = '📊 Hide Comparison';
+            btn.textContent = 'Hide Comparison';
             buildComparisonTable();
         } else {
             container.style.display = 'none';
-            btn.textContent = '📊 Compare All Runs';
+            btn.textContent = 'Compare All Runs';
         }
     }
     window.toggleCompareTable = toggleCompareTable;
@@ -819,7 +826,7 @@
         const compareBtn = document.getElementById('compareRunsBtn');
         if (comparisonContainer && comparisonContainer.style.display === 'block') {
             comparisonContainer.style.display = 'none';
-            if (compareBtn) compareBtn.textContent = '📊 Compare All Runs';
+            if (compareBtn) compareBtn.textContent = 'Compare All Runs';
         }
         
         document.getElementById('leaderboardDate').textContent = `Daily Challenge - ${dateStr}`;
@@ -866,7 +873,7 @@
                 compareBtn.style.background = '#3b82f6';
                 compareBtn.style.cursor = 'pointer';
                 compareBtn.style.opacity = '1';
-                compareBtn.textContent = '📊 Compare All Runs';
+                compareBtn.textContent = 'Compare All Runs';
                 console.log('→ Button UNLOCKED');
             } else {
                 // Locked
@@ -874,7 +881,7 @@
                 compareBtn.style.background = '#9ca3af';
                 compareBtn.style.cursor = 'not-allowed';
                 compareBtn.style.opacity = '0.6';
-                compareBtn.textContent = '🔒 Complete Daily Challenge to Compare';
+                compareBtn.textContent = '🔒 Complete Daily to Compare';
                 console.log('→ Button LOCKED');
             }
         } catch(btnError) {
