@@ -1836,45 +1836,41 @@
 
 
 
+
+
     // === FIREBASE EVENT HANDLERS ===
+    // Wait for page to fully load before attaching event listeners
+    window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         console.log('Daily Challenge clicked!');
-        
         // Check if game data is loaded
         if (!platesReady || !dictionaryReady || !ALL_PLATES || ALL_PLATES.length === 0) {
             alert('Game data is still loading... Please wait a moment and try again.');
             return;
         }
-        
         // Sign in if needed
         if (!currentUser && !await signInWithGoogle()) return;
-        
         // Check if already played today
         if (await checkIfPlayedToday()) { 
             alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.'); 
             return; 
         }
-        
         // Generate daily plates
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        
         if (!dailyPlateSequence || !dailyPlateSequence.length) { 
             alert('Failed to generate daily plates. Please try again.'); 
             return; 
         }
-        
         // Show mode indicator
         const mi = document.getElementById('modeIndicator');
         mi.style.display = 'block';
         mi.textContent = '🏆 DAILY CHALLENGE MODE';
         mi.style.background = '#fef3c7';
         mi.style.color = '#92400e';
-        
         // Start the game
         openStartModal();
     });
-
     document.getElementById('practiceBtn').addEventListener('click', () => {
         console.log('Practice clicked!');
         gameMode = 'practice';
@@ -1886,7 +1882,6 @@
         mi.style.color = '#3730a3';
         openStartModal();
     });
-
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
         console.log('Leaderboard clicked!');
         const t = getTodayString();
@@ -1895,22 +1890,20 @@
         displayLeaderboard(t);
         document.getElementById('leaderboardContent').scrollIntoView({behavior:'smooth',block:'nearest'});
     });
-
     document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
         const v = document.getElementById('leaderboardDatePicker').value;
         if (v) displayLeaderboard(v);
     });
-
     document.getElementById('todayLeaderboardBtn').addEventListener('click', () => {
         const t = getTodayString();
         document.getElementById('leaderboardDatePicker').value = t;
         displayLeaderboard(t);
     });
-
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+    });
     // === END FIREBASE HANDLERS ===
 
-    loadDictionary();
+    loadDictionary();;
     loadDifficulty();
 </script>
 
