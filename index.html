@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v3</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -1943,8 +1943,28 @@
     });
     // === END FIREBASE HANDLERS ===
 
-    loadDictionary();;
+    loadDictionary();
     loadDifficulty();
+</script>
+
+<script>
+// Auto-load today's leaderboard when page is fully loaded
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        try {
+            const today = getTodayString();
+            const datePicker = document.getElementById('leaderboardDatePicker');
+            if (datePicker) {
+                datePicker.value = today;
+                datePicker.max = today;
+                displayLeaderboard(today);
+                console.log('Auto-loaded leaderboard for:', today);
+            }
+        } catch (error) {
+            console.error('Error auto-loading leaderboard:', error);
+        }
+    }, 2000); // Wait 2 seconds for Firebase to connect
+});
 </script>
 
 
