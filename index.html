@@ -578,10 +578,11 @@
                 return;
             }
             let h = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;">';
-            h += '<th style="padding:8px;">Rank</th><th style="padding:8px;">Player</th><th style="padding:8px;text-align:right;">Time</th></tr></thead><tbody>';
+            h += '<th style="padding:8px;">Rank</th><th style="padding:8px;">Player</th><th style="padding:8px;text-align:right;">Time</th><th style="padding:8px;text-align:center;">Details</th></tr></thead><tbody>';
             scores.forEach((s,i)=>{
                 const bg=i<3?'#fef3c7':(i%2?'#fff':'#f9fafb');
-                h+=`<tr style="background:${bg};"><td style="padding:8px;font-weight:bold;">#${i+1}</td><td style="padding:8px;">${s.userName}</td><td style="padding:8px;text-align:right;font-weight:600;">${s.totalTime.toFixed(1)}s</td></tr>`;
+                h+=`<tr style="background:${bg};"><td style="padding:8px;font-weight:bold;">#${i+1}</td><td style="padding:8px;">${s.userName}</td><td style="padding:8px;text-align:right;font-weight:600;">${s.totalTime.toFixed(1)}s</td>`;
+                h+=`<td style="padding:8px;text-align:center;"><button onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\'")}',${s.totalTime},${s.solved||0},${s.skipped||0})" style="padding:4px 12px;cursor:pointer;background:#3b82f6;color:white;border:1px solid #2563eb;border-radius:4px;">👁 View</button></td></tr>`;
             });
             h += '</tbody></table>';
             document.getElementById('leaderboardContent').innerHTML = h;
