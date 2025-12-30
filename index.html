@@ -515,7 +515,7 @@
         const seed = dateStr.split('-').reduce((a,v)=>a+parseInt(v),0);
         const rng = seededRandom(seed);
         if (!platesReady || !ALL_PLATES.length) return [];
-        return [...ALL_PLATES].sort(()=>rng()-0.5).slice(0,TOTAL_PLATES);
+        return [...ALL_PLATES].sort(()=>rng()-0.5).slice(0,200);
     }
 
     async function signInWithGoogle() {
