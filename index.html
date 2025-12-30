@@ -352,7 +352,7 @@
         <button id="signOutBtn" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
     </div>
 </div>
-<div id="modeIndicator" style="display:none;padding:8px;background:#e5e7eb;border-radius:4px;margin-bottom:10px;font-weight:600;"></div>
+<div id="modeIndicator" style="padding:8px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:4px;margin-bottom:10px;font-weight:600;text-align:center;color:#6b7280;">👆 Select a game mode above to begin</div>
 
 
 <div class="layout">
@@ -2090,11 +2090,21 @@
         console.log('Practice clicked!');
         gameMode = 'practice';
         dailyPlateSequence = null;
+        
+        // Update button styles
+        document.getElementById('practiceBtn').style.background = '#dbeafe';
+        document.getElementById('practiceBtn').style.border = '2px solid #3b82f6';
+        document.getElementById('dailyChallengeBtn').style.background = '';
+        document.getElementById('dailyChallengeBtn').style.border = '';
+        
+        // Update mode indicator
         const mi = document.getElementById('modeIndicator');
         mi.style.display = 'block';
         mi.textContent = '🎮 PRACTICE MODE';
         mi.style.background = '#e0e7ff';
         mi.style.color = '#3730a3';
+        mi.style.border = 'none';
+        mi.style.textAlign = 'left';
         openStartModal();
     });
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
