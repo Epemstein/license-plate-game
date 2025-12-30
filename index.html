@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v14</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -756,7 +756,7 @@
             for (let i = 0; i < maxPlates; i++) {
                 const stats = plateStats[i];
                 const skipColor = stats.skipRate > 50 ? '#dc2626' : stats.skipRate > 25 ? '#f59e0b' : '#16a34a';
-                html += `<th style="padding:8px;text-align:center;min-width:100px;">`;
+                html += `<th style="padding:8px;text-align:center;min-width:100px;cursor:pointer;" onclick="showViableWordsForPlate('${plateNames[i]}')" title="Click to see all viable words">`;
                 html += `<div style="font-weight:bold;font-size:1rem;">${plateNames[i]}</div>`;
                 html += `<div style="font-size:0.75rem;color:#6b7280;margin-top:2px;">Avg: ${stats.avgTime}s</div>`;
                 html += `<div style="font-size:0.75rem;color:${skipColor};margin-top:1px;">Skip: ${stats.skipRate}%</div>`;
@@ -2292,6 +2292,38 @@
         }
     }
     window.closeRunDetailsModal = closeRunDetailsModal;
+
+    // Show viable words for a plate in the comparison table
+    function showViableWordsForPlate(plate) {
+        if (!plate || plate === '—') return;
+        
+        // Use the same function that's used during gameplay
+        const viableWords = findViableWords(plate);
+        
+        // Show in a modal or use the existing chart modal
+        const modalBackdrop = document.getElementById('chartModalBackdrop');
+        const modalTitle = document.getElementById('chartModalTitle');
+        const modalContent = document.getElementById('chartModalContent');
+        
+        modalTitle.textContent = `Viable Words for ${plate}`;
+        
+        let html = '<div style="max-height:400px;overflow-y:auto;">';
+        html += '<p style="margin-bottom:10px;">All valid words for this plate:</p>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">';
+        
+        viableWords.forEach(word => {
+            html += `<div style="padding:6px;background:#f3f4f6;border-radius:4px;text-align:center;">${word}</div>`;
+        });
+        
+        html += '</div>';
+        html += `<p style="margin-top:15px;color:#6b7280;font-size:0.9rem;">Total: ${viableWords.length} words</p>`;
+        html += '</div>';
+        
+        modalContent.innerHTML = html;
+        modalBackdrop.classList.add('show');
+    }
+    window.showViableWordsForPlate = showViableWordsForPlate;
+
 
     // Global function for Load button
     function loadSelectedDate() {
