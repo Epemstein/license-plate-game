@@ -2298,40 +2298,38 @@
         if (!plate || plate === '—') return;
         
         console.log('Showing viable words for:', plate);
+        console.log('ALL_PLATES available:', typeof ALL_PLATES !== 'undefined');
+        console.log('PLATE_DIFFICULTY available:', typeof PLATE_DIFFICULTY !== 'undefined');
         
-        // Find viable words from the dictionary
-        const viableWords = [];
-        if (DICTIONARY && DICTIONARY.length) {
-            const upperPlate = plate.toUpperCase();
-            for (const word of DICTIONARY) {
-                const upperWord = word.toUpperCase();
-                let plateIdx = 0;
-                for (let i = 0; i < upperWord.length && plateIdx < upperPlate.length; i++) {
-                    if (upperWord[i] === upperPlate[plateIdx]) plateIdx++;
-                }
-                if (plateIdx === upperPlate.length) viableWords.push(word);
-            }
+        // Get viable words from the plate data (like during gameplay)
+        let viableWords = [];
+        if (typeof PLATE_DIFFICULTY !== 'undefined' && PLATE_DIFFICULTY[plate]) {
+            viableWords = PLATE_DIFFICULTY[plate].viable || [];
         }
         
         console.log('Found viable words:', viableWords.length);
         
-        // Show in a modal or use the existing chart modal
-        const modalBackdrop = document.getElementById('chartModalBackdrop');
-        const modalTitle = document.getElementById('chartModalTitle');
-        const modalContent = document.getElementById('chartModalContent');
+        if (viableWords.length === 0) {
+            alert(`No viable words data found for plate ${plate}`);
+            return;
+        }
+        
+        // Use the run details modal
+        const modalBackdrop = document.getElementById('runDetailsModalBackdrop');
+        const modalTitle = document.getElementById('runDetailsModalTitle');
+        const modalContent = document.getElementById('runDetailsContent');
         
         modalTitle.textContent = `Viable Words for ${plate}`;
         
-        let html = '<div style="max-height:400px;overflow-y:auto;">';
-        html += '<p style="margin-bottom:10px;">All valid words for this plate:</p>';
+        let html = '<div style="max-height:500px;overflow-y:auto;padding:10px;">';
         html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">';
         
         viableWords.forEach(word => {
-            html += `<div style="padding:6px;background:#f3f4f6;border-radius:4px;text-align:center;">${word}</div>`;
+            html += `<div style="padding:8px;background:#f3f4f6;border-radius:4px;text-align:center;font-size:0.9rem;">${word}</div>`;
         });
         
         html += '</div>';
-        html += `<p style="margin-top:15px;color:#6b7280;font-size:0.9rem;">Total: ${viableWords.length} words</p>`;
+        html += `<p style="margin-top:20px;text-align:center;color:#6b7280;font-size:0.95rem;font-weight:600;">Total: ${viableWords.length} viable words</p>`;
         html += '</div>';
         
         modalContent.innerHTML = html;
