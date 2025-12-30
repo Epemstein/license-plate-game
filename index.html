@@ -1980,6 +1980,16 @@
     
     window.viewPlayerRun = viewPlayerRun; // Make it globally accessible for onclick
 
+    // Global function to close run details modal
+    function closeRunDetailsModal() {
+        const backdrop = document.getElementById('runDetailsModalBackdrop');
+        if (backdrop) {
+            backdrop.classList.remove('show');
+        }
+    }
+    window.closeRunDetailsModal = closeRunDetailsModal;
+
+
     // === FIREBASE EVENT HANDLERS ===
     // Wait for page to fully load before attaching event listeners
     window.addEventListener('DOMContentLoaded', function() {
@@ -2073,17 +2083,17 @@ window.addEventListener('load', function() {
 
 
 <!-- Player Run Details Modal -->
-<div id="runDetailsModalBackdrop" class="modal-backdrop">
+<div id="runDetailsModalBackdrop" class="modal-backdrop" onclick="if(event.target.id==='runDetailsModalBackdrop')closeRunDetailsModal()">
     <div class="modal">
         <div class="modal-header">
             <div class="modal-title" id="runDetailsModalTitle">Player's Run</div>
-            <button class="modal-close-btn" id="runDetailsModalCloseBtn">&times;</button>
+            <button class="modal-close-btn" onclick="closeRunDetailsModal()">&times;</button>
         </div>
         <div class="modal-body">
             <div id="runDetailsContent"></div>
         </div>
         <div class="modal-footer">
-            <button id="runDetailsModalCloseBtnBottom">Close</button>
+            <button onclick="closeRunDetailsModal()">Close</button>
         </div>
     </div>
 </div>
