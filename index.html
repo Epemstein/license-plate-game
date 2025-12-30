@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v2</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -1443,13 +1443,20 @@
         gameModalMode = "end";
         gameModalTitleEl.textContent = "Run complete!";
         gameModalBodyEl.innerHTML = `
-            <p>You solved <strong>${TOTAL_PLATES}</strong> plates in
+            <p>You solved <strong>${solvedCount}</strong> plates in
             <strong>${finalTimeSec.toFixed(1)} seconds</strong> (including skip penalties).</p>
             <p>You can view a breakdown chart of each plate's time, or close this and inspect the table.</p>
+            ${gameMode === 'daily' ? '<p style="margin-top:1rem; color:#92400e; background:#fef3c7; padding:8px; border-radius:4px;"><strong>Daily Challenge Complete!</strong> Come back tomorrow for a new challenge.</p>' : ''}
         `;
 
-        gameModalPrimaryBtnEl.disabled = false;
-        gameModalPrimaryBtnEl.textContent = "Play again";
+        // Only show "Play again" for practice mode
+        if (gameMode === 'daily') {
+            gameModalPrimaryBtnEl.style.display = "none";
+        } else {
+            gameModalPrimaryBtnEl.disabled = false;
+            gameModalPrimaryBtnEl.textContent = "Play again";
+            gameModalPrimaryBtnEl.style.display = "inline-block";
+        }
 
         gameModalSecondaryBtnEl.style.display = "inline-block";
         gameModalSecondaryBtnEl.textContent = "View chart";
