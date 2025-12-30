@@ -896,12 +896,24 @@
         }
         if (gameMode==='daily' && dailyPlateSequence && dailyPlateSequence.length) {
             const idx = usedPlates.size;
+            
+            // Check if we've run out of plates
             if (idx>=dailyPlateSequence.length) { 
-                // Out of plates but haven't solved 10 yet - this shouldn't happen
-                // Just end the game
+                // Ran out of plates! This is a problem.
+                // Show error and end the game
+                resultEl.textContent = "Ran out of plates! This shouldn't happen. Please report this bug.";
+                resultEl.style.color = "red";
                 endGame(); 
                 return; 
             }
+            
+            // Check if we've SOLVED enough (this is the real end condition)
+            if (solvedCount >= TOTAL_PLATES) {
+                endGame();
+                return;
+            }
+            
+            // Get next plate from the daily sequence
             const chosen = dailyPlateSequence[idx];
             usedPlates.add(chosen);
             currentPlate = chosen;
