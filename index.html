@@ -842,7 +842,34 @@
             });
             h += '</tbody></table>';
             document.getElementById('leaderboardContent').innerHTML = h;
+            
+            // Update Compare button state (grey out if locked)
+            const compareBtn = document.getElementById('compareRunsBtn');
+            console.log('=== COMPARE BUTTON STATE ===');
+            console.log('currentUser:', currentUser ? currentUser.uid : 'null');
+            console.log('userHasPlayed:', userHasPlayed);
+            console.log('isPastDate:', isPastDate);
+            
+            if (userHasPlayed || isPastDate) {
+                // Unlocked
+                compareBtn.disabled = false;
+                compareBtn.style.background = '#3b82f6';
+                compareBtn.style.cursor = 'pointer';
+                compareBtn.style.opacity = '1';
+                compareBtn.textContent = '📊 Compare All Runs';
+                console.log('→ Button UNLOCKED');
+            } else {
+                // Locked
+                compareBtn.disabled = true;
+                compareBtn.style.background = '#9ca3af';
+                compareBtn.style.cursor = 'not-allowed';
+                compareBtn.style.opacity = '0.6';
+                compareBtn.textContent = '🔒 Complete Daily Challenge to Compare';
+                console.log('→ Button LOCKED');
+            }
+            
         } catch(e) {
+            console.error('Leaderboard error:', e);
             document.getElementById('leaderboardContent').innerHTML = '<p style="text-align:center;color:#dc2626;padding:20px;">Error loading</p>';
         }
     }
