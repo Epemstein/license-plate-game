@@ -2334,22 +2334,68 @@
         const modalTitle = document.getElementById('runDetailsModalTitle');
         const modalContent = document.getElementById('runDetailsContent');
         
-        modalTitle.textContent = `Viable Words for ${plate}`;
+        // Use the dedicated words modal (same as in-game)
+        const wordsModalBackdrop = document.getElementById('wordsModalBackdrop');
+        const wordsModalTitle = document.getElementById('wordsModalTitle');
+        const wordsModalList = document.getElementById('wordsModalList');
         
-        let html = '<div style="max-height:500px;overflow-y:auto;padding:10px;">';
-        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">';
+        wordsModalTitle.textContent = `Plate: ${plate}`;
         
-        viableWords.forEach(word => {
-            html += `<div style="padding:8px;background:#f3f4f6;border-radius:4px;text-align:center;font-size:0.9rem;">${word}</div>`;
+        // Store for sorting
+        window.currentViableWords = viableWords;
+        window.currentPlateName = plate;
+        
+        // Initial display (A-Z)
+        displayViableWords('alpha');
+        
+        // Show modal
+        wordsModalBackdrop.classList.add('show');
+    }
+    
+    // Display viable words with highlighting (used by showViableWordsForPlate and sort buttons)
+    function displayViableWords(sortType) {
+        const viableWords = window.currentViableWords || [];
+        const plate = window.currentPlateName || '';
+        const wordsModalList = document.getElementById('wordsModalList');
+        const wordsCountEl = document.getElementById('wordsModalCount');
+        
+        // Sort words
+        let sorted = [...viableWords];
+        if (sortType === 'length') {
+            sorted.sort((a, b) => a.length - b.length || a.localeCompare(b));
+        } else {
+            sorted.sort((a, b) => a.localeCompare(b));
+        }
+        
+        // Highlight plate letters in each word
+        const upperPlate = plate.toUpperCase();
+        let html = '';
+        
+        sorted.forEach(word => {
+            const upperWord = word.toUpperCase();
+            let highlighted = '';
+            let plateIdx = 0;
+            
+            for (let i = 0; i < word.length; i++) {
+                if (plateIdx < upperPlate.length && upperWord[i] === upperPlate[plateIdx]) {
+                    highlighted += `<strong style="color:#16a34a;">${word[i]}</strong>`;
+                    plateIdx++;
+                } else {
+                    highlighted += word[i];
+                }
+            }
+            
+            html += `<div class="word-item">${highlighted}</div>`;
         });
         
-        html += '</div>';
-        html += `<p style="margin-top:20px;text-align:center;color:#6b7280;font-size:0.95rem;font-weight:600;">Total: ${viableWords.length} viable words</p>`;
-        html += '</div>';
+        wordsModalList.innerHTML = html;
+        wordsCountEl.textContent = `${viableWords.length} viable words`;
         
-        modalContent.innerHTML = html;
-        modalBackdrop.classList.add('show');
+        // Update sort button states
+        document.getElementById('wordsSortAlphaBtn').classList.toggle('active', sortType === 'alpha');
+        document.getElementById('wordsSortLengthBtn').classList.toggle('active', sortType === 'length');
     }
+    window.displayViableWords = displayViableWords;
     window.showViableWordsForPlate = showViableWordsForPlate;
 
 
