@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v34</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -539,12 +539,25 @@
 
     async function saveScore(time,solved,skipped) {
         if (!currentUser || gameMode!=='daily') return;
-        await database.ref(`scores/${getTodayString()}/${currentUser.uid}`).set({
-            userId:currentUser.uid,
-            userName:currentUser.displayName||currentUser.email,
-            totalTime:Math.floor(time*10)/10,
-            solved,skipped,
-            timestamp:Date.now()
+        const today = getTodayString();
+        
+        // Prepare game history for saving
+        const historyData = gameHistory.map(entry => ({
+            plate: entry.plate,
+            word: entry.word,
+            skipped: entry.skipped || false,
+            thinkingSeconds: Math.floor(entry.thinkingSeconds * 10) / 10,
+            penaltySeconds: entry.penaltySeconds || 0
+        }));
+        
+        await database.ref(`scores/${today}/${currentUser.uid}`).set({
+            userId: currentUser.uid,
+            userName: currentUser.displayName || currentUser.email,
+            totalTime: Math.floor(time*10)/10,
+            solved: solved,
+            skipped: skipped,
+            timestamp: Date.now(),
+            history: historyData
         });
     }
 
@@ -1880,7 +1893,7 @@
 
 
     // View player run details
-    async function viewPlayerRun(userId, dateString, userName, totalTime) {
+    async function viewPlayerRun(userId, dateString, userName, totalTime, solved, skipped) {
         const backdrop = document.getElementById('runDetailsModalBackdrop');
         const titleEl = document.getElementById('runDetailsModalTitle');
         const contentEl = document.getElementById('runDetailsContent');
@@ -1894,7 +1907,14 @@
             const data = snapshot.val();
             
             if (!data || !data.history || data.history.length === 0) {
-                contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;">No detailed history available</p>';
+                contentEl.innerHTML = `
+                    <p style="text-align:center;color:#6b7280;padding:20px;">
+                        <strong>Summary Stats:</strong><br>
+                        Total Time: ${totalTime.toFixed(1)}s<br>
+                        Solved: ${solved}<br>
+                        Skipped: ${skipped}<br><br>
+                        <em>Detailed breakdown not available (run completed before this feature was added)</em>
+                    </p>`;
                 return;
             }
             
