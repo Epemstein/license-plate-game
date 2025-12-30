@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v02</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -756,8 +756,8 @@
             for (let i = 0; i < maxPlates; i++) {
                 const stats = plateStats[i];
                 const skipColor = stats.skipRate > 50 ? '#dc2626' : stats.skipRate > 25 ? '#f59e0b' : '#16a34a';
-                html += `<th style="padding:8px;text-align:center;min-width:100px;cursor:pointer;" onclick="showViableWordsForPlate('${plateNames[i]}')" title="Click to see all viable words">`;
-                html += `<div style="font-weight:bold;font-size:1rem;">${plateNames[i]}</div>`;
+                html += `<th style="padding:8px;text-align:center;min-width:100px;">`;
+                html += `<div onclick="showViableWordsForPlate('${plateNames[i]}')" style="font-weight:bold;font-size:1rem;cursor:pointer;display:inline-block;" title="Click to see all viable words">${plateNames[i]}</div>`;
                 html += `<div style="font-size:0.75rem;color:#6b7280;margin-top:2px;">Avg: ${stats.avgTime}s</div>`;
                 html += `<div style="font-size:0.75rem;color:${skipColor};margin-top:1px;">Skip: ${stats.skipRate}%</div>`;
                 html += `</th>`;
@@ -2297,8 +2297,23 @@
     function showViableWordsForPlate(plate) {
         if (!plate || plate === '—') return;
         
-        // Use the same function that's used during gameplay
-        const viableWords = findViableWords(plate);
+        console.log('Showing viable words for:', plate);
+        
+        // Find viable words from the dictionary
+        const viableWords = [];
+        if (DICTIONARY && DICTIONARY.length) {
+            const upperPlate = plate.toUpperCase();
+            for (const word of DICTIONARY) {
+                const upperWord = word.toUpperCase();
+                let plateIdx = 0;
+                for (let i = 0; i < upperWord.length && plateIdx < upperPlate.length; i++) {
+                    if (upperWord[i] === upperPlate[plateIdx]) plateIdx++;
+                }
+                if (plateIdx === upperPlate.length) viableWords.push(word);
+            }
+        }
+        
+        console.log('Found viable words:', viableWords.length);
         
         // Show in a modal or use the existing chart modal
         const modalBackdrop = document.getElementById('chartModalBackdrop');
