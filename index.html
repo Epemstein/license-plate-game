@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v42</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -515,7 +515,49 @@
         const seed = dateStr.split('-').reduce((a,v)=>a+parseInt(v),0);
         const rng = seededRandom(seed);
         if (!platesReady || !ALL_PLATES.length) return [];
-        return [...ALL_PLATES].sort(()=>rng()-0.5).slice(0,200);
+        
+        // Use weighted difficulty selection like the original game
+        const dailyPlates = [];
+        const usedPlates = new Set();
+        
+        while (dailyPlates.length < 200 && usedPlates.size < ALL_PLATES.length) {
+            // Pick a difficulty band using the same probabilities as the game
+            const r = rng();
+            let band;
+            if (r < 0.40) band = "very_easy";
+            else if (r < 0.60) band = "easy";
+            else if (r < 0.75) band = "medium";
+            else if (r < 0.90) band = "difficult";
+            else if (r < 0.95) band = "hard";
+            else if (r < 0.98) band = "very_hard";
+            else band = "impossible";
+            
+            // Get all plates in this band that haven't been used
+            const bandPlates = ALL_PLATES.filter(plate => {
+                if (usedPlates.has(plate)) return false;
+                const diff = PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate] ? PLATE_DIFFICULTY[plate].difficulty : null;
+                if (!diff) return false;
+                
+                if (band === "very_easy" && diff >= 0 && diff <= 10) return true;
+                if (band === "easy" && diff >= 11 && diff <= 34) return true;
+                if (band === "medium" && diff >= 35 && diff <= 49) return true;
+                if (band === "difficult" && diff >= 50 && diff <= 79) return true;
+                if (band === "hard" && diff >= 80 && diff <= 88) return true;
+                if (band === "very_hard" && diff >= 89 && diff <= 96) return true;
+                if (band === "impossible" && diff >= 97 && diff <= 100) return true;
+                return false;
+            });
+            
+            // Pick a random plate from this band
+            if (bandPlates.length > 0) {
+                const idx = Math.floor(rng() * bandPlates.length);
+                const chosen = bandPlates[idx];
+                dailyPlates.push(chosen);
+                usedPlates.add(chosen);
+            }
+        }
+        
+        return dailyPlates;
     }
 
     async function signInWithGoogle() {
