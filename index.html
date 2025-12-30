@@ -637,22 +637,22 @@
     
     // Get color based on time (gradient)
     function getTimeColor(seconds) {
-        if (seconds <= 3) return '#22c55e'; // green
-        if (seconds >= 20) return '#ef4444'; // red
+        if (seconds <= 1.5) return '#22c55e'; // green (under 1.5s)
+        if (seconds >= 30) return '#ef4444'; // dark red (30s+)
         
-        if (seconds <= 10) {
-            // Green to white (3s → 10s)
-            const ratio = (seconds - 3) / 7;
+        if (seconds <= 12) {
+            // Green to white (1.5s → 12s)
+            const ratio = (seconds - 1.5) / 10.5;
             const r = Math.round(34 + (255 - 34) * ratio);
             const g = Math.round(197 + (255 - 197) * ratio);
             const b = Math.round(94 + (255 - 94) * ratio);
             return `rgb(${r},${g},${b})`;
         } else {
-            // White to red (10s → 20s)
-            const ratio = (seconds - 10) / 10;
+            // White to red (12s → 30s)
+            const ratio = (seconds - 12) / 18;
             const r = 255;
-            const g = Math.round(255 - 16 * ratio);
-            const b = Math.round(255 - 187 * ratio);
+            const g = Math.round(255 - (255 - 68) * ratio);
+            const b = Math.round(255 - (255 - 68) * ratio);
             return `rgb(${r},${g},${b})`;
         }
     }
@@ -707,11 +707,41 @@
             // Build table
             let html = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">';
             
-            // Header row with plate names
+            // Calculate statistics for each plate first
+            const plateStats = [];
+            for (let i = 0; i < maxPlates; i++) {
+                let totalTime = 0;
+                let count = 0;
+                let skipCount = 0;
+                
+                playersData.forEach(player => {
+                    if (i < player.history.length) {
+                        count++;
+                        const entry = player.history[i];
+                        const time = entry.skipped 
+                            ? (entry.thinkingSeconds || 0) + entry.penaltySeconds 
+                            : entry.thinkingSeconds;
+                        totalTime += time;
+                        if (entry.skipped) skipCount++;
+                    }
+                });
+                
+                const avgTime = count > 0 ? (totalTime / count).toFixed(1) : '—';
+                const skipRate = count > 0 ? Math.round((skipCount / count) * 100) : 0;
+                plateStats.push({ avgTime, skipRate });
+            }
+            
+            // Header row with plate names and stats
             html += '<thead><tr style="background:#f3f4f6;">';
             html += '<th style="padding:8px;text-align:left;position:sticky;left:0;background:#f3f4f6;z-index:2;min-width:120px;">Player</th>';
             for (let i = 0; i < maxPlates; i++) {
-                html += `<th style="padding:8px;text-align:center;min-width:100px;">${plateNames[i]}</th>`;
+                const stats = plateStats[i];
+                const skipColor = stats.skipRate > 50 ? '#dc2626' : stats.skipRate > 25 ? '#f59e0b' : '#16a34a';
+                html += `<th style="padding:8px;text-align:center;min-width:100px;">`;
+                html += `<div style="font-weight:bold;font-size:1rem;">${plateNames[i]}</div>`;
+                html += `<div style="font-size:0.75rem;color:#6b7280;margin-top:2px;">Avg: ${stats.avgTime}s</div>`;
+                html += `<div style="font-size:0.75rem;color:${skipColor};margin-top:1px;">Skip: ${stats.skipRate}%</div>`;
+                html += `</th>`;
             }
             html += '</tr></thead><tbody>';
             
@@ -756,52 +786,7 @@
                 html += '</tr>';
             });
             
-            // Stats row
-            html += '<tr style="background:#fef3c7;border-top:3px solid #f59e0b;"><td colspan="' + (maxPlates + 1) + '" style="padding:8px;font-weight:bold;text-align:center;">📊 STATISTICS</td></tr>';
-            
-            // Avg Time row
-            html += '<tr style="background:#fef9e6;">';
-            html += '<td style="padding:8px;font-weight:600;">Avg Time</td>';
-            for (let i = 0; i < maxPlates; i++) {
-                let totalTime = 0;
-                let count = 0;
-                
-                playersData.forEach(player => {
-                    if (i < player.history.length) {
-                        const entry = player.history[i];
-                        // Use total time (thinking + penalty for skips)
-                        const time = entry.skipped 
-                            ? (entry.thinkingSeconds || 0) + entry.penaltySeconds 
-                            : entry.thinkingSeconds;
-                        totalTime += time;
-                        count++;
-                    }
-                });
-                
-                const avgTime = count > 0 ? (totalTime / count).toFixed(1) : '—';
-                html += `<td style="padding:4px;text-align:center;font-weight:600;">${avgTime}s</td>`;
-            }
-            html += '</tr>';
-            
-            // Skip Rate row
-            html += '<tr style="background:#fef9e6;">';
-            html += '<td style="padding:8px;font-weight:600;">Skip Rate</td>';
-            for (let i = 0; i < maxPlates; i++) {
-                let skipCount = 0;
-                let count = 0;
-                
-                playersData.forEach(player => {
-                    if (i < player.history.length) {
-                        count++;
-                        if (player.history[i].skipped) skipCount++;
-                    }
-                });
-                
-                const skipRate = count > 0 ? Math.round((skipCount / count) * 100) : 0;
-                const color = skipRate > 50 ? '#dc2626' : skipRate > 25 ? '#f59e0b' : '#16a34a';
-                html += `<td style="padding:4px;text-align:center;font-weight:600;color:${color};">${skipRate}%</td>`;
-            }
-            html += '</tr>';
+            // Stats are now in the header, so remove these rows
             
             html += '</tbody></table>';
             contentEl.innerHTML = html;
