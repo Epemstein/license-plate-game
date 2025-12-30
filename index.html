@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v04</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -490,6 +490,7 @@
     let gameMode = 'practice';
     let currentUser = null;
     let dailyPlateSequence = null;
+    let currentViewingDate = null; // Track which date we're viewing
 
     auth.onAuthStateChanged((user) => {
         currentUser = user;
@@ -663,7 +664,9 @@
         contentEl.innerHTML = 'Loading comparison...';
         
         try {
-            const dateStr = getTodayString();
+            // Use the date currently being viewed, not always today
+            const dateStr = currentViewingDate || getTodayString();
+            console.log('Building comparison for date:', dateStr);
             const scores = await loadLeaderboard(dateStr);
             
             if (scores.length === 0) {
@@ -799,6 +802,7 @@
 
     async function displayLeaderboard(dateStr) {
         console.log('=== displayLeaderboard called with date:', dateStr);
+        currentViewingDate = dateStr; // Track the date we're viewing
         document.getElementById('leaderboardDate').textContent = `Daily Challenge - ${dateStr}`;
         document.getElementById('leaderboardContent').innerHTML = 'Loading...';
         try {
