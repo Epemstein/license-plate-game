@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v14</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -843,7 +843,13 @@
             h += '</tbody></table>';
             document.getElementById('leaderboardContent').innerHTML = h;
             
-            // Update Compare button state (grey out if locked)
+        } catch(e) {
+            console.error('Leaderboard error:', e);
+            document.getElementById('leaderboardContent').innerHTML = '<p style="text-align:center;color:#dc2626;padding:20px;">Error loading</p>';
+        }
+        
+        // Update Compare button state (grey out if locked) - AFTER try/catch
+        try {
             const compareBtn = document.getElementById('compareRunsBtn');
             console.log('=== COMPARE BUTTON STATE ===');
             console.log('currentUser:', currentUser ? currentUser.uid : 'null');
@@ -867,10 +873,8 @@
                 compareBtn.textContent = '🔒 Complete Daily Challenge to Compare';
                 console.log('→ Button LOCKED');
             }
-            
-        } catch(e) {
-            console.error('Leaderboard error:', e);
-            document.getElementById('leaderboardContent').innerHTML = '<p style="text-align:center;color:#dc2626;padding:20px;">Error loading</p>';
+        } catch(btnError) {
+            console.error('Button state error:', btnError);
         }
     }
     // === END FIREBASE ===
