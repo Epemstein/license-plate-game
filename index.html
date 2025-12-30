@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v3</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -582,7 +582,14 @@
             scores.forEach((s,i)=>{
                 const bg=i<3?'#fef3c7':(i%2?'#fff':'#f9fafb');
                 h+=`<tr style="background:${bg};"><td style="padding:8px;font-weight:bold;">#${i+1}</td><td style="padding:8px;">${s.userName}</td><td style="padding:8px;text-align:right;font-weight:600;">${s.totalTime.toFixed(1)}s</td>`;
-                h+=`<td style="padding:8px;text-align:center;"><button onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\'")}',${s.totalTime},${s.solved||0},${s.skipped||0})" style="padding:4px 12px;cursor:pointer;background:#3b82f6;color:white;border:1px solid #2563eb;border-radius:4px;">👁 View</button></td></tr>`;
+                // Only show View button if current user has completed their run today
+                const userHasPlayed = currentUser && scores.some(score => score.userId === currentUser.uid);
+                if (userHasPlayed || dateStr !== getTodayString()) {
+                    h+=`<td style="padding:8px;text-align:center;"><button onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\'")}',${s.totalTime},${s.solved||0},${s.skipped||0})" style="padding:4px 12px;cursor:pointer;background:#3b82f6;color:white;border:1px solid #2563eb;border-radius:4px;">👁 View</button></td>`;
+                } else {
+                    h+=`<td style="padding:8px;text-align:center;"><span style="color:#9ca3af;font-size:0.85rem;">🔒 Complete daily to unlock</span></td>`;
+                }
+                h+=`</tr>`;
             });
             h += '</tbody></table>';
             document.getElementById('leaderboardContent').innerHTML = h;
@@ -1893,6 +1900,25 @@
 
 
 
+
+    // Highlight plate letters in a word
+    function highlightPlateInWord(plate, word) {
+        const upperWord = word.toUpperCase();
+        const upperPlate = plate.toUpperCase();
+        let result = '';
+        let plateIndex = 0;
+        
+        for (let i = 0; i < word.length; i++) {
+            if (plateIndex < upperPlate.length && upperWord[i] === upperPlate[plateIndex]) {
+                result += `<span style="color:#16a34a;font-weight:700;">${word[i]}</span>`;
+                plateIndex++;
+            } else {
+                result += word[i];
+            }
+        }
+        
+        return result;
+    }
     // View player run details
     async function viewPlayerRun(userId, dateString, userName, totalTime, solved, skipped) {
         const backdrop = document.getElementById('runDetailsModalBackdrop');
@@ -1934,7 +1960,9 @@
                     html += `<td style="padding:8px;color:#f59e0b;">+${entry.penaltySeconds}s (skipped)</td>`;
                     html += `<td style="padding:8px;text-align:right;">${entry.thinkingSeconds.toFixed(1)}s (+${entry.penaltySeconds}s)</td>`;
                 } else {
-                    html += `<td style="padding:8px;color:#16a34a;">${entry.word}</td>`;
+                    // Highlight the plate letters in the word
+                    const highlightedWord = highlightPlateInWord(entry.plate, entry.word);
+                    html += `<td style="padding:8px;color:#16a34a;">${highlightedWord}</td>`;
                     html += `<td style="padding:8px;text-align:right;">${entry.thinkingSeconds.toFixed(1)}s</td>`;
                 }
                 
