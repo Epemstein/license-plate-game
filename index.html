@@ -803,6 +803,15 @@
     async function displayLeaderboard(dateStr) {
         console.log('=== displayLeaderboard called with date:', dateStr);
         currentViewingDate = dateStr; // Track the date we're viewing
+        
+        // Auto-collapse comparison table when date changes
+        const comparisonContainer = document.getElementById('comparisonTableContainer');
+        const compareBtn = document.getElementById('compareRunsBtn');
+        if (comparisonContainer && comparisonContainer.style.display === 'block') {
+            comparisonContainer.style.display = 'none';
+            if (compareBtn) compareBtn.textContent = '📊 Compare All Runs';
+        }
+        
         document.getElementById('leaderboardDate').textContent = `Daily Challenge - ${dateStr}`;
         document.getElementById('leaderboardContent').innerHTML = 'Loading...';
         try {
@@ -2367,7 +2376,7 @@ window.addEventListener('load', function() {
     </div>
     
     <!-- Compare Runs Button -->
-    <div id="compareRunsContainer" style="margin-top:20px;text-align:center;display:block;">
+    <div id="compareRunsContainer" style="margin-top:20px;text-align:center;display:none;">
         <button id="compareRunsBtn" onclick="toggleCompareTable()" style="padding:12px 24px;font-size:1rem;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
             📊 Compare All Runs
         </button>
