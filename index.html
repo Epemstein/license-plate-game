@@ -339,427 +339,251 @@
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js">
-    // ========== FIREBASE EVENT HANDLERS ==========
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
-        if (!currentUser) {
-            const signedIn = await signInWithGoogle();
-            if (!signedIn) return;
-        }
-        const played = await checkIfPlayedToday();
-        if (played) {
-            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
-            return;
-        }
+        if (!currentUser) { if (!await signInWithGoogle()) return; }
+        if (await checkIfPlayedToday()) { alert('Already played today! Try Practice Mode.'); return; }
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
-            alert('Failed to generate daily plates. Please wait for data to load.');
-            return;
-        }
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
-        document.getElementById('modeIndicator').style.background = '#fef3c7';
-        document.getElementById('modeIndicator').style.color = '#92400e';
+        if (!dailyPlateSequence || dailyPlateSequence.length===0) { alert('Failed to generate plates. Wait for data to load.'); return; }
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🏆 DAILY CHALLENGE MODE';
+        mi.style.background = '#fef3c7';
+        mi.style.color = '#92400e';
         openStartModal();
     });
 
     document.getElementById('practiceBtn').addEventListener('click', () => {
         gameMode = 'practice';
         dailyPlateSequence = null;
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
-        document.getElementById('modeIndicator').style.background = '#e0e7ff';
-        document.getElementById('modeIndicator').style.color = '#3730a3';
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🎮 PRACTICE MODE';
+        mi.style.background = '#e0e7ff';
+        mi.style.color = '#3730a3';
         openStartModal();
     });
-
-    async function displayLeaderboard(dateString) {
-        const dateEl = document.getElementById('leaderboardDate');
-        const contentEl = document.getElementById('leaderboardContent');
-        
-        dateEl.textContent = `Daily Challenge - ${dateString}`;
-        contentEl.innerHTML = 'Loading scores...';
-        
-        try {
-            const scores = await loadLeaderboard(dateString);
-            if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
-                return;
-            }
-            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
-            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
-            html += '<th style="padding: 8px; text-align: left;">Player</th>';
-            html += '<th style="padding: 8px; text-align: right;">Time</th>';
-            html += '</tr></thead><tbody>';
-            scores.forEach((score, index) => {
-                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
-                html += `<tr style="background: ${bgColor};">`;
-                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
-                html += `<td style="padding: 8px;">${score.userName}</td>`;
-                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            contentEl.innerHTML = html;
-        } catch (error) {
-            console.error('Error loading leaderboard:', error);
-            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
-        }
-    }
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
-        datePicker.max = today; // Can't select future dates
+        datePicker.max = today;
         backdrop.classList.add('show');
         displayLeaderboard(today);
     });
-    
+
     document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
-        const datePicker = document.getElementById('leaderboardDatePicker');
-        if (datePicker.value) {
-            displayLeaderboard(datePicker.value);
-        }
+        const dp = document.getElementById('leaderboardDatePicker');
+        if (dp.value) displayLeaderboard(dp.value);
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-    // ========== END HANDLERS ==========
 
 </script>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
-    // ========== FIREBASE EVENT HANDLERS ==========
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
-        if (!currentUser) {
-            const signedIn = await signInWithGoogle();
-            if (!signedIn) return;
-        }
-        const played = await checkIfPlayedToday();
-        if (played) {
-            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
-            return;
-        }
+        if (!currentUser) { if (!await signInWithGoogle()) return; }
+        if (await checkIfPlayedToday()) { alert('Already played today! Try Practice Mode.'); return; }
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
-            alert('Failed to generate daily plates. Please wait for data to load.');
-            return;
-        }
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
-        document.getElementById('modeIndicator').style.background = '#fef3c7';
-        document.getElementById('modeIndicator').style.color = '#92400e';
+        if (!dailyPlateSequence || dailyPlateSequence.length===0) { alert('Failed to generate plates. Wait for data to load.'); return; }
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🏆 DAILY CHALLENGE MODE';
+        mi.style.background = '#fef3c7';
+        mi.style.color = '#92400e';
         openStartModal();
     });
 
     document.getElementById('practiceBtn').addEventListener('click', () => {
         gameMode = 'practice';
         dailyPlateSequence = null;
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
-        document.getElementById('modeIndicator').style.background = '#e0e7ff';
-        document.getElementById('modeIndicator').style.color = '#3730a3';
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🎮 PRACTICE MODE';
+        mi.style.background = '#e0e7ff';
+        mi.style.color = '#3730a3';
         openStartModal();
     });
-
-    async function displayLeaderboard(dateString) {
-        const dateEl = document.getElementById('leaderboardDate');
-        const contentEl = document.getElementById('leaderboardContent');
-        
-        dateEl.textContent = `Daily Challenge - ${dateString}`;
-        contentEl.innerHTML = 'Loading scores...';
-        
-        try {
-            const scores = await loadLeaderboard(dateString);
-            if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
-                return;
-            }
-            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
-            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
-            html += '<th style="padding: 8px; text-align: left;">Player</th>';
-            html += '<th style="padding: 8px; text-align: right;">Time</th>';
-            html += '</tr></thead><tbody>';
-            scores.forEach((score, index) => {
-                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
-                html += `<tr style="background: ${bgColor};">`;
-                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
-                html += `<td style="padding: 8px;">${score.userName}</td>`;
-                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            contentEl.innerHTML = html;
-        } catch (error) {
-            console.error('Error loading leaderboard:', error);
-            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
-        }
-    }
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
-        datePicker.max = today; // Can't select future dates
+        datePicker.max = today;
         backdrop.classList.add('show');
         displayLeaderboard(today);
     });
-    
+
     document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
-        const datePicker = document.getElementById('leaderboardDatePicker');
-        if (datePicker.value) {
-            displayLeaderboard(datePicker.value);
-        }
+        const dp = document.getElementById('leaderboardDatePicker');
+        if (dp.value) displayLeaderboard(dp.value);
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-    // ========== END HANDLERS ==========
 
 </script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js">
-    // ========== FIREBASE EVENT HANDLERS ==========
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
-        if (!currentUser) {
-            const signedIn = await signInWithGoogle();
-            if (!signedIn) return;
-        }
-        const played = await checkIfPlayedToday();
-        if (played) {
-            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
-            return;
-        }
+        if (!currentUser) { if (!await signInWithGoogle()) return; }
+        if (await checkIfPlayedToday()) { alert('Already played today! Try Practice Mode.'); return; }
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
-            alert('Failed to generate daily plates. Please wait for data to load.');
-            return;
-        }
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
-        document.getElementById('modeIndicator').style.background = '#fef3c7';
-        document.getElementById('modeIndicator').style.color = '#92400e';
+        if (!dailyPlateSequence || dailyPlateSequence.length===0) { alert('Failed to generate plates. Wait for data to load.'); return; }
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🏆 DAILY CHALLENGE MODE';
+        mi.style.background = '#fef3c7';
+        mi.style.color = '#92400e';
         openStartModal();
     });
 
     document.getElementById('practiceBtn').addEventListener('click', () => {
         gameMode = 'practice';
         dailyPlateSequence = null;
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
-        document.getElementById('modeIndicator').style.background = '#e0e7ff';
-        document.getElementById('modeIndicator').style.color = '#3730a3';
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🎮 PRACTICE MODE';
+        mi.style.background = '#e0e7ff';
+        mi.style.color = '#3730a3';
         openStartModal();
     });
-
-    async function displayLeaderboard(dateString) {
-        const dateEl = document.getElementById('leaderboardDate');
-        const contentEl = document.getElementById('leaderboardContent');
-        
-        dateEl.textContent = `Daily Challenge - ${dateString}`;
-        contentEl.innerHTML = 'Loading scores...';
-        
-        try {
-            const scores = await loadLeaderboard(dateString);
-            if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
-                return;
-            }
-            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
-            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
-            html += '<th style="padding: 8px; text-align: left;">Player</th>';
-            html += '<th style="padding: 8px; text-align: right;">Time</th>';
-            html += '</tr></thead><tbody>';
-            scores.forEach((score, index) => {
-                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
-                html += `<tr style="background: ${bgColor};">`;
-                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
-                html += `<td style="padding: 8px;">${score.userName}</td>`;
-                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            contentEl.innerHTML = html;
-        } catch (error) {
-            console.error('Error loading leaderboard:', error);
-            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
-        }
-    }
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
-        datePicker.max = today; // Can't select future dates
+        datePicker.max = today;
         backdrop.classList.add('show');
         displayLeaderboard(today);
     });
-    
+
     document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
-        const datePicker = document.getElementById('leaderboardDatePicker');
-        if (datePicker.value) {
-            displayLeaderboard(datePicker.value);
-        }
+        const dp = document.getElementById('leaderboardDatePicker');
+        if (dp.value) displayLeaderboard(dp.value);
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-    // ========== END HANDLERS ==========
 
 </script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
-    // ========== FIREBASE EVENT HANDLERS ==========
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
-        if (!currentUser) {
-            const signedIn = await signInWithGoogle();
-            if (!signedIn) return;
-        }
-        const played = await checkIfPlayedToday();
-        if (played) {
-            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
-            return;
-        }
+        if (!currentUser) { if (!await signInWithGoogle()) return; }
+        if (await checkIfPlayedToday()) { alert('Already played today! Try Practice Mode.'); return; }
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
-            alert('Failed to generate daily plates. Please wait for data to load.');
-            return;
-        }
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
-        document.getElementById('modeIndicator').style.background = '#fef3c7';
-        document.getElementById('modeIndicator').style.color = '#92400e';
+        if (!dailyPlateSequence || dailyPlateSequence.length===0) { alert('Failed to generate plates. Wait for data to load.'); return; }
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🏆 DAILY CHALLENGE MODE';
+        mi.style.background = '#fef3c7';
+        mi.style.color = '#92400e';
         openStartModal();
     });
 
     document.getElementById('practiceBtn').addEventListener('click', () => {
         gameMode = 'practice';
         dailyPlateSequence = null;
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
-        document.getElementById('modeIndicator').style.background = '#e0e7ff';
-        document.getElementById('modeIndicator').style.color = '#3730a3';
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🎮 PRACTICE MODE';
+        mi.style.background = '#e0e7ff';
+        mi.style.color = '#3730a3';
         openStartModal();
     });
-
-    async function displayLeaderboard(dateString) {
-        const dateEl = document.getElementById('leaderboardDate');
-        const contentEl = document.getElementById('leaderboardContent');
-        
-        dateEl.textContent = `Daily Challenge - ${dateString}`;
-        contentEl.innerHTML = 'Loading scores...';
-        
-        try {
-            const scores = await loadLeaderboard(dateString);
-            if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
-                return;
-            }
-            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
-            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
-            html += '<th style="padding: 8px; text-align: left;">Player</th>';
-            html += '<th style="padding: 8px; text-align: right;">Time</th>';
-            html += '</tr></thead><tbody>';
-            scores.forEach((score, index) => {
-                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
-                html += `<tr style="background: ${bgColor};">`;
-                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
-                html += `<td style="padding: 8px;">${score.userName}</td>`;
-                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            contentEl.innerHTML = html;
-        } catch (error) {
-            console.error('Error loading leaderboard:', error);
-            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
-        }
-    }
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
-        datePicker.max = today; // Can't select future dates
+        datePicker.max = today;
         backdrop.classList.add('show');
         displayLeaderboard(today);
     });
-    
+
     document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
-        const datePicker = document.getElementById('leaderboardDatePicker');
-        if (datePicker.value) {
-            displayLeaderboard(datePicker.value);
-        }
+        const dp = document.getElementById('leaderboardDatePicker');
+        if (dp.value) displayLeaderboard(dp.value);
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-    // ========== END HANDLERS ==========
 
 </script>
 </head>
 <body>
 
-<h1>The License Plate Game v65</h1>
-
-<div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-    <button id="dailyChallengeBtn" style="padding: 10px 20px; font-size: 1rem; background: #fbbf24; border: 2px solid #f59e0b; font-weight: bold; cursor: pointer;">🏆 Daily Challenge</button>
-    <button id="practiceBtn" style="padding: 10px 20px; font-size: 1rem; cursor: pointer;">🎮 Practice Mode</button>
-    <button id="leaderboardBtn" style="padding: 10px 20px; font-size: 1rem; cursor: pointer;">📊 View Leaderboard</button>
-    <div id="userInfo" style="display: none; margin-left: auto; padding: 10px; background: #f3f4f6; border-radius: 4px;">
+<h1>The License Plate Game v4</h1>
+<div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <button id="dailyChallengeBtn" style="padding:10px 20px;font-size:1rem;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
+    <button id="practiceBtn" style="padding:10px 20px;font-size:1rem;cursor:pointer;">🎮 Practice Mode</button>
+    <button id="leaderboardBtn" style="padding:10px 20px;font-size:1rem;cursor:pointer;">📊 View Leaderboard</button>
+    <div id="userInfo" style="display:none;margin-left:auto;padding:10px;background:#f3f4f6;border-radius:4px;">
         Signed in as: <strong id="userName"></strong>
-        <button id="signOutBtn" style="margin-left: 10px; padding: 4px 8px; cursor: pointer;">Sign Out</button>
+        <button id="signOutBtn" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
     </div>
 </div>
-
-<div id="modeIndicator" style="display: none; padding: 8px; background: #e5e7eb; border-radius: 4px; margin-bottom: 10px; font-weight: 600;"></div>
-
+<div id="modeIndicator" style="display:none;padding:8px;background:#e5e7eb;border-radius:4px;margin-bottom:10px;font-weight:600;"></div>
 
 
 <div class="layout">
@@ -881,7 +705,6 @@
 
 <script>
 
-    // ========== FIREBASE CONFIGURATION ==========
     const firebaseConfig = {
         apiKey: "AIzaSyBEa4aJf-cB25uzvEXdpNf1bG5kOOL5PXs",
         authDomain: "license-plate-game-2ea96.firebaseapp.com",
@@ -891,47 +714,37 @@
         messagingSenderId: "247985429580",
         appId: "1:247985429580:web:4927cee2ca3581b569a8e9"
     };
-
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const database = firebase.database();
-
     let gameMode = 'practice';
     let currentUser = null;
     let dailyPlateSequence = null;
 
     auth.onAuthStateChanged((user) => {
         currentUser = user;
-        const userInfoEl = document.getElementById('userInfo');
-        const userNameEl = document.getElementById('userName');
-        if (user) {
-            userInfoEl.style.display = 'block';
-            userNameEl.textContent = user.displayName || user.email;
-        } else {
-            userInfoEl.style.display = 'none';
-        }
+        const ui = document.getElementById('userInfo');
+        const un = document.getElementById('userName');
+        if (user) { ui.style.display = 'block'; un.textContent = user.displayName || user.email; }
+        else { ui.style.display = 'none'; }
     });
 
     function getTodayString() {
         const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     }
 
     function seededRandom(seed) {
         let value = seed;
-        return function() {
-            value = (value * 9301 + 49297) % 233280;
-            return value / 233280;
-        };
+        return function() { value = (value*9301+49297)%233280; return value/233280; };
     }
 
     function generateDailyPlates(dateString) {
-        const seed = dateString.split('-').reduce((acc, val) => acc + parseInt(val), 0);
+        const seed = dateString.split('-').reduce((acc,val)=>acc+parseInt(val),0);
         const rng = seededRandom(seed);
-        if (!platesReady || ALL_PLATES.length === 0) return [];
-        const availablePlates = [...ALL_PLATES];
-        const shuffled = availablePlates.sort(() => rng() - 0.5);
-        return shuffled.slice(0, TOTAL_PLATES);
+        if (!platesReady || ALL_PLATES.length===0) return [];
+        const avail = [...ALL_PLATES];
+        return avail.sort(()=>rng()-0.5).slice(0,TOTAL_PLATES);
     }
 
     async function signInWithGoogle() {
@@ -940,8 +753,8 @@
             await auth.signInWithPopup(provider);
             return true;
         } catch (error) {
-            console.error('Sign in error:', error);
-            alert('Failed to sign in: ' + error.message);
+            console.error('Sign in error:',error);
+            alert('Failed to sign in: '+error.message);
             return false;
         }
     }
@@ -949,35 +762,62 @@
     async function checkIfPlayedToday() {
         if (!currentUser) return false;
         const today = getTodayString();
-        const scoreSnapshot = await database.ref(`scores/${today}/${currentUser.uid}`).once('value');
-        if (scoreSnapshot.exists()) return true;
-        const startedSnapshot = await database.ref(`started/${today}/${currentUser.uid}`).once('value');
-        if (startedSnapshot.exists()) return true;
-        return false;
+        const ss = await database.ref(`scores/${today}/${currentUser.uid}`).once('value');
+        if (ss.exists()) return true;
+        const st = await database.ref(`started/${today}/${currentUser.uid}`).once('value');
+        return st.exists();
     }
 
-    async function saveScore(totalTime, solvedCount, skippedCount) {
-        if (!currentUser || gameMode !== 'daily') return;
+    async function saveScore(totalTime,solvedCount,skippedCount) {
+        if (!currentUser || gameMode!=='daily') return;
         const today = getTodayString();
-        const score = {
-            userId: currentUser.uid,
-            userName: currentUser.displayName || currentUser.email,
-            totalTime: Math.floor(totalTime * 10) / 10,
-            solved: solvedCount,
-            skipped: skippedCount,
-            timestamp: Date.now()
-        };
-        await database.ref(`scores/${today}/${currentUser.uid}`).set(score);
+        await database.ref(`scores/${today}/${currentUser.uid}`).set({
+            userId:currentUser.uid,
+            userName:currentUser.displayName||currentUser.email,
+            totalTime:Math.floor(totalTime*10)/10,
+            solved:solvedCount,
+            skipped:skippedCount,
+            timestamp:Date.now()
+        });
     }
 
     async function loadLeaderboard(dateString) {
-        const snapshot = await database.ref(`scores/${dateString}`).once('value');
+        const snap = await database.ref(`scores/${dateString}`).once('value');
         const scores = [];
-        snapshot.forEach((child) => scores.push(child.val()));
-        scores.sort((a, b) => a.totalTime - b.totalTime);
+        snap.forEach((child)=>scores.push(child.val()));
+        scores.sort((a,b)=>a.totalTime-b.totalTime);
         return scores;
     }
-    // ========== END FIREBASE ==========
+
+    async function displayLeaderboard(dateString) {
+        const dateEl = document.getElementById('leaderboardDate');
+        const contentEl = document.getElementById('leaderboardContent');
+        dateEl.textContent = `Daily Challenge - ${dateString}`;
+        contentEl.innerHTML = 'Loading...';
+        try {
+            const scores = await loadLeaderboard(dateString);
+            if (scores.length===0) {
+                contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">No scores for this date.</p>';
+                return;
+            }
+            let html = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;">';
+            html += '<th style="padding:8px;text-align:left;">Rank</th>';
+            html += '<th style="padding:8px;text-align:left;">Player</th>';
+            html += '<th style="padding:8px;text-align:right;">Time</th></tr></thead><tbody>';
+            scores.forEach((score,i)=>{
+                const bg = i<3?'#fef3c7':(i%2===0?'#f9fafb':'#fff');
+                html += `<tr style="background:${bg};">`;
+                html += `<td style="padding:8px;font-weight:bold;">#${i+1}</td>`;
+                html += `<td style="padding:8px;">${score.userName}</td>`;
+                html += `<td style="padding:8px;text-align:right;font-weight:600;">${score.totalTime.toFixed(1)}s</td></tr>`;
+            });
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+        } catch (error) {
+            console.error('Error:',error);
+            contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;padding:20px;">Failed to load</p>';
+        }
+    }
 
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
@@ -1290,25 +1130,19 @@
     }
 
     function pickRandomPlate() {
-        if (!platesReady || ALL_PLATES.length === 0) {
-            resultEl.textContent = "No viable plates available.";
+        if (!platesReady || ALL_PLATES.length===0) {
+            resultEl.textContent = "No viable plates.";
             resultEl.style.color = "red";
             return;
         }
-
-        // DAILY CHALLENGE MODE
-        if (gameMode === 'daily' && dailyPlateSequence && dailyPlateSequence.length > 0) {
+        if (gameMode==='daily' && dailyPlateSequence && dailyPlateSequence.length>0) {
             const plateIndex = usedPlates.size;
-            if (plateIndex >= dailyPlateSequence.length) {
-                endGame();
-                return;
-            }
+            if (plateIndex>=dailyPlateSequence.length) { endGame(); return; }
             const chosen = dailyPlateSequence[plateIndex];
             usedPlates.add(chosen);
             currentPlate = chosen;
             plateEl.textContent = chosen;
             resultEl.textContent = "";
-            resultEl.style.color = "";
             plateLocked = false;
             checkButtonEl.disabled = false;
             skipButtonEl.disabled = false;
@@ -1320,57 +1154,33 @@
             wordInputEl.focus();
             return;
         }
-
-        // PRACTICE MODE
-        if (usedPlates.size === ALL_PLATES.length) {
-            resultEl.textContent = "You've seen all available plates! Ending this run.";
+        if (usedPlates.size===ALL_PLATES.length) {
+            resultEl.textContent = "Seen all plates!";
             resultEl.style.color = "red";
             endGame();
             return;
         }
-
         const primaryBand = choosePrimaryBand();
         const startIndex = BAND_NAMES.indexOf(primaryBand);
         const bandOrder = [];
-        for (let i = 0; i < BAND_NAMES.length; i++) {
-            bandOrder.push(BAND_NAMES[(startIndex + i) % BAND_NAMES.length]);
-        }
-
+        for (let i=0;i<BAND_NAMES.length;i++) bandOrder.push(BAND_NAMES[(startIndex+i)%BAND_NAMES.length]);
         let chosen = null;
-        for (const band of bandOrder) {
-            chosen = pickRandomPlateFromBand(band);
-            if (chosen) break;
-        }
-
+        for (const band of bandOrder) { chosen = pickRandomPlateFromBand(band); if (chosen) break; }
         if (!chosen) {
-            const remaining = ALL_PLATES.filter(p => !usedPlates.has(p));
-            if (remaining.length === 0) {
-                resultEl.textContent = "No unused plates left. Ending this run.";
-                resultEl.style.color = "red";
-                endGame();
-                return;
-            }
-            const idx = Math.floor(Math.random() * remaining.length);
-            chosen = remaining[idx];
+            const remaining = ALL_PLATES.filter(p=>!usedPlates.has(p));
+            if (remaining.length===0) { resultEl.textContent = "No unused plates."; resultEl.style.color = "red"; endGame(); return; }
+            chosen = remaining[Math.floor(Math.random()*remaining.length)];
         }
-
         usedPlates.add(chosen);
         const jsCount = computeJsViableCount(chosen);
-        if (jsCount <= 0) {
-            if (usedPlates.size === ALL_PLATES.length) {
-                resultEl.textContent = "No plates with viable words available. Ending this run.";
-                resultEl.style.color = "red";
-                endGame();
-                return;
-            }
+        if (jsCount<=0) {
+            if (usedPlates.size===ALL_PLATES.length) { resultEl.textContent = "No viable words."; resultEl.style.color = "red"; endGame(); return; }
             pickRandomPlate();
             return;
         }
-
         currentPlate = chosen;
         plateEl.textContent = chosen;
         resultEl.textContent = "";
-        resultEl.style.color = "";
         plateLocked = false;
         checkButtonEl.disabled = false;
         skipButtonEl.disabled = false;
@@ -1502,25 +1312,18 @@
         startTime = performance.now();
         timerIntervalId = setInterval(updateTimer, 100);
         updateProgressDisplay();
-        
         document.getElementById('dailyChallengeBtn').disabled = true;
         document.getElementById('practiceBtn').disabled = true;
-        
-        if (gameMode === 'daily' && currentUser) {
+        if (gameMode==='daily' && currentUser) {
             const today = getTodayString();
-            database.ref(`started/${today}/${currentUser.uid}`).set({
-                timestamp: Date.now(),
-                started: true
-            }).catch(err => console.error('Failed to save started flag:', err));
-            
+            database.ref(`started/${today}/${currentUser.uid}`).set({timestamp:Date.now(),started:true});
             window.onbeforeunload = function(e) {
-                if (gameStarted && !gameOver && gameMode === 'daily') {
+                if (gameStarted && !gameOver && gameMode==='daily') {
                     e.preventDefault();
-                    return 'Are you sure you want to leave? Your daily challenge attempt will be used up and you won\'t be on the leaderboard!';
+                    return 'Leave? Your daily attempt will be used up!';
                 }
             };
         }
-        
         pickRandomPlate();
     }
 
@@ -1601,21 +1404,12 @@
         wordInputEl.readOnly = true;
 
         openEndModal(totalSec);
-        
+        showRestartGameButton();
+        showChartButton();
         document.getElementById('dailyChallengeBtn').disabled = false;
         document.getElementById('practiceBtn').disabled = false;
         window.onbeforeunload = null;
-        
-        if (gameMode === 'daily' && currentUser) {
-            saveScore(totalSec, solvedCount, skipCount).then(() => {
-                console.log('Score saved!');
-            }).catch(err => {
-                console.error('Failed to save score:', err);
-            });
-        }
-        
-        showRestartGameButton();
-        showChartButton();
+        if (gameMode==='daily' && currentUser) { saveScore(totalSec,solvedCount,skipCount); }
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -1843,10 +1637,7 @@
         gameModalTitleEl.textContent = "License Plate Game – Time Trial";
         gameModalBodyEl.innerHTML = `
             <p style="margin-bottom:1rem;">
-                ${gameMode === 'daily' 
-                    ? '<strong>🏆 Daily Challenge:</strong> Everyone gets the same 10 plates today. Compete for the best time!' 
-                    : '<strong>🎮 Practice Mode:</strong> Random plates, play as much as you want!'
-                }
+                ${gameMode==='daily'?'<strong>🏆 Daily Challenge:</strong> Same 10 plates for everyone today!':'<strong>🎮 Practice Mode:</strong> Random plates, unlimited plays!'}
             </p>
             <p><strong>How it works:</strong></p>
             <ul>
@@ -2290,123 +2081,79 @@
     loadDictionary();
     loadDifficulty();
 
-    // ========== FIREBASE EVENT HANDLERS ==========
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
-        if (!currentUser) {
-            const signedIn = await signInWithGoogle();
-            if (!signedIn) return;
-        }
-        const played = await checkIfPlayedToday();
-        if (played) {
-            alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
-            return;
-        }
+        if (!currentUser) { if (!await signInWithGoogle()) return; }
+        if (await checkIfPlayedToday()) { alert('Already played today! Try Practice Mode.'); return; }
         gameMode = 'daily';
         dailyPlateSequence = generateDailyPlates(getTodayString());
-        if (!dailyPlateSequence || dailyPlateSequence.length === 0) {
-            alert('Failed to generate daily plates. Please wait for data to load.');
-            return;
-        }
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🏆 DAILY CHALLENGE MODE';
-        document.getElementById('modeIndicator').style.background = '#fef3c7';
-        document.getElementById('modeIndicator').style.color = '#92400e';
+        if (!dailyPlateSequence || dailyPlateSequence.length===0) { alert('Failed to generate plates. Wait for data to load.'); return; }
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🏆 DAILY CHALLENGE MODE';
+        mi.style.background = '#fef3c7';
+        mi.style.color = '#92400e';
         openStartModal();
     });
 
     document.getElementById('practiceBtn').addEventListener('click', () => {
         gameMode = 'practice';
         dailyPlateSequence = null;
-        document.getElementById('modeIndicator').style.display = 'block';
-        document.getElementById('modeIndicator').textContent = '🎮 PRACTICE MODE';
-        document.getElementById('modeIndicator').style.background = '#e0e7ff';
-        document.getElementById('modeIndicator').style.color = '#3730a3';
+        const mi = document.getElementById('modeIndicator');
+        mi.style.display = 'block';
+        mi.textContent = '🎮 PRACTICE MODE';
+        mi.style.background = '#e0e7ff';
+        mi.style.color = '#3730a3';
         openStartModal();
     });
-
-    async function displayLeaderboard(dateString) {
-        const dateEl = document.getElementById('leaderboardDate');
-        const contentEl = document.getElementById('leaderboardContent');
-        
-        dateEl.textContent = `Daily Challenge - ${dateString}`;
-        contentEl.innerHTML = 'Loading scores...';
-        
-        try {
-            const scores = await loadLeaderboard(dateString);
-            if (scores.length === 0) {
-                contentEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No scores for this date yet.</p>';
-                return;
-            }
-            let html = '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #f3f4f6;">';
-            html += '<th style="padding: 8px; text-align: left;">Rank</th>';
-            html += '<th style="padding: 8px; text-align: left;">Player</th>';
-            html += '<th style="padding: 8px; text-align: right;">Time</th>';
-            html += '</tr></thead><tbody>';
-            scores.forEach((score, index) => {
-                const bgColor = index < 3 ? '#fef3c7' : (index % 2 === 0 ? '#f9fafb' : '#fff');
-                html += `<tr style="background: ${bgColor};">`;
-                html += `<td style="padding: 8px; font-weight: bold;">#${index + 1}</td>`;
-                html += `<td style="padding: 8px;">${score.userName}</td>`;
-                html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${score.totalTime.toFixed(1)}s</td>`;
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            contentEl.innerHTML = html;
-        } catch (error) {
-            console.error('Error loading leaderboard:', error);
-            contentEl.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">Failed to load leaderboard</p>';
-        }
-    }
 
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
         const backdrop = document.getElementById('leaderboardModalBackdrop');
         const datePicker = document.getElementById('leaderboardDatePicker');
         const today = getTodayString();
         datePicker.value = today;
-        datePicker.max = today; // Can't select future dates
+        datePicker.max = today;
         backdrop.classList.add('show');
         displayLeaderboard(today);
     });
-    
+
     document.getElementById('loadLeaderboardBtn').addEventListener('click', () => {
-        const datePicker = document.getElementById('leaderboardDatePicker');
-        if (datePicker.value) {
-            displayLeaderboard(datePicker.value);
-        }
+        const dp = document.getElementById('leaderboardDatePicker');
+        if (dp.value) displayLeaderboard(dp.value);
     });
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
     document.getElementById('leaderboardModalCloseBtn').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalCloseBtnBottom').addEventListener('click', () => {
         document.getElementById('leaderboardModalBackdrop').classList.remove('show');
     });
+
     document.getElementById('leaderboardModalBackdrop').addEventListener('click', (e) => {
         if (e.target.id === 'leaderboardModalBackdrop') {
             document.getElementById('leaderboardModalBackdrop').classList.remove('show');
         }
     });
-    // ========== END HANDLERS ==========
 
 </script>
 
 
-<!-- Leaderboard Modal -->
 <div id="leaderboardModalBackdrop" class="modal-backdrop">
     <div class="modal">
         <div class="modal-header">
             <div class="modal-title">🏆 Daily Leaderboard</div>
-            <button class="modal-close-btn" id="leaderboardModalCloseBtn" aria-label="Close">&times;</button>
+            <button class="modal-close-btn" id="leaderboardModalCloseBtn">&times;</button>
         </div>
         <div class="modal-body">
-            <div style="text-align: center; margin-bottom: 16px;">
-                <label for="leaderboardDatePicker" style="margin-right: 8px; font-weight: 600;">Select Date:</label>
-                <input type="date" id="leaderboardDatePicker" style="padding: 6px; font-size: 1rem; border: 1px solid #d1d5db; border-radius: 4px;">
-                <button id="loadLeaderboardBtn" style="margin-left: 8px; padding: 6px 12px; cursor: pointer;">Load</button>
+            <div style="text-align:center;margin-bottom:16px;">
+                <label for="leaderboardDatePicker" style="margin-right:8px;font-weight:600;">Select Date:</label>
+                <input type="date" id="leaderboardDatePicker" style="padding:6px;font-size:1rem;border:1px solid #d1d5db;border-radius:4px;">
+                <button id="loadLeaderboardBtn" style="margin-left:8px;padding:6px 12px;cursor:pointer;">Load</button>
             </div>
-            <div id="leaderboardDate" style="text-align: center; margin-bottom: 12px; font-size: 1.1rem; color: #6b7280;"></div>
-            <div id="leaderboardContent" style="max-height: 400px; overflow-y: auto;">Loading scores...</div>
+            <div id="leaderboardDate" style="text-align:center;margin-bottom:12px;font-size:1.1rem;color:#6b7280;"></div>
+            <div id="leaderboardContent" style="max-height:400px;overflow-y:auto;">Loading...</div>
         </div>
         <div class="modal-footer">
             <button id="leaderboardModalCloseBtnBottom">Close</button>
