@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v24</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -691,14 +691,27 @@
                 return;
             }
             
+            // Collect all plate names in order
+            const plateNames = [];
+            for (let i = 0; i < maxPlates; i++) {
+                let plateName = '—';
+                for (const player of playersData) {
+                    if (i < player.history.length && player.history[i].plate) {
+                        plateName = player.history[i].plate;
+                        break;
+                    }
+                }
+                plateNames.push(plateName);
+            }
+            
             // Build table
             let html = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">';
             
-            // Header row with plate numbers
+            // Header row with plate names
             html += '<thead><tr style="background:#f3f4f6;">';
             html += '<th style="padding:8px;text-align:left;position:sticky;left:0;background:#f3f4f6;z-index:2;min-width:120px;">Player</th>';
             for (let i = 0; i < maxPlates; i++) {
-                html += `<th style="padding:8px;text-align:center;min-width:100px;">Plate ${i+1}</th>`;
+                html += `<th style="padding:8px;text-align:center;min-width:100px;">${plateNames[i]}</th>`;
             }
             html += '</tr></thead><tbody>';
             
@@ -706,48 +719,38 @@
             playersData.forEach((player, idx) => {
                 const bg = idx % 2 === 0 ? '#fff' : '#f9fafb';
                 
-                // Player name row
                 html += `<tr style="background:${bg};">`;
-                html += `<td style="padding:8px;font-weight:bold;position:sticky;left:0;background:${bg};z-index:1;" rowspan="2">${player.name}<br><span style="font-size:0.85rem;color:#6b7280;">(${player.time.toFixed(1)}s)</span></td>`;
+                html += `<td style="padding:12px;font-weight:bold;position:sticky;left:0;background:${bg};z-index:1;">${player.name}<br><span style="font-size:0.85rem;color:#6b7280;">(${player.time.toFixed(1)}s)</span></td>`;
                 
-                // Words
+                // Combined word + time cells with gradient
                 for (let i = 0; i < maxPlates; i++) {
                     if (i < player.history.length) {
                         const entry = player.history[i];
-                        const plateNum = entry.plate || '—';
                         const word = entry.skipped ? '❌ skipped' : entry.word;
-                        const color = entry.skipped ? '#fee2e2' : '#fff';
                         
-                        html += `<td style="padding:4px;text-align:center;background:${color};border:1px solid #e5e7eb;" title="Plate: ${plateNum}">`;
-                        html += `<div style="font-weight:600;">${plateNum}</div>`;
-                        html += `<div style="font-size:0.85rem;">${word}</div>`;
-                        html += `</td>`;
-                    } else {
-                        html += `<td style="padding:4px;background:#f3f4f6;border:1px solid #e5e7eb;"></td>`;
-                    }
-                }
-                html += '</tr>';
-                
-                // Time row with gradient colors
-                html += `<tr style="background:${bg};">`;
-                for (let i = 0; i < maxPlates; i++) {
-                    if (i < player.history.length) {
-                        const entry = player.history[i];
-                        const time = entry.skipped ? entry.penaltySeconds : entry.thinkingSeconds;
-                        const displayTime = entry.skipped ? `+${entry.penaltySeconds}s` : `${time.toFixed(1)}s`;
-                        const bgColor = getTimeColor(time);
-                        const textColor = time > 15 ? '#fff' : '#000';
+                        // Calculate total time (thinking + penalty for skips)
+                        const totalTime = entry.skipped 
+                            ? (entry.thinkingSeconds || 0) + entry.penaltySeconds 
+                            : entry.thinkingSeconds;
+                        
+                        const displayTime = entry.skipped 
+                            ? `${totalTime.toFixed(1)}s` 
+                            : `${totalTime.toFixed(1)}s`;
+                        
+                        const bgColor = getTimeColor(totalTime);
+                        const textColor = totalTime > 15 ? '#fff' : '#000';
                         
                         // Tooltip info
                         const tooltip = entry.skipped 
-                            ? `Skipped - Penalty: ${entry.penaltySeconds}s`
-                            : `Word: ${entry.word}\nTime: ${time.toFixed(1)}s\nPlate: ${entry.plate}`;
+                            ? `Skipped\nThinking: ${(entry.thinkingSeconds || 0).toFixed(1)}s\nPenalty: +${entry.penaltySeconds}s\nTotal: ${totalTime.toFixed(1)}s`
+                            : `Word: ${entry.word}\nTime: ${totalTime.toFixed(1)}s`;
                         
-                        html += `<td style="padding:4px;text-align:center;background:${bgColor};color:${textColor};border:1px solid #e5e7eb;font-weight:600;" title="${tooltip}">`;
-                        html += displayTime;
+                        html += `<td style="padding:8px;text-align:center;background:${bgColor};color:${textColor};border:2px solid #fff;" title="${tooltip}">`;
+                        html += `<div style="font-weight:600;font-size:0.9rem;">${word}</div>`;
+                        html += `<div style="font-size:0.85rem;margin-top:2px;">${displayTime}</div>`;
                         html += `</td>`;
                     } else {
-                        html += `<td style="padding:4px;background:#f3f4f6;border:1px solid #e5e7eb;"></td>`;
+                        html += `<td style="padding:8px;background:#f3f4f6;border:2px solid #fff;"></td>`;
                     }
                 }
                 html += '</tr>';
@@ -766,7 +769,10 @@
                 playersData.forEach(player => {
                     if (i < player.history.length) {
                         const entry = player.history[i];
-                        const time = entry.skipped ? entry.penaltySeconds : entry.thinkingSeconds;
+                        // Use total time (thinking + penalty for skips)
+                        const time = entry.skipped 
+                            ? (entry.thinkingSeconds || 0) + entry.penaltySeconds 
+                            : entry.thinkingSeconds;
                         totalTime += time;
                         count++;
                     }
