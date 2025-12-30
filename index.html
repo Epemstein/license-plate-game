@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v41</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -604,13 +604,23 @@
     }
 
     async function loadLeaderboard(dateStr) {
+        console.log('Loading scores for:', dateStr);
         const snap = await database.ref(`scores/${dateStr}`).once('value');
+        console.log('Firebase snapshot exists:', snap.exists());
+        console.log('Raw snapshot value:', snap.val());
         const scores = [];
-        snap.forEach(c=>scores.push(c.val()));
-        return scores.sort((a,b)=>a.totalTime-b.totalTime);
+        snap.forEach(c => {
+            console.log('Processing score:', c.val());
+            scores.push(c.val());
+        });
+        console.log('Total scores loaded:', scores.length);
+        const sorted = scores.sort((a,b)=>a.totalTime-b.totalTime);
+        console.log('Sorted scores:', sorted);
+        return sorted;
     }
 
     async function displayLeaderboard(dateStr) {
+        console.log('=== displayLeaderboard called with date:', dateStr);
         document.getElementById('leaderboardDate').textContent = `Daily Challenge - ${dateStr}`;
         document.getElementById('leaderboardContent').innerHTML = 'Loading...';
         try {
@@ -2031,6 +2041,17 @@
     }
     window.closeRunDetailsModal = closeRunDetailsModal;
 
+    // Global function for Today button (backup)
+    function loadTodayScores() {
+        console.log('=== TODAY BUTTON CLICKED ===');
+        const t = getTodayString();
+        const picker = document.getElementById('leaderboardDatePicker');
+        if (picker) picker.value = t;
+        displayLeaderboard(t);
+    }
+    window.loadTodayScores = loadTodayScores;
+
+
 
     // === FIREBASE EVENT HANDLERS ===
     // Wait for page to fully load before attaching event listeners
@@ -2146,7 +2167,7 @@ window.addEventListener('load', function() {
         <label for="leaderboardDatePicker" style="font-weight:600;">Date:</label>
         <input type="date" id="leaderboardDatePicker" style="padding:8px;border:1px solid #d1d5db;border-radius:4px;">
         <button id="loadLeaderboardBtn" style="padding:8px 16px;cursor:pointer;">Load</button>
-        <button id="todayLeaderboardBtn" style="padding:8px 16px;cursor:pointer;">Today</button>
+        <button id="todayLeaderboardBtn" onclick="loadTodayScores()" style="padding:8px 16px;cursor:pointer;">Today</button>
     </div>
     <div id="leaderboardDate" style="text-align:center;margin-bottom:16px;font-size:1.1rem;color:#6b7280;font-weight:600;"></div>
     <div id="leaderboardContent" style="background:white;padding:20px;border-radius:8px;min-height:200px;">
