@@ -609,6 +609,9 @@
             timestamp: Date.now(),
             history: historyData
         });
+        
+        // Refresh leaderboard to unlock View buttons and Compare button
+        displayLeaderboard(today);
     }
 
     async function loadLeaderboard(dateStr) {
