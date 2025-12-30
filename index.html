@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v4</h1>
+<h1>The License Plate Game v3</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -1094,6 +1094,12 @@
         updateProgressDisplay();
         document.getElementById('dailyChallengeBtn').disabled = true;
         document.getElementById('practiceBtn').disabled = true;
+        
+        // Hide restart button during daily challenge
+        if (gameMode === 'daily') {
+            startButtonEl.style.display = 'none';
+        }
+        
         if (gameMode==='daily' && currentUser) {
             database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({timestamp:Date.now(),started:true});
             window.onbeforeunload = e => {
