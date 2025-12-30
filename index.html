@@ -1835,6 +1835,11 @@
     });
 
 
+
+    loadDictionary();
+    loadDifficulty();
+</script>
+
     // === FIREBASE EVENT HANDLERS ===
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         console.log('Daily Challenge clicked!');
@@ -1908,10 +1913,6 @@
 
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
     // === END FIREBASE HANDLERS ===
-
-    loadDictionary();
-    loadDifficulty();
-</script>
 
 
 <div style="margin-top:40px;padding:20px;background:#f9fafb;border-radius:8px;">
