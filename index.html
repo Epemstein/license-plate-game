@@ -1413,7 +1413,7 @@
         }
         
         if (gameMode==='daily' && currentUser) {
-            database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({userId:currentUser.uid,timestamp:Date.now(),started:true});
+            database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({userName:currentUser.displayName||currentUser.email,timestamp:Date.now(),started:true});
             window.onbeforeunload = e => {
                 if (gameStarted && !gameOver && gameMode==='daily') {
                     e.preventDefault();
