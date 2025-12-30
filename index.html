@@ -1878,6 +1878,59 @@
 
 
 
+
+    // View player run details
+    async function viewPlayerRun(userId, dateString, userName, totalTime) {
+        const backdrop = document.getElementById('runDetailsModalBackdrop');
+        const titleEl = document.getElementById('runDetailsModalTitle');
+        const contentEl = document.getElementById('runDetailsContent');
+        
+        titleEl.textContent = `${userName}'s Run`;
+        contentEl.innerHTML = 'Loading...';
+        backdrop.classList.add('show');
+        
+        try {
+            const snapshot = await database.ref(`scores/${dateString}/${userId}`).once('value');
+            const data = snapshot.val();
+            
+            if (!data || !data.history || data.history.length === 0) {
+                contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;">No detailed history available</p>';
+                return;
+            }
+            
+            let html = `<p style="margin-bottom:16px;"><strong>Total Time:</strong> ${totalTime.toFixed(1)}s | <strong>Solved:</strong> ${data.solved} | <strong>Skipped:</strong> ${data.skipped}</p>`;
+            html += '<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;">';
+            html += '<th style="padding:8px;text-align:left;">Plate</th>';
+            html += '<th style="padding:8px;text-align:left;">Word / Penalty</th>';
+            html += '<th style="padding:8px;text-align:right;">Time</th></tr></thead><tbody>';
+            
+            data.history.forEach((entry, idx) => {
+                const bg = idx % 2 === 0 ? '#f9fafb' : '#fff';
+                html += `<tr style="background:${bg};">`;
+                html += `<td style="padding:8px;font-weight:600;">${entry.plate}</td>`;
+                
+                if (entry.skipped) {
+                    html += `<td style="padding:8px;color:#f59e0b;">+${entry.penaltySeconds}s (skipped)</td>`;
+                    html += `<td style="padding:8px;text-align:right;">${entry.thinkingSeconds.toFixed(1)}s (+${entry.penaltySeconds}s)</td>`;
+                } else {
+                    html += `<td style="padding:8px;color:#16a34a;">${entry.word}</td>`;
+                    html += `<td style="padding:8px;text-align:right;">${entry.thinkingSeconds.toFixed(1)}s</td>`;
+                }
+                
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+            
+        } catch (error) {
+            console.error('Error loading run details:', error);
+            contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;">Failed to load run details</p>';
+        }
+    }
+    
+    window.viewPlayerRun = viewPlayerRun; // Make it globally accessible for onclick
+
     // === FIREBASE EVENT HANDLERS ===
     // Wait for page to fully load before attaching event listeners
     window.addEventListener('DOMContentLoaded', function() {
@@ -1968,6 +2021,23 @@ window.addEventListener('load', function() {
 </script>
 
 
+
+
+<!-- Player Run Details Modal -->
+<div id="runDetailsModalBackdrop" class="modal-backdrop">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="runDetailsModalTitle">Player's Run</div>
+            <button class="modal-close-btn" id="runDetailsModalCloseBtn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="runDetailsContent"></div>
+        </div>
+        <div class="modal-footer">
+            <button id="runDetailsModalCloseBtnBottom">Close</button>
+        </div>
+    </div>
+</div>
 
 <div style="margin-top:40px;padding:20px;background:#f9fafb;border-radius:8px;">
     <h2 style="margin-top:0;">🏆 Daily Leaderboard</h2>
