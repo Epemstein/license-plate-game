@@ -844,10 +844,7 @@
             let h = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;">';
             h += '<th style="padding:8px;">Rank</th><th style="padding:8px;">Player</th><th style="padding:8px;text-align:right;">Time</th><th style="padding:8px;text-align:center;">Details</th></tr></thead><tbody>';
             scores.forEach((s,i)=>{
-                const bg = i===0 ? '#fef3c7' : // Light gold for 1st
-                       i===1 ? '#e5e7eb' : // Light grey/silver for 2nd  
-                       i===2 ? '#fed7aa' : // Light bronze/orange for 3rd
-                       (i%2?'#fff':'#f9fafb'); // Alternating grey for rest
+                const bg = i===0 ? '#fef3c7' : (i%2?'#fff':'#f9fafb'); // Gold for 1st, alternating grey for rest
                 h+=`<tr style="background:${bg};"><td style="padding:8px;font-weight:bold;">#${i+1}</td><td style="padding:8px;">${s.userName}</td><td style="padding:8px;text-align:right;font-weight:600;">${s.totalTime.toFixed(1)}s</td>`;
                 // Use the userHasPlayed value calculated before the loop
                 if (userHasPlayed || isPastDate) {
