@@ -619,6 +619,193 @@
         return sorted;
     }
 
+
+    // Toggle comparison table
+    function toggleCompareTable() {
+        const container = document.getElementById('comparisonTableContainer');
+        const btn = document.getElementById('compareRunsBtn');
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            btn.textContent = '📊 Hide Comparison';
+            buildComparisonTable();
+        } else {
+            container.style.display = 'none';
+            btn.textContent = '📊 Compare All Runs';
+        }
+    }
+    window.toggleCompareTable = toggleCompareTable;
+    
+    // Get color based on time (gradient)
+    function getTimeColor(seconds) {
+        if (seconds <= 3) return '#22c55e'; // green
+        if (seconds >= 20) return '#ef4444'; // red
+        
+        if (seconds <= 10) {
+            // Green to white (3s → 10s)
+            const ratio = (seconds - 3) / 7;
+            const r = Math.round(34 + (255 - 34) * ratio);
+            const g = Math.round(197 + (255 - 197) * ratio);
+            const b = Math.round(94 + (255 - 94) * ratio);
+            return `rgb(${r},${g},${b})`;
+        } else {
+            // White to red (10s → 20s)
+            const ratio = (seconds - 10) / 10;
+            const r = 255;
+            const g = Math.round(255 - 16 * ratio);
+            const b = Math.round(255 - 187 * ratio);
+            return `rgb(${r},${g},${b})`;
+        }
+    }
+    
+    // Build comparison table
+    async function buildComparisonTable() {
+        const contentEl = document.getElementById('comparisonTable');
+        contentEl.innerHTML = 'Loading comparison...';
+        
+        try {
+            const dateStr = getTodayString();
+            const scores = await loadLeaderboard(dateStr);
+            
+            if (scores.length === 0) {
+                contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;">No data available</p>';
+                return;
+            }
+            
+            // Find the longest history (most plates encountered)
+            let maxPlates = 0;
+            const playersData = [];
+            
+            for (const score of scores) {
+                if (score.history && score.history.length > 0) {
+                    maxPlates = Math.max(maxPlates, score.history.length);
+                    playersData.push({
+                        name: score.userName,
+                        time: score.totalTime,
+                        history: score.history
+                    });
+                }
+            }
+            
+            if (maxPlates === 0) {
+                contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;">No detailed history available</p>';
+                return;
+            }
+            
+            // Build table
+            let html = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">';
+            
+            // Header row with plate numbers
+            html += '<thead><tr style="background:#f3f4f6;">';
+            html += '<th style="padding:8px;text-align:left;position:sticky;left:0;background:#f3f4f6;z-index:2;min-width:120px;">Player</th>';
+            for (let i = 0; i < maxPlates; i++) {
+                html += `<th style="padding:8px;text-align:center;min-width:100px;">Plate ${i+1}</th>`;
+            }
+            html += '</tr></thead><tbody>';
+            
+            // Player rows
+            playersData.forEach((player, idx) => {
+                const bg = idx % 2 === 0 ? '#fff' : '#f9fafb';
+                
+                // Player name row
+                html += `<tr style="background:${bg};">`;
+                html += `<td style="padding:8px;font-weight:bold;position:sticky;left:0;background:${bg};z-index:1;" rowspan="2">${player.name}<br><span style="font-size:0.85rem;color:#6b7280;">(${player.time.toFixed(1)}s)</span></td>`;
+                
+                // Words
+                for (let i = 0; i < maxPlates; i++) {
+                    if (i < player.history.length) {
+                        const entry = player.history[i];
+                        const plateNum = entry.plate || '—';
+                        const word = entry.skipped ? '❌ skipped' : entry.word;
+                        const color = entry.skipped ? '#fee2e2' : '#fff';
+                        
+                        html += `<td style="padding:4px;text-align:center;background:${color};border:1px solid #e5e7eb;" title="Plate: ${plateNum}">`;
+                        html += `<div style="font-weight:600;">${plateNum}</div>`;
+                        html += `<div style="font-size:0.85rem;">${word}</div>`;
+                        html += `</td>`;
+                    } else {
+                        html += `<td style="padding:4px;background:#f3f4f6;border:1px solid #e5e7eb;"></td>`;
+                    }
+                }
+                html += '</tr>';
+                
+                // Time row with gradient colors
+                html += `<tr style="background:${bg};">`;
+                for (let i = 0; i < maxPlates; i++) {
+                    if (i < player.history.length) {
+                        const entry = player.history[i];
+                        const time = entry.skipped ? entry.penaltySeconds : entry.thinkingSeconds;
+                        const displayTime = entry.skipped ? `+${entry.penaltySeconds}s` : `${time.toFixed(1)}s`;
+                        const bgColor = getTimeColor(time);
+                        const textColor = time > 15 ? '#fff' : '#000';
+                        
+                        // Tooltip info
+                        const tooltip = entry.skipped 
+                            ? `Skipped - Penalty: ${entry.penaltySeconds}s`
+                            : `Word: ${entry.word}\nTime: ${time.toFixed(1)}s\nPlate: ${entry.plate}`;
+                        
+                        html += `<td style="padding:4px;text-align:center;background:${bgColor};color:${textColor};border:1px solid #e5e7eb;font-weight:600;" title="${tooltip}">`;
+                        html += displayTime;
+                        html += `</td>`;
+                    } else {
+                        html += `<td style="padding:4px;background:#f3f4f6;border:1px solid #e5e7eb;"></td>`;
+                    }
+                }
+                html += '</tr>';
+            });
+            
+            // Stats row
+            html += '<tr style="background:#fef3c7;border-top:3px solid #f59e0b;"><td colspan="' + (maxPlates + 1) + '" style="padding:8px;font-weight:bold;text-align:center;">📊 STATISTICS</td></tr>';
+            
+            // Avg Time row
+            html += '<tr style="background:#fef9e6;">';
+            html += '<td style="padding:8px;font-weight:600;">Avg Time</td>';
+            for (let i = 0; i < maxPlates; i++) {
+                let totalTime = 0;
+                let count = 0;
+                
+                playersData.forEach(player => {
+                    if (i < player.history.length) {
+                        const entry = player.history[i];
+                        const time = entry.skipped ? entry.penaltySeconds : entry.thinkingSeconds;
+                        totalTime += time;
+                        count++;
+                    }
+                });
+                
+                const avgTime = count > 0 ? (totalTime / count).toFixed(1) : '—';
+                html += `<td style="padding:4px;text-align:center;font-weight:600;">${avgTime}s</td>`;
+            }
+            html += '</tr>';
+            
+            // Skip Rate row
+            html += '<tr style="background:#fef9e6;">';
+            html += '<td style="padding:8px;font-weight:600;">Skip Rate</td>';
+            for (let i = 0; i < maxPlates; i++) {
+                let skipCount = 0;
+                let count = 0;
+                
+                playersData.forEach(player => {
+                    if (i < player.history.length) {
+                        count++;
+                        if (player.history[i].skipped) skipCount++;
+                    }
+                });
+                
+                const skipRate = count > 0 ? Math.round((skipCount / count) * 100) : 0;
+                const color = skipRate > 50 ? '#dc2626' : skipRate > 25 ? '#f59e0b' : '#16a34a';
+                html += `<td style="padding:4px;text-align:center;font-weight:600;color:${color};">${skipRate}%</td>`;
+            }
+            html += '</tr>';
+            
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+            
+        } catch (error) {
+            console.error('Error building comparison:', error);
+            contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;">Error loading comparison</p>';
+        }
+    }
+
     async function displayLeaderboard(dateStr) {
         console.log('=== displayLeaderboard called with date:', dateStr);
         document.getElementById('leaderboardDate').textContent = `Daily Challenge - ${dateStr}`;
@@ -2182,6 +2369,19 @@ window.addEventListener('load', function() {
     <div id="leaderboardDate" style="text-align:center;margin-bottom:16px;font-size:1.1rem;color:#6b7280;font-weight:600;"></div>
     <div id="leaderboardContent" style="background:white;padding:20px;border-radius:8px;min-height:200px;">
         <p style="text-align:center;color:#6b7280;">Click a button above to view scores</p>
+    </div>
+    
+    <!-- Compare Runs Button -->
+    <div id="compareRunsContainer" style="margin-top:20px;text-align:center;display:none;">
+        <button id="compareRunsBtn" onclick="toggleCompareTable()" style="padding:12px 24px;font-size:1rem;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+            📊 Compare All Runs
+        </button>
+    </div>
+    
+    <!-- Comparison Table -->
+    <div id="comparisonTableContainer" style="margin-top:20px;background:white;padding:20px;border-radius:8px;display:none;overflow-x:auto;">
+        <h3 style="margin-top:0;">Run Comparison</h3>
+        <div id="comparisonTable"></div>
     </div>
 </div>
 
