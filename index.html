@@ -623,8 +623,14 @@
 
     // Toggle comparison table
     function toggleCompareTable() {
-        const container = document.getElementById('comparisonTableContainer');
         const btn = document.getElementById('compareRunsBtn');
+        
+        // Don't do anything if button is disabled (locked)
+        if (btn.disabled) {
+            return;
+        }
+        
+        const container = document.getElementById('comparisonTableContainer');
         if (container.style.display === 'none') {
             container.style.display = 'block';
             btn.textContent = '📊 Hide Comparison';
@@ -2376,7 +2382,7 @@ window.addEventListener('load', function() {
     </div>
     
     <!-- Compare Runs Button -->
-    <div id="compareRunsContainer" style="margin-top:20px;text-align:center;display:none;">
+    <div id="compareRunsContainer" style="margin-top:20px;text-align:center;display:block;">
         <button id="compareRunsBtn" onclick="toggleCompareTable()" style="padding:12px 24px;font-size:1rem;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
             📊 Compare All Runs
         </button>
