@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v12</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -2298,19 +2298,34 @@
         if (!plate || plate === '—') return;
         
         console.log('Showing viable words for:', plate);
-        console.log('ALL_PLATES available:', typeof ALL_PLATES !== 'undefined');
-        console.log('PLATE_DIFFICULTY available:', typeof PLATE_DIFFICULTY !== 'undefined');
         
-        // Get viable words from the plate data (like during gameplay)
-        let viableWords = [];
-        if (typeof PLATE_DIFFICULTY !== 'undefined' && PLATE_DIFFICULTY[plate]) {
-            viableWords = PLATE_DIFFICULTY[plate].viable || [];
+        // Calculate viable words from DICTIONARY
+        const viableWords = [];
+        const upperPlate = plate.toUpperCase();
+        
+        if (typeof DICTIONARY !== 'undefined' && DICTIONARY.size > 0) {
+            for (const word of DICTIONARY) {
+                const upperWord = word.toUpperCase();
+                let plateIdx = 0;
+                
+                // Check if plate letters appear in order in the word
+                for (let i = 0; i < upperWord.length && plateIdx < upperPlate.length; i++) {
+                    if (upperWord[i] === upperPlate[plateIdx]) {
+                        plateIdx++;
+                    }
+                }
+                
+                // If all plate letters were found in order, it's viable
+                if (plateIdx === upperPlate.length) {
+                    viableWords.push(word);
+                }
+            }
         }
         
         console.log('Found viable words:', viableWords.length);
         
         if (viableWords.length === 0) {
-            alert(`No viable words data found for plate ${plate}`);
+            alert(`No viable words found for plate ${plate}. Dictionary may not be loaded yet.`);
             return;
         }
         
