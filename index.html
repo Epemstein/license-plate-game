@@ -896,7 +896,12 @@
         }
         if (gameMode==='daily' && dailyPlateSequence && dailyPlateSequence.length) {
             const idx = usedPlates.size;
-            if (idx>=dailyPlateSequence.length) { endGame(); return; }
+            if (idx>=dailyPlateSequence.length) { 
+                // Out of plates but haven't solved 10 yet - this shouldn't happen
+                // Just end the game
+                endGame(); 
+                return; 
+            }
             const chosen = dailyPlateSequence[idx];
             usedPlates.add(chosen);
             currentPlate = chosen;
@@ -1162,7 +1167,10 @@
         wordInputEl.readOnly = true;
 
         openEndModal(totalSec);
-        showRestartGameButton();
+        // Don't show restart for daily challenge
+        if (gameMode !== 'daily') {
+            showRestartGameButton();
+        }
         showChartButton();
         document.getElementById('dailyChallengeBtn').disabled = false;
         document.getElementById('practiceBtn').disabled = false;
