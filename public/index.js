@@ -13,7 +13,6 @@ const auth = firebase.auth();
 const database = firebase.database();
 let gameMode = "practice";
 let currentUser = null;
-let dailyPlateSequence = null;
 let currentViewingDate = null; // Track which date we're viewing
 
 auth.onAuthStateChanged((user) => {
@@ -40,71 +39,6 @@ function getTodayString() {
     2,
     "0"
   )}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function seededRandom(seed) {
-  let v = seed;
-  return () => {
-    v = (v * 9301 + 49297) % 233280;
-    return v / 233280;
-  };
-}
-
-function generatePlates(rng) {
-  if (!platesReady || !ALL_PLATES.length) return [];
-
-  // Use weighted difficulty selection like the original game
-  const dailyPlates = [];
-  const usedPlates = new Set();
-
-  while (dailyPlates.length < 200 && usedPlates.size < ALL_PLATES.length) {
-    // Pick a difficulty band using the same probabilities as the game
-    const r = rng();
-    let band;
-    if (r < 0.4) band = "very_easy";
-    else if (r < 0.6) band = "easy";
-    else if (r < 0.75) band = "medium";
-    else if (r < 0.9) band = "difficult";
-    else if (r < 0.95) band = "hard";
-    else if (r < 0.98) band = "very_hard";
-    else band = "impossible";
-
-    // Get all plates in this band that haven't been used
-    const bandPlates = ALL_PLATES.filter((plate) => {
-      if (usedPlates.has(plate)) return false;
-      const diff =
-        PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate]
-          ? PLATE_DIFFICULTY[plate].difficulty
-          : null;
-      if (!diff) return false;
-
-      if (band === "very_easy" && diff >= 0 && diff <= 10) return true;
-      if (band === "easy" && diff >= 11 && diff <= 34) return true;
-      if (band === "medium" && diff >= 35 && diff <= 49) return true;
-      if (band === "difficult" && diff >= 50 && diff <= 79) return true;
-      if (band === "hard" && diff >= 80 && diff <= 88) return true;
-      if (band === "very_hard" && diff >= 89 && diff <= 96) return true;
-      if (band === "impossible" && diff >= 97 && diff <= 100) return true;
-      return false;
-    });
-
-    // Pick a random plate from this band
-    if (bandPlates.length > 0) {
-      const idx = Math.floor(rng() * bandPlates.length);
-      const chosen = bandPlates[idx];
-      dailyPlates.push(chosen);
-      usedPlates.add(chosen);
-    }
-  }
-
-  return dailyPlates;
-}
-
-function generateDailyPlates(dateStr) {
-  // TODO: this is susceptible to finagling with the local date
-  const seed = dateStr.split("-").reduce((a, v) => a + parseInt(v), 0);
-  const rng = seededRandom(seed);
-  return generatePlates(rng);
 }
 
 async function signInWithGoogle() {
@@ -502,27 +436,6 @@ async function displayLeaderboard(dateStr) {
 }
 // === END FIREBASE ===
 
-// --------- CONFIG ---------
-const TOTAL_PLATES = 10;
-
-const VERY_EASY_PROB = 0.4; // 0–10
-const EASY_PROB = 0.2; // 11–34
-const MEDIUM_PROB = 0.15; // 35–49
-const DIFFICULT_PROB = 0.15; // 50–79
-const HARD_PROB = 0.05; // 80–88
-const VERY_HARD_PROB = 0.03; // 89–96
-const IMPOSSIBLE_PROB = 0.01; // 97–100
-
-const BAND_NAMES = [
-  "very_easy",
-  "easy",
-  "medium",
-  "difficult",
-  "hard",
-  "very_hard",
-  "impossible",
-];
-
 // --------- GLOBAL STATE ---------
 let WORDS = [];
 let DICTIONARY = new Set();
@@ -749,6 +662,83 @@ function computeJsViableCount(plate) {
 }
 
 // --------- PLATE SELECTION ---------
+const TOTAL_PLATES = 10;
+
+const VERY_EASY_PROB = 0.4; // 0–10
+const EASY_PROB = 0.2; // 11–34
+const MEDIUM_PROB = 0.15; // 35–49
+const DIFFICULT_PROB = 0.15; // 50–79
+const HARD_PROB = 0.05; // 80–88
+const VERY_HARD_PROB = 0.03; // 89–96
+const IMPOSSIBLE_PROB = 0.01; // 97–100
+
+const BAND_NAMES = [
+  "very_easy",
+  "easy",
+  "medium",
+  "difficult",
+  "hard",
+  "very_hard",
+  "impossible",
+];
+
+function seededRandom(seed) {
+  let v = seed;
+  return () => {
+    v = (v * 9301 + 49297) % 233280;
+    return v / 233280;
+  };
+}
+
+function generatePlates(rng, max) {
+  if (!platesReady || !ALL_PLATES.length) return [];
+
+  // Use weighted difficulty selection like the original game
+  const dailyPlates = [];
+  const usedPlates = new Set();
+
+  while (dailyPlates.length < max && usedPlates.size < ALL_PLATES.length) {
+    // Pick a difficulty band using the same probabilities as the game
+    let band = choosePrimaryBand(rng);
+
+    // Get all plates in this band that haven't been used
+    const bandPlates = ALL_PLATES.filter((plate) => {
+      if (usedPlates.has(plate)) return false;
+      const diff =
+        PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate]
+          ? PLATE_DIFFICULTY[plate].difficulty
+          : null;
+      if (!diff) return false;
+
+      if (band === "very_easy" && diff >= 0 && diff <= 10) return true;
+      if (band === "easy" && diff >= 11 && diff <= 34) return true;
+      if (band === "medium" && diff >= 35 && diff <= 49) return true;
+      if (band === "difficult" && diff >= 50 && diff <= 79) return true;
+      if (band === "hard" && diff >= 80 && diff <= 88) return true;
+      if (band === "very_hard" && diff >= 89 && diff <= 96) return true;
+      if (band === "impossible" && diff >= 97 && diff <= 100) return true;
+      return false;
+    });
+
+    // Pick a random plate from this band
+    if (bandPlates.length > 0) {
+      const idx = Math.floor(rng() * bandPlates.length);
+      const chosen = bandPlates[idx];
+      dailyPlates.push(chosen);
+      usedPlates.add(chosen);
+    }
+  }
+
+  return dailyPlates;
+}
+
+function generateDailyPlates(dateStr) {
+  // TODO: this is susceptible to finagling with the local date
+  const seed = dateStr.split("-").reduce((a, v) => a + parseInt(v), 0);
+  const rng = seededRandom(seed);
+  return generatePlates(rng, 200);
+}
+
 function getBandPool(bandName) {
   switch (bandName) {
     case "very_easy":
@@ -770,17 +760,8 @@ function getBandPool(bandName) {
   }
 }
 
-function pickRandomPlateFromBand(bandName) {
-  const poolRef = getBandPool(bandName);
-  const remaining = poolRef.filter((p) => !usedPlates.has(p));
-  if (remaining.length === 0) return null;
-
-  const idx = Math.floor(Math.random() * remaining.length);
-  return remaining[idx];
-}
-
-function choosePrimaryBand() {
-  const r = Math.random();
+function choosePrimaryBand(rng) {
+  const r = rng();
   let threshold = 0;
 
   threshold += VERY_EASY_PROB;
@@ -957,7 +938,12 @@ async function playDaily() {
     return;
   }
 
-  let plates = generateDailyPlates(getTodayString());
+  const date = new Date();
+  let seed = date.getDate() + date.getMonth()*100 + date.getFullYear()*1000
+
+  let rng = seededRandom(seed);
+  let plates = generatePlates(rng, 2);
+
   let idx = 0;
   let solved = 0;
   let nextPenalty = 5;
@@ -1002,20 +988,12 @@ async function playDaily() {
 
     // Check if we've run out of plates
     if (idx >= plates.length) {
-      // Ran out of plates! This is a problem.
-      // Show error and end the game
-      resultEl.textContent =
-        "Ran out of plates! This shouldn't happen. Please report this bug.";
-      resultEl.style.color = "red";
-      return;
+      console.log("generating more plates...")
+      seed *= 10;
+      let rng = seededRandom(seed);
+      plates.push(...generatePlates(rng, 200));
+      continue
     }
-
-    console.log(
-      "Daily mode - solvedCount:",
-      solved,
-      "TOTAL_PLATES:",
-      TOTAL_PLATES
-    );
 
     let exit = false;
     let word = "";
@@ -1028,7 +1006,8 @@ async function playDaily() {
         switch (e.detail.action) {
           case "submitWord":
             word = wordInputEl.value.trim();
-            let [ok, matchIndices, reason] = checkWord(currentPlate, word);
+            let [ok, indices, reason] = checkWord(currentPlate, word);
+            matchIndices = indices;
 
             if (ok) {
               solved++;
@@ -1067,7 +1046,6 @@ async function playDaily() {
       currentPlate,
       skip ? penaltyLabel : word,
       matchIndices,
-      null,
       PLATE_DIFFICULTY[currentPlate].difficulty,
       `${thinkingSeconds.toFixed(1)}s`
     );
@@ -1093,7 +1071,7 @@ async function playDaily() {
 }
 
 async function playPractice() {
-  let plates = generatePlates(Math.random);
+  let plates = generatePlates(Math.random, 200);
   let idx = 0;
   let solved = 0;
   let nextPenalty = 5;
@@ -1120,20 +1098,10 @@ async function playPractice() {
 
     // Check if we've run out of plates
     if (idx >= plates.length) {
-      // Ran out of plates! This is a problem.
-      // Show error and end the game
-      resultEl.textContent =
-        "Ran out of plates! This shouldn't happen. Please report this bug.";
-      resultEl.style.color = "red";
-      return;
+      console.log("generating more plates...")
+      plates.push(...generatePlates(Math.random, 200));
+      continue
     }
-
-    console.log(
-      "Practice mode - solvedCount:",
-      solved,
-      "TOTAL_PLATES:",
-      TOTAL_PLATES
-    );
 
     let exit = false;
     let word = "";
@@ -1146,7 +1114,8 @@ async function playPractice() {
         switch (e.detail.action) {
           case "submitWord":
             word = wordInputEl.value.trim();
-            let [ok, matchIndices, reason] = checkWord(currentPlate, word);
+            let [ok, indices, reason] = checkWord(currentPlate, word);
+            matchIndices = indices;
 
             if (ok) {
               solved++;
@@ -1185,7 +1154,6 @@ async function playPractice() {
       currentPlate,
       skip ? penaltyLabel : word,
       matchIndices,
-      null,
       PLATE_DIFFICULTY[currentPlate].difficulty,
       `${thinkingSeconds.toFixed(1)}s`
     );
@@ -1193,19 +1161,15 @@ async function playPractice() {
     idx++;
   }
 
-  console.log("Ending game - solved 10!");
-
   const baseElapsedSec = (performance.now() - startTime) / 1000;
   const totalSec = baseElapsedSec + penaltySeconds;
-
-  window.onbeforeunload = null;
 
   resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
   resultEl.style.color = "green";
 }
 
 async function playEndless() {
-  let plates = generatePlates(Math.random);
+  let plates = generatePlates(Math.random, 1);
   let idx = 0;
   let solved = 0;
 
@@ -1231,20 +1195,10 @@ async function playEndless() {
 
     // Check if we've run out of plates
     if (idx >= plates.length) {
-      // Ran out of plates! This is a problem.
-      // Show error and end the game
-      resultEl.textContent =
-        "Ran out of plates! This shouldn't happen. Please report this bug.";
-      resultEl.style.color = "red";
-      return;
+      console.log("generating more plates...")
+      plates.push(...generatePlates(Math.random, 200))
+      continue;
     }
-
-    console.log(
-      "Practice mode - solvedCount:",
-      solved,
-      "TOTAL_PLATES:",
-      TOTAL_PLATES
-    );
 
     let exit = false;
     let word = "";
@@ -1256,7 +1210,8 @@ async function playEndless() {
         switch (e.detail.action) {
           case "submitWord":
             word = wordInputEl.value.trim();
-            let [ok, matchIndices, reason] = checkWord(currentPlate, word);
+            let [ok, indices, reason] = checkWord(currentPlate, word);
+            matchIndices = indices;
 
             if (ok) {
               solved++;
@@ -1297,7 +1252,6 @@ async function playEndless() {
       currentPlate,
       skip ? "Skipped" : word,
       matchIndices,
-      null,
       PLATE_DIFFICULTY[currentPlate].difficulty,
       `${thinkingSeconds.toFixed(1)}s`
     );
@@ -1350,7 +1304,6 @@ function addToHistoryWithAnimation(
   plate,
   word,
   matchIndices,
-  fromRectWord,
   diffScore,
   timeLabel
 ) {
@@ -1413,7 +1366,7 @@ function addToHistoryWithAnimation(
   addPlateCellClickHandler(plateTd, plate);
 
   const plateFrom = plateEl.getBoundingClientRect();
-  const wordFrom = fromRectWord || wordInputEl.getBoundingClientRect();
+  const wordFrom = wordInputEl.getBoundingClientRect();
   const plateTo = plateTd.getBoundingClientRect();
   const wordTo = wordTd.getBoundingClientRect();
   const diffTo = diffTd.getBoundingClientRect();
@@ -2089,8 +2042,6 @@ window.addEventListener("DOMContentLoaded", function () {
   document
     .getElementById("dailyChallengeBtn")
     .addEventListener("click", async () => {
-      console.log("Daily Challenge clicked!");
-
       // Check if game data is loaded
       if (
         !platesReady ||
@@ -2115,10 +2066,9 @@ window.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-      // Set mode
       gameMode = "daily";
-      dailyPlateSequence = generateDailyPlates(getTodayString());
 
+      // Set mode
       document.getElementById("dailyChallengeBtn").style.borderBottom =
         "5px solid #92400e";
       document.getElementById("practiceBtn").style.borderBottom = "none";
@@ -2137,11 +2087,8 @@ window.addEventListener("DOMContentLoaded", function () {
     });
 
   document.getElementById("practiceBtn").addEventListener("click", () => {
-    console.log("Practice clicked!");
-
     // Set mode
     gameMode = "practice";
-    dailyPlateSequence = null;
 
     document.getElementById("dailyChallengeBtn").style.borderBottom = "none";
     document.getElementById("practiceBtn").style.borderBottom =
@@ -2164,7 +2111,6 @@ window.addEventListener("DOMContentLoaded", function () {
   document.getElementById("endlessBtn").addEventListener("click", () => {
     // Set mode
     gameMode = "endless";
-    dailyPlateSequence = null;
 
     document.getElementById("dailyChallengeBtn").style.borderBottom = "none";
     document.getElementById("practiceBtn").style.borderBottom = "none";
