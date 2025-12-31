@@ -2491,10 +2491,27 @@
         openStartModal();
     });
 
-    // Rules button
+    // Rules button and modal
     document.getElementById('rulesBtn').addEventListener('click', () => {
         console.log('Rules clicked!');
         document.getElementById('rulesModalBackdrop').classList.add('show');
+    });
+    
+    // Close rules modal - X button
+    document.getElementById('rulesModalCloseBtn').addEventListener('click', () => {
+        document.getElementById('rulesModalBackdrop').classList.remove('show');
+    });
+    
+    // Close rules modal - Got it button
+    document.getElementById('rulesModalCloseBtnBottom').addEventListener('click', () => {
+        document.getElementById('rulesModalBackdrop').classList.remove('show');
+    });
+    
+    // Close rules modal - click outside
+    document.getElementById('rulesModalBackdrop').addEventListener('click', (e) => {
+        if (e.target.id === 'rulesModalBackdrop') {
+            document.getElementById('rulesModalBackdrop').classList.remove('show');
+        }
     });
     
     document.getElementById('practiceBtn').addEventListener('click', () => {
