@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v1</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;margin-right:10px;">Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;background:#e9d5ff;border:2px solid #9370db;cursor:pointer;margin-right:10px;font-weight:bold;">Practice Mode</button>
@@ -2492,10 +2492,23 @@
     });
 
     // Rules button and modal
-    document.getElementById('rulesBtn').addEventListener('click', () => {
-        console.log('Rules clicked!');
-        document.getElementById('rulesModalBackdrop').classList.add('show');
-    });
+    const rulesBtnElement = document.getElementById('rulesBtn');
+    console.log('Rules button element:', rulesBtnElement);
+    if (rulesBtnElement) {
+        rulesBtnElement.addEventListener('click', () => {
+            console.log('Rules clicked!');
+            const modal = document.getElementById('rulesModalBackdrop');
+            console.log('Modal element:', modal);
+            if (modal) {
+                modal.classList.add('show');
+                console.log('Modal should be visible now');
+            } else {
+                console.error('Modal not found!');
+            }
+        });
+    } else {
+        console.error('Rules button not found!');
+    }
     
     // Close rules modal - X button
     document.getElementById('rulesModalCloseBtn').addEventListener('click', () => {
