@@ -342,10 +342,11 @@
 </head>
 <body>
 
-<h1>The License Plate Game v41</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
-    <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
+    <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;margin-right:10px;">🎮 Practice Mode</button>
+    <button id="rulesBtn" style="padding:10px 20px;background:#9370db;color:#fff;border:none;font-weight:600;cursor:pointer;border-radius:4px;">Rules</button>
 
     <div id="authSection" style="margin-left:auto;">
         <button id="signInBtn" onclick="signInWithGoogle()" style="display:none;padding:8px 16px;cursor:pointer;background:#4285f4;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Google</button>
@@ -873,7 +874,7 @@
                 h+=`<tr style="background:${bg};"><td style="padding:8px;font-weight:bold;">#${i+1}</td><td style="padding:8px;">${s.userName}</td><td style="padding:8px;text-align:right;font-weight:600;">${s.totalTime.toFixed(1)}s</td>`;
                 // Use the userHasPlayed value calculated before the loop
                 if (userHasPlayed || isPastDate) {
-                    h+=`<td style="padding:8px;text-align:center;"><button onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\'")}',${s.totalTime},${s.solved||0},${s.skipped||0})" style="padding:4px 12px;cursor:pointer;background:#3b82f6;color:white;border:1px solid #2563eb;border-radius:4px;">👁 View</button></td>`;
+                    h+=`<td style="padding:8px;text-align:center;"><button onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\'")}',${s.totalTime},${s.solved||0},${s.skipped||0})" style="padding:4px 12px;cursor:pointer;background:#9370db;color:white;border:1px solid #7d5bbe;border-radius:4px;">👁 View</button></td>`;
                 } else {
                     h+=`<td style="padding:8px;text-align:center;"><span style="color:#9ca3af;font-size:0.85rem;">🔒 Complete daily to unlock</span></td>`;
                 }
@@ -898,7 +899,7 @@
             if (userHasPlayed || isPastDate) {
                 // Unlocked
                 compareBtn.disabled = false;
-                compareBtn.style.background = '#3b82f6';
+                compareBtn.style.background = '#9370db';
                 compareBtn.style.cursor = 'pointer';
                 compareBtn.style.opacity = '1';
                 compareBtn.textContent = 'Compare All Runs';
@@ -2496,7 +2497,7 @@
         
         // Update button styles
         document.getElementById('practiceBtn').style.background = '#dbeafe';
-        document.getElementById('practiceBtn').style.border = '2px solid #3b82f6';
+        document.getElementById('practiceBtn').style.border = '2px solid #9370db';
         document.getElementById('dailyChallengeBtn').style.background = '';
         document.getElementById('dailyChallengeBtn').style.border = '';
         
@@ -2589,7 +2590,7 @@ window.addEventListener('load', function() {
     
     <!-- Compare Runs Button -->
     <div id="compareRunsContainer" style="margin-top:20px;text-align:center;display:block;">
-        <button id="compareRunsBtn" onclick="toggleCompareTable()" style="padding:12px 24px;font-size:1rem;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+        <button id="compareRunsBtn" onclick="toggleCompareTable()" style="padding:12px 24px;font-size:1rem;background:#9370db;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
             Compare All Runs
         </button>
     </div>
@@ -2598,6 +2599,102 @@ window.addEventListener('load', function() {
     <div id="comparisonTableContainer" style="margin-top:20px;background:white;padding:20px;border-radius:8px;display:none;width:950px;">
         <h3 style="margin-top:0;">Run Comparison</h3>
         <div id="comparisonTable"></div>
+    </div>
+</div>
+
+
+<!-- MODAL: Rules -->
+<div id="rulesModalBackdrop" class="modal-backdrop" style="display:none;">
+    <div class="modal" style="max-width:600px;">
+        <div class="modal-header" style="background:#9370db;">
+            <div class="modal-title">How to Play</div>
+            <button class="modal-close-btn" id="rulesModalCloseBtn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Rule 1: Basic Objective -->
+            <div style="margin-bottom:32px;">
+                <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1f2937;">Objective</div>
+                <div style="font-size:15px;line-height:1.6;color:#4b5563;margin-bottom:16px;">
+                    Complete <strong>10 plates</strong> as fast as you can. For each plate, find a word that contains the license plate letters <strong>in order</strong> (but not necessarily consecutively).
+                </div>
+            </div>
+            
+            <div style="height:1px;background:#e5e7eb;margin:24px 0;"></div>
+            
+            <!-- Rule 2: Letter Order Matters -->
+            <div style="margin-bottom:32px;">
+                <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1f2937;">Valid Examples</div>
+                <div style="font-size:15px;line-height:1.6;color:#4b5563;margin-bottom:16px;">
+                    For plate <strong>RSE</strong>, these words work:
+                </div>
+                
+                <!-- Plate visual outside the examples -->
+                <div style="text-align:center;margin-bottom:20px;">
+                    <div style="background:white;border:3px solid #374151;border-radius:6px;padding:12px 20px;display:inline-block;font-size:32px;font-weight:900;letter-spacing:4px;font-family:'Courier New',monospace;">RSE</div>
+                </div>
+                
+                <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:8px;padding:16px;margin-bottom:12px;">
+                    <div style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+                        <span style="color:#16a34a;font-size:20px;margin-right:8px;">✓</span> Example 1
+                    </div>
+                    <div style="font-size:28px;font-weight:600;margin-bottom:8px;letter-spacing:1px;">
+                        <span style="color:#16a34a;font-weight:800;">r</span><span style="color:#1f2937;">i</span><span style="color:#16a34a;font-weight:800;">s</span><span style="color:#16a34a;font-weight:800;">e</span>
+                    </div>
+                    <div style="font-size:14px;color:#6b7280;font-style:italic;">R, then S, then E ✓</div>
+                </div>
+                
+                <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:8px;padding:16px;margin-bottom:12px;">
+                    <div style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+                        <span style="color:#16a34a;font-size:20px;margin-right:8px;">✓</span> Example 2
+                    </div>
+                    <div style="font-size:28px;font-weight:600;margin-bottom:8px;letter-spacing:1px;">
+                        <span style="color:#1f2937;">coa</span><span style="color:#16a34a;font-weight:800;">r</span><span style="color:#16a34a;font-weight:800;">s</span><span style="color:#16a34a;font-weight:800;">e</span>
+                    </div>
+                    <div style="font-size:14px;color:#6b7280;font-style:italic;">R, then S, then E (letters don't need to be consecutive) ✓</div>
+                </div>
+                
+                <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:8px;padding:16px;margin-bottom:12px;">
+                    <div style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+                        <span style="color:#16a34a;font-size:20px;margin-right:8px;">✓</span> Example 3
+                    </div>
+                    <div style="font-size:28px;font-weight:600;margin-bottom:8px;letter-spacing:1px;">
+                        <span style="color:#1f2937;">b</span><span style="color:#16a34a;font-weight:800;">r</span><span style="color:#1f2937;">i</span><span style="color:#16a34a;font-weight:800;">s</span><span style="color:#1f2937;">k</span><span style="color:#16a34a;font-weight:800;">e</span><span style="color:#1f2937;">t</span>
+                    </div>
+                    <div style="font-size:14px;color:#6b7280;font-style:italic;">R appears first, then S, then E (can have letters in between) ✓</div>
+                </div>
+            </div>
+            
+            <div style="height:1px;background:#e5e7eb;margin:24px 0;"></div>
+            
+            <!-- Rule 3: Order Matters -->
+            <div style="margin-bottom:32px;">
+                <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1f2937;">Invalid Example</div>
+                <div style="font-size:15px;line-height:1.6;color:#4b5563;margin-bottom:16px;">
+                    Order matters! This does NOT work:
+                </div>
+                
+                <div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:8px;padding:16px;margin-bottom:12px;">
+                    <div style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+                        <span style="color:#dc2626;font-size:20px;margin-right:8px;">✗</span> Plate: RSE
+                    </div>
+                    <div style="font-size:28px;font-weight:600;margin-bottom:8px;letter-spacing:1px;">
+                        <span style="color:#dc2626;font-weight:800;">s</span><span style="color:#1f2937;">u</span><span style="color:#16a34a;font-weight:800;">r</span><span style="color:#1f2937;">mi</span><span style="color:#16a34a;font-weight:800;">s</span><span style="color:#16a34a;font-weight:800;">e</span>
+                    </div>
+                    <div style="font-size:14px;color:#6b7280;font-style:italic;">
+                        First S comes BEFORE the R - wrong order! ✗
+                    </div>
+                </div>
+            </div>
+            
+            <div style="height:1px;background:#e5e7eb;margin:24px 0;"></div>
+            
+            <!-- Key Reminder -->
+            <div style="background:#f3e8ff;border-left:4px solid #9370db;padding:12px 16px;border-radius:4px;font-size:15px;color:#6b21a8;font-weight:500;">
+                <strong>Key Rule:</strong> The plate letters must appear in your word in the same order as the plate, reading left to right.
+            </div>
+            
+            <button id="rulesModalCloseBtnBottom" style="width:100%;padding:14px;background:#9370db;color:white;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:24px;">Got it!</button>
+        </div>
     </div>
 </div>
 
