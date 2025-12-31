@@ -365,7 +365,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v40</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;margin-right:10px;">Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;background:#e9d5ff;border:2px solid #9370db;cursor:pointer;margin-right:10px;font-weight:bold;">Practice Mode</button>
@@ -899,7 +899,7 @@
             h += '<th style="padding:8px;">Rank</th><th style="padding:8px;">Player</th><th style="padding:8px;text-align:right;">Time</th><th style="padding:8px;text-align:center;">Details</th></tr></thead><tbody>';
             scores.forEach((s,i)=>{
                 const bg = i===0 ? '#fef3c7' : (i%2?'#fff':'#f9fafb'); // Gold for 1st, alternating grey for rest
-                h+=`<tr style="background:${bg};"><td style="padding:8px;font-weight:bold;">#${i+1}</td><td style="padding:8px;">${s.userName}</td><td style="padding:8px;text-align:right;font-weight:600;">${s.totalTime.toFixed(1)}s</td>`;
+                h+=`<tr style="background:${bg};"><td style="padding:8px;font-weight:bold;">#${i+1}</td><td style="padding:8px;">${s.userName}</td><td style="padding:8px;text-align:right;font-weight:600;">${(userHasPlayed || isPastDate) ? s.totalTime.toFixed(1) + 's' : '<span class="blurred-score">' + s.totalTime.toFixed(1) + 's</span>'}</td>`;
                 // Use the userHasPlayed value calculated before the loop
                 if (userHasPlayed || isPastDate) {
                     h+=`<td style="padding:8px;text-align:center;"><button onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\'")}',${s.totalTime},${s.solved||0},${s.skipped||0})" style="padding:4px 12px;cursor:pointer;background:#9370db;color:white;border:1px solid #7d5bbe;border-radius:4px;">View</button></td>`;
