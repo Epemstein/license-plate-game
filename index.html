@@ -611,6 +611,15 @@
         displayLeaderboard(today);
     }
 
+
+    // Load a specific player's run history (only when View is clicked)
+    async function loadPlayerHistory(userId, dateStr) {
+        const ref = database.ref(`scores/${dateStr}/${userId}`);
+        const snapshot = await ref.once('value');
+        if (!snapshot.exists()) return null;
+        return snapshot.val();
+    }
+
     async function loadLeaderboard(dateStr) {
         console.log('Loading scores for:', dateStr);
         const snap = await database.ref(`scores/${dateStr}`).once('value');
