@@ -333,6 +333,18 @@
                 flex-direction: column;
             }
         }
+    
+        button#dailyChallengeBtn:hover {
+            filter: brightness(0.9);
+        }
+        
+        button#practiceBtn:hover {
+            filter: brightness(0.9);
+        }
+        
+        button#rulesBtn:hover {
+            filter: brightness(0.9);
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -342,7 +354,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v11</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;margin-right:10px;">Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;background:#e9d5ff;border:2px solid #9370db;cursor:pointer;margin-right:10px;font-weight:bold;">Practice Mode</button>
@@ -2494,8 +2506,8 @@
         mi.style.background = '#fef3c7';
         mi.style.color = '#92400e';
         
-        // Start the game immediately
-        openStartModal();
+        // Show Start Game button
+        document.getElementById('startGameBtn').style.display = 'inline-block';
     });
 
     // Rules button and modal
@@ -2553,8 +2565,8 @@
         mi.style.background = '#f3e8ff';
         mi.style.color = '#6b21a8';
         
-        // Start the game immediately
-        openStartModal();
+        // Show Start Game button
+        document.getElementById('startGameBtn').style.display = 'inline-block';
     });
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
         console.log('Leaderboard clicked!');
