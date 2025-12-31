@@ -360,13 +360,14 @@
 </head>
 <body>
 
-<h1>The License Plate Game v49</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;margin-right:10px;">Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;background:#e9d5ff;border:2px solid #9370db;cursor:pointer;margin-right:10px;font-weight:bold;">Practice Mode</button>
     <button id="rulesBtn" style="padding:10px 20px;background:#e5e7eb;border:2px solid #9ca3af;cursor:pointer;font-weight:bold;">How to Play</button>
 
     <div id="authSection" style="margin-left:auto;">
+        <span id="authPlaceholder" style="color:#9ca3af;padding:10px;">Loading...</span>
         <button id="signInBtn" onclick="signInWithGoogle()" style="display:none;padding:8px 16px;cursor:pointer;background:#4285f4;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Google</button>
         <div id="userInfo" style="display:none;padding:10px;background:#f3f4f6;border-radius:4px;">
             Signed in: <strong id="userName"></strong>
@@ -403,7 +404,7 @@
         <div id="result"></div>
         <button id="chartButton">View run chart</button>
 
-        <div id="debug"></div>
+        <div id="debug" style="color:#9ca3af;font-size:0.9rem;margin-top:10px;">Loading game data...</div>
     </div>
 
     <!-- RIGHT PANEL -->
@@ -517,10 +518,12 @@
         const userInfo = document.getElementById('userInfo');
         if (user) {
             signInBtn.style.display = 'none';
-            userInfo.style.display = 'block';
+            document.getElementById('authPlaceholder').style.display = 'none';
+                userInfo.style.display = 'block';
             document.getElementById('userName').textContent = user.displayName || user.email;
         } else {
-            signInBtn.style.display = 'inline-block';
+            document.getElementById('authPlaceholder').style.display = 'none';
+                signInBtn.style.display = 'inline-block';
             userInfo.style.display = 'none';
         }
     });
