@@ -1663,7 +1663,13 @@
             wordsSortLengthBtnEl.classList.add("active");
         }
 
-        renderWordsList(mode);
+        // Check if we're using the new displayViableWords (from comparison table)
+        if (window.currentViableWords) {
+            displayViableWords(mode);
+        } else {
+            // Use the old renderWordsList (from gameplay)
+            renderWordsList(mode);
+        }
     }
 
     function renderWordsList(sortMode) {
