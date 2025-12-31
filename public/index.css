@@ -1,0 +1,361 @@
+@font-face {
+  font-family: "RoadgeekUS";
+  src: url("fonts/Roadgeek.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  max-width: 1100px;
+  margin: 10px auto;
+  padding: 0 16px 40px;
+  line-height: 1.5;
+}
+
+h1 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.left-panel {
+  flex: 0 0 55%;
+}
+.right-panel {
+  flex: 1;
+}
+
+.car-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-width: 360px;
+  height: 380px;
+  overflow: hidden;
+}
+
+.car-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.plate-text {
+  position: absolute;
+  left: 52%;
+  bottom: 26%;
+  transform: translateX(-50%);
+  font-family: "RoadgeekUS", sans-serif;
+  font-size: 3rem;
+  letter-spacing: 0.33em;
+  color: #222;
+  font-weight: 400;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.difficulty {
+  margin-top: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.diff-easy {
+  color: #16a34a;
+}
+.diff-med {
+  color: #d97706;
+}
+.diff-hard {
+  color: #dc2626;
+}
+
+.controls {
+  margin: 24px 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.controls input[type="text"] {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px;
+  font-size: 1rem;
+}
+
+button {
+  padding: 8px 14px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+#startButton {
+  display: none;
+}
+
+#chartButton {
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  display: none;
+}
+
+#result {
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+#debug {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+#timerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+#timerDisplay {
+  color: #111827;
+}
+#progressDisplay {
+  color: #374151;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.95rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+}
+
+tr:nth-child(even) td {
+  background-color: #f9fafb;
+}
+
+.history-empty {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.plate-letter-highlight {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.clickable-plate {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.clickable-plate:hover {
+  text-decoration-style: solid;
+}
+
+/* Floating labels */
+.float-label {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  z-index: 999;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 3px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  opacity: 1;
+  transition: top 0.4s ease-out, left 0.4s ease-out, opacity 0.4s ease-out;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.float-label-plate {
+  font-size: 1.1rem;
+  letter-spacing: 0.3em;
+  font-weight: 600;
+}
+
+.float-label-word {
+  font-weight: 600;
+}
+
+.float-label-diff {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* Modal base styles */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+}
+
+/* Explicit stacking order so words > chart > game */
+#chartModalBackdrop {
+  z-index: 950;
+}
+#wordsModalBackdrop {
+  z-index: 1000;
+}
+
+.modal-backdrop.show {
+  display: flex;
+}
+
+.modal {
+  background: #ffffff;
+  border-radius: 8px;
+  max-width: 700px;
+  width: 100%;
+  max-height: 80vh;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f3f4f6;
+}
+
+.modal-title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.modal-body {
+  padding: 10px 14px;
+  overflow-y: auto;
+  font-size: 0.95rem;
+}
+
+.modal-footer {
+  padding: 8px 14px;
+  border-top: 1px solid #e5e7eb;
+  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-close-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.words-list {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  white-space: normal;
+}
+
+.words-list-item {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.words-sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+}
+
+.words-sort-label {
+  color: #6b7280;
+}
+
+.words-sort-button {
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  cursor: pointer;
+}
+
+.words-sort-button.active {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+#resultsChart {
+  width: 100%;
+  min-height: 320px;
+}
+
+@media (max-width: 800px) {
+  .layout {
+    flex-direction: column;
+  }
+}
+
+button#dailyChallengeBtn:hover {
+  filter: brightness(0.9);
+}
+
+button#practiceBtn:hover {
+  filter: brightness(0.9);
+}
+
+button#endlessBtn:hover {
+  filter: brightness(0.9);
+}
+
+button#rulesBtn:hover {
+  filter: brightness(0.9);
+}
+
+#wordInput:focus {
+  outline: none;
+  border: 2px solid #9370db;
+  background: #faf5ff;
+}

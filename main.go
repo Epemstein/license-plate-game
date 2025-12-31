@@ -13,5 +13,5 @@ func main() {
 		log.Fatalf("error creating listener: %v\n", err)
 	}
 
-	_ = http.Serve(l, http.FileServer(http.FS(os.DirFS("."))))
+	_ = http.Serve(l, http.FileServer(http.FS(os.DirFS("public"))))
 }
