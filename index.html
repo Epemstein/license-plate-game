@@ -1482,8 +1482,12 @@
         startTime = performance.now();
         timerIntervalId = setInterval(updateTimer, 100);
         updateProgressDisplay();
-        document.getElementById('dailyChallengeBtn').disabled = true;
-        document.getElementById('practiceBtn').disabled = true;
+        
+        // Only disable buttons during daily challenge (not practice)
+        if (gameMode === 'daily') {
+            document.getElementById('dailyChallengeBtn').disabled = true;
+            document.getElementById('practiceBtn').disabled = true;
+        }
         
         // Hide restart button during daily challenge
         if (gameMode === 'daily') {
@@ -1590,6 +1594,7 @@
             showRestartGameButton();
         }
         showChartButton();
+        // Re-enable buttons (they're only disabled during daily challenge)
         document.getElementById('dailyChallengeBtn').disabled = false;
         document.getElementById('practiceBtn').disabled = false;
         window.onbeforeunload = null;
