@@ -361,10 +361,7 @@
 <div class="layout">
     <!-- LEFT PANEL -->
     <div class="left-panel">
-        <p>
-            Solve <strong>10 plates</strong> as fast as you can.<br>
-            The plate letters must appear in your word in order (not necessarily consecutively).
-        </p>
+        <!-- Instructions removed -->
 
         <div class="car-wrapper">
             <img src="car.png" alt="Car with license plate" class="car-image">
@@ -1096,10 +1093,7 @@
 
         platesReady = true;
 
-        debugEl.textContent +=
-            ` | ${ALL_PLATES.length.toLocaleString()} plates` +
-            ` (VE: ${VERY_EASY_PLATES.length}, E: ${EASY_PLATES.length}, M: ${MEDIUM_PLATES.length}, ` +
-            `D: ${DIFFICULT_PLATES.length}, H: ${HARD_PLATES.length}, VH: ${VERY_HARD_PLATES.length}, IMP: ${IMPOSSIBLE_PLATES.length})`;
+        debugEl.textContent += ` | ${ALL_PLATES.length.toLocaleString()} plates`;
 
         maybeEnableStart();
     }
