@@ -354,7 +354,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v54</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;margin-right:10px;">Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;background:#e9d5ff;border:2px solid #9370db;cursor:pointer;margin-right:10px;font-weight:bold;">Practice Mode</button>
@@ -2507,7 +2507,9 @@
         mi.style.color = '#92400e';
         
         // Show Start Game button
-        document.getElementById('startGameBtn').style.display = 'inline-block';
+        const startBtn = document.getElementById('startButton');
+        startBtn.textContent = 'Start Game';
+        startBtn.style.display = 'inline-block';
     });
 
     // Rules button and modal
@@ -2566,7 +2568,9 @@
         mi.style.color = '#6b21a8';
         
         // Show Start Game button
-        document.getElementById('startGameBtn').style.display = 'inline-block';
+        const startBtn = document.getElementById('startButton');
+        startBtn.textContent = 'Start Game';
+        startBtn.style.display = 'inline-block';
     });
     document.getElementById('leaderboardBtn').addEventListener('click', () => {
         console.log('Leaderboard clicked!');
