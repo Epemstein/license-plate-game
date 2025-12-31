@@ -2672,22 +2672,21 @@ window.addEventListener('load', function() {
             <button class="modal-close-btn" id="rulesModalCloseBtn" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-            <!-- Rule 1: Basic Objective -->
+            <!-- Objective -->
             <div style="margin-bottom:32px;">
                 <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1f2937;">Objective</div>
-                <div style="font-size:15px;line-height:1.6;color:#4b5563;margin-bottom:16px;">
-                    Complete <strong>10 plates</strong> as fast as you can. For each plate, find a word that contains the license plate letters <strong>in order</strong> (but not necessarily consecutively).
-                </div>
+                <ul style="font-size:15px;line-height:1.8;color:#4b5563;margin:0;padding-left:20px;">
+                    <li>Complete <strong>10 plates</strong> as fast as you can</li>
+                    <li>For each plate, find a word that contains the license plate letters <strong>in order</strong> (but not necessarily consecutively)</li>
+                    <li>You can press <strong>Skip</strong>, but it adds a time penalty: +5s, then +10s, +15s, etc.</li>
+                </ul>
             </div>
             
             <div style="height:1px;background:#e5e7eb;margin:24px 0;"></div>
             
-            <!-- Rule 2: Letter Order Matters -->
+            <!-- Examples -->
             <div style="margin-bottom:32px;">
-                <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1f2937;">Valid Examples</div>
-                <div style="font-size:15px;line-height:1.6;color:#4b5563;margin-bottom:16px;">
-                    For plate <strong>RSE</strong>, these words work:
-                </div>
+                <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1f2937;">Examples</div>
                 
                 <!-- Plate visual outside the examples -->
                 <div style="text-align:center;margin-bottom:20px;">
@@ -2726,13 +2725,6 @@ window.addEventListener('load', function() {
             </div>
             
             <div style="height:1px;background:#e5e7eb;margin:24px 0;"></div>
-            
-            <!-- Rule 3: Order Matters -->
-            <div style="margin-bottom:32px;">
-                <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1f2937;">Invalid Example</div>
-                <div style="font-size:15px;line-height:1.6;color:#4b5563;margin-bottom:16px;">
-                    Order matters! This does NOT work:
-                </div>
                 
                 <div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:8px;padding:16px;margin-bottom:12px;">
                     <div style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
@@ -2746,13 +2738,7 @@ window.addEventListener('load', function() {
                     </div>
                 </div>
             </div>
-            
-            <div style="height:1px;background:#e5e7eb;margin:24px 0;"></div>
-            
-            <!-- Key Reminder -->
-            <div style="background:#f3e8ff;border-left:4px solid #9370db;padding:12px 16px;border-radius:4px;font-size:15px;color:#6b21a8;font-weight:500;">
-                <strong>Key Rule:</strong> The plate letters must appear in your word in the same order as the plate, reading left to right.
-            </div>
+
             
             <button id="rulesModalCloseBtnBottom" style="width:100%;padding:14px;background:#9370db;color:white;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:24px;">Got it!</button>
         </div>
