@@ -342,7 +342,7 @@
 </head>
 <body>
 
-<h1>The License Plate Game v24</h1>
+<h1>The License Plate Game v4</h1>
 <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">🏆 Daily Challenge</button>
     <button id="practiceBtn" style="padding:10px 20px;cursor:pointer;">🎮 Practice Mode</button>
@@ -710,22 +710,23 @@
                 return;
             }
             
-            // Find the longest history (most plates encountered)
-            let maxPlates = 0;
+            // Load full history for each player on-demand
             const playersData = [];
+            let maxPlates = 0;
             
             for (const score of scores) {
-                if (score.history && score.history.length > 0) {
-                    maxPlates = Math.max(maxPlates, score.history.length);
+                const playerData = await loadPlayerHistory(score.userId, dateStr);
+                if (playerData && playerData.history && playerData.history.length > 0) {
+                    maxPlates = Math.max(maxPlates, playerData.history.length);
                     playersData.push({
                         name: score.userName,
                         time: score.totalTime,
-                        history: score.history
+                        history: playerData.history
                     });
                 }
             }
             
-            if (maxPlates === 0) {
+            if (playersData.length === 0) {
                 contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;">No detailed history available</p>';
                 return;
             }
