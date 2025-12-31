@@ -620,7 +620,35 @@
         return snapshot.val();
     }
 
-// Old loadLeaderboard removed - using new version below
+    async function loadLeaderboard(dateStr) {
+        const ref = database.ref(`scores/${dateStr}`);
+        const snapshot = await ref.once('value');
+        if (!snapshot.exists()) return [];
+        
+        const arr = [];
+        const rawData = snapshot.val();
+        
+        // Process each user's score WITHOUT including history
+        for (const userId in rawData) {
+            const data = rawData[userId];
+            // DON'T include history to prevent cheating via console
+            arr.push({
+                userId: data.userId,
+                userName: data.userName,
+                totalTime: data.totalTime,
+                solved: data.solved,
+                skipped: data.skipped,
+                timestamp: data.timestamp
+                // history is intentionally excluded
+            });
+        }
+        
+        arr.sort((a, b) => a.totalTime - b.totalTime);
+        
+        // Only log count, not actual data
+        return arr;
+    }
+
 
 
     // Toggle comparison table
