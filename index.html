@@ -2384,10 +2384,10 @@
             
             for (let i = 0; i < word.length; i++) {
                 if (plateIdx < upperPlate.length && upperWord[i] === upperPlate[plateIdx]) {
-                    highlighted += `<strong style="color:#16a34a;">${word[i]}</strong>`;
+                    highlighted += `<strong style="color:#16a34a;">${word[i].toLowerCase()}</strong>`;
                     plateIdx++;
                 } else {
-                    highlighted += word[i];
+                    highlighted += word[i].toLowerCase();
                 }
             }
             
