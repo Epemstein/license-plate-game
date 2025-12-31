@@ -264,7 +264,7 @@ async function buildComparisonTable() {
           ? "#f59e0b"
           : "#16a34a";
       html += `<th style="padding:8px;text-align:center;min-width:100px;">`;
-      html += `<div onclick="showViableWordsForPlate('${plateNames[i]}')" style="font-weight:bold;font-size:1rem;cursor:pointer;display:inline-block;" title="Click to see all viable words">${plateNames[i]}</div>`;
+      html += `<div onclick="openWordsModal('${plateNames[i]}')" style="font-weight:bold;font-size:1rem;cursor:pointer;display:inline-block;" title="Click to see all viable words">${plateNames[i]}</div>`;
       html += `<div style="font-size:0.75rem;color:#6b7280;margin-top:2px;">Avg: ${stats.avgTime}s</div>`;
       html += `<div style="font-size:0.75rem;color:${skipColor};margin-top:1px;">Skip: ${stats.skipRate}%</div>`;
       html += `</th>`;
@@ -542,7 +542,7 @@ async function loadDictionary() {
 
 async function loadDifficulty() {
   try {
-    const res = await fetch("plate_difficulty.json?v=2");
+    const res = await fetch("plate_difficulty.json");
     PLATE_DIFFICULTY = await res.json();
     difficultyReady = true;
 
@@ -575,7 +575,7 @@ function tryBuildPlateList() {
     if (DICTIONARY.has(plate)) continue;
 
     let diff =
-      entry && typeof entry.difficulty === "number" ? entry.difficulty : 50;
+      entry && typeof entry.percentile === "number" ? entry.percentile : 50;
 
     all.push(plate);
 
@@ -619,35 +619,31 @@ function maybeEnableStart() {
 
 // --------- PLATE MATCHING ---------
 function getPlateMatchIndices(plate, word) {
-  plate = plate.toUpperCase();
-  const upperWord = word.toUpperCase();
-
-  let expectedPlateIndex = 0;
-  const matchedIndices = [];
-
-  for (let i = 0; i < upperWord.length; i++) {
-    const ch = upperWord[i];
-    const posInPlate = plate.indexOf(ch);
-
-    if (posInPlate === -1) continue;
-
-    if (posInPlate === expectedPlateIndex) {
-      matchedIndices.push(i);
-      expectedPlateIndex++;
-      if (expectedPlateIndex === plate.length) {
-        return matchedIndices;
-      }
-    } else if (posInPlate > expectedPlateIndex) {
-      return null;
-    } else {
+  let i = 0;
+  let indices = [];
+  for (let j = 0; j < word.length; j++) {
+    if (i == plate.length) {
+      break;
+    }
+    if (word[j] == plate[i]) {
+      indices.push(j);
+      i++;
       continue;
     }
+    if (plate.slice(i + 1).indexOf(word[j]) >= 0) {
+      return false;
+    }
   }
+
+  if (i == plate.length) {
+    return indices;
+  }
+
   return null;
 }
 
 function wordMatchesPlate(plate, word) {
-  return getPlateMatchIndices(plate, word) !== null;
+  return !!getPlateMatchIndices(plate, word);
 }
 
 function computeJsViableCount(plate) {
@@ -706,7 +702,7 @@ function generatePlates(rng, max) {
       if (usedPlates.has(plate)) return false;
       const diff =
         PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate]
-          ? PLATE_DIFFICULTY[plate].difficulty
+          ? PLATE_DIFFICULTY[plate].percentile
           : null;
       if (!diff) return false;
 
@@ -798,7 +794,7 @@ function updateDifficultyDisplay(plate) {
     difficultyLabelEl.className = "difficulty diff-med";
   } else {
     const entry = PLATE_DIFFICULTY[plate];
-    const diff = entry.difficulty;
+    const diff = entry.percentile;
     if (!diff || diff <= 0) {
       difficultyLabelEl.textContent = "Difficulty: —";
       difficultyLabelEl.className = "difficulty diff-med";
@@ -818,7 +814,7 @@ function updateDifficultyDisplay(plate) {
 
 function getPlateDifficultyScore(plate) {
   if (!PLATE_DIFFICULTY || !PLATE_DIFFICULTY[plate]) return null;
-  const d = PLATE_DIFFICULTY[plate].difficulty;
+  const d = PLATE_DIFFICULTY[plate].percentile;
   if (!d || d <= 0) return null;
   return d;
 }
@@ -939,7 +935,7 @@ async function playDaily() {
   }
 
   const date = new Date();
-  let seed = date.getDate() + date.getMonth()*100 + date.getFullYear()*1000
+  let seed = date.getDate() + date.getMonth() * 100 + date.getFullYear() * 1000;
 
   let rng = seededRandom(seed);
   let plates = generatePlates(rng, 2);
@@ -988,11 +984,11 @@ async function playDaily() {
 
     // Check if we've run out of plates
     if (idx >= plates.length) {
-      console.log("generating more plates...")
+      console.log("generating more plates...");
       seed *= 10;
       let rng = seededRandom(seed);
       plates.push(...generatePlates(rng, 200));
-      continue
+      continue;
     }
 
     let exit = false;
@@ -1046,7 +1042,7 @@ async function playDaily() {
       currentPlate,
       skip ? penaltyLabel : word,
       matchIndices,
-      PLATE_DIFFICULTY[currentPlate].difficulty,
+      PLATE_DIFFICULTY[currentPlate].percentile,
       `${thinkingSeconds.toFixed(1)}s`
     );
 
@@ -1098,9 +1094,9 @@ async function playPractice() {
 
     // Check if we've run out of plates
     if (idx >= plates.length) {
-      console.log("generating more plates...")
+      console.log("generating more plates...");
       plates.push(...generatePlates(Math.random, 200));
-      continue
+      continue;
     }
 
     let exit = false;
@@ -1154,7 +1150,7 @@ async function playPractice() {
       currentPlate,
       skip ? penaltyLabel : word,
       matchIndices,
-      PLATE_DIFFICULTY[currentPlate].difficulty,
+      PLATE_DIFFICULTY[currentPlate].percentile,
       `${thinkingSeconds.toFixed(1)}s`
     );
 
@@ -1195,8 +1191,8 @@ async function playEndless() {
 
     // Check if we've run out of plates
     if (idx >= plates.length) {
-      console.log("generating more plates...")
-      plates.push(...generatePlates(Math.random, 200))
+      console.log("generating more plates...");
+      plates.push(...generatePlates(Math.random, 200));
       continue;
     }
 
@@ -1252,7 +1248,7 @@ async function playEndless() {
       currentPlate,
       skip ? "Skipped" : word,
       matchIndices,
-      PLATE_DIFFICULTY[currentPlate].difficulty,
+      PLATE_DIFFICULTY[currentPlate].percentile,
       `${thinkingSeconds.toFixed(1)}s`
     );
 
@@ -1403,31 +1399,7 @@ function addToHistoryWithAnimation(
 }
 
 // --------- WORDS MODAL (SORTING) ---------
-function setWordsSortMode(mode) {
-  currentWordsModalSortMode = mode;
-
-  if (mode === "alpha") {
-    wordsSortAlphaBtnEl.classList.add("active");
-    wordsSortLengthBtnEl.classList.remove("active");
-  } else {
-    wordsSortAlphaBtnEl.classList.remove("active");
-    wordsSortLengthBtnEl.classList.add("active");
-  }
-
-  // Check if we're using the new displayViableWords (from comparison table)
-  if (window.currentViableWords) {
-    displayViableWords(mode);
-  } else {
-    // Use the old renderWordsList (from gameplay)
-    renderWordsList(mode);
-  }
-}
-
-function renderWordsList(sortMode) {
-  // Clear comparison table data to prevent conflicts
-  window.currentViableWords = null;
-  window.currentPlateName = null;
-
+function renderWordsList(sortMode,) {
   wordsModalListEl.innerHTML = "";
 
   const plate = currentWordsModalPlate;
@@ -1457,12 +1429,11 @@ function renderWordsList(sortMode) {
     line.className = "words-list-item";
 
     const indices = getPlateMatchIndices(plate, w) || [];
-    const indexSet = new Set(indices);
 
     let html = "";
     for (let i = 0; i < w.length; i++) {
       const ch = w[i];
-      if (indexSet.has(i)) {
+      if (indices.indexOf(i) >= 0) {
         html += `<span class="plate-letter-highlight">${ch}</span>`;
       } else {
         html += ch;
@@ -1482,15 +1453,14 @@ function openWordsModal(plate) {
   wordsModalTitleEl.textContent = `Plate: ${plate}`;
   wordsModalStatusEl.textContent = "Finding viable words…";
 
-  currentWordsModalPlate = plate;
+  currentWordsModalPlate = plate.toLowerCase();
   currentWordsModalMatches = [];
-  setWordsSortMode("alpha");
 
   wordsModalBackdropEl.classList.add("show");
 
   const matches = [];
   for (const w of WORDS) {
-    if (wordMatchesPlate(plate, w)) {
+    if (wordMatchesPlate(currentWordsModalPlate, w)) {
       matches.push(w);
     }
   }
@@ -1501,12 +1471,21 @@ function openWordsModal(plate) {
   const countFromScan = matches.length;
   wordsModalStatusEl.textContent = `${countFromScan.toLocaleString()} viable words`;
 
-  renderWordsList(currentWordsModalSortMode);
+  renderWordsList(currentWordsModalSortMode, matches);
 }
 
 function closeWordsModal() {
   wordsModalBackdropEl.classList.remove("show");
 }
+
+// Global function to close run details modal
+function closeRunDetailsModal() {
+  const backdrop = document.getElementById("runDetailsModalBackdrop");
+  if (backdrop) {
+    backdrop.classList.remove("show");
+  }
+}
+window.closeRunDetailsModal = closeRunDetailsModal;
 
 // --------- MISMATCH EXPLANATION ---------
 function explainPlateMismatch(plate, word) {
@@ -1768,14 +1747,6 @@ wordsModalBackdropEl.addEventListener("click", (e) => {
   }
 });
 
-wordsSortAlphaBtnEl.addEventListener("click", () => {
-  setWordsSortMode("alpha");
-});
-
-wordsSortLengthBtnEl.addEventListener("click", () => {
-  setWordsSortMode("length");
-});
-
 chartModalCloseBtnEl.addEventListener("click", closeChartModal);
 chartModalCloseBtnBottomEl.addEventListener("click", closeChartModal);
 chartModalBackdropEl.addEventListener("click", (e) => {
@@ -1884,135 +1855,6 @@ async function viewPlayerRun(
 }
 
 window.viewPlayerRun = viewPlayerRun; // Make it globally accessible for onclick
-
-// Global function to close run details modal
-function closeRunDetailsModal() {
-  const backdrop = document.getElementById("runDetailsModalBackdrop");
-  if (backdrop) {
-    backdrop.classList.remove("show");
-  }
-}
-window.closeRunDetailsModal = closeRunDetailsModal;
-
-// Show viable words for a plate in the comparison table
-function showViableWordsForPlate(plate) {
-  if (!plate || plate === "—") return;
-
-  console.log("Showing viable words for:", plate);
-
-  // Calculate viable words from DICTIONARY
-  const viableWords = [];
-  const upperPlate = plate.toUpperCase();
-
-  if (typeof DICTIONARY !== "undefined" && DICTIONARY.size > 0) {
-    for (const word of DICTIONARY) {
-      const upperWord = word.toUpperCase();
-      let plateIdx = 0;
-
-      // Check if plate letters appear in order in the word
-      for (
-        let i = 0;
-        i < upperWord.length && plateIdx < upperPlate.length;
-        i++
-      ) {
-        if (upperWord[i] === upperPlate[plateIdx]) {
-          plateIdx++;
-        }
-      }
-
-      // If all plate letters were found in order, it's viable
-      if (plateIdx === upperPlate.length) {
-        viableWords.push(word);
-      }
-    }
-  }
-
-  console.log("Found viable words:", viableWords.length);
-
-  if (viableWords.length === 0) {
-    alert(
-      `No viable words found for plate ${plate}. Dictionary may not be loaded yet.`
-    );
-    return;
-  }
-
-  // Use the run details modal
-  const modalBackdrop = document.getElementById("runDetailsModalBackdrop");
-  const modalTitle = document.getElementById("runDetailsModalTitle");
-  const modalContent = document.getElementById("runDetailsContent");
-
-  // Use the dedicated words modal (same as in-game)
-  const wordsModalBackdrop = document.getElementById("wordsModalBackdrop");
-  const wordsModalTitle = document.getElementById("wordsModalTitle");
-  const wordsModalList = document.getElementById("wordsModalList");
-
-  wordsModalTitle.textContent = `Plate: ${plate}`;
-
-  // Store for sorting
-  window.currentViableWords = viableWords;
-  window.currentPlateName = plate;
-
-  // Initial display (A-Z)
-  displayViableWords("alpha");
-
-  // Show modal
-  wordsModalBackdrop.classList.add("show");
-}
-
-// Display viable words with highlighting (used by showViableWordsForPlate and sort buttons)
-function displayViableWords(sortType) {
-  const viableWords = window.currentViableWords || [];
-  const plate = window.currentPlateName || "";
-  const wordsModalList = document.getElementById("wordsModalList");
-  const wordsCountEl = document.getElementById("wordsModalStatus");
-
-  // Sort words
-  let sorted = [...viableWords];
-  if (sortType === "length") {
-    sorted.sort((a, b) => a.length - b.length || a.localeCompare(b));
-  } else {
-    sorted.sort((a, b) => a.localeCompare(b));
-  }
-
-  // Highlight plate letters in each word
-  const upperPlate = plate.toUpperCase();
-  let html = "";
-
-  sorted.forEach((word) => {
-    const upperWord = word.toUpperCase();
-    let highlighted = "";
-    let plateIdx = 0;
-
-    for (let i = 0; i < word.length; i++) {
-      if (
-        plateIdx < upperPlate.length &&
-        upperWord[i] === upperPlate[plateIdx]
-      ) {
-        highlighted += `<strong style="color:#16a34a;">${word[
-          i
-        ].toLowerCase()}</strong>`;
-        plateIdx++;
-      } else {
-        highlighted += word[i].toLowerCase();
-      }
-    }
-
-    html += `<div class="word-item">${highlighted}</div>`;
-  });
-
-  wordsModalList.innerHTML = html;
-  wordsCountEl.textContent = `${viableWords.length} viable words`;
-
-  // Update sort button states
-  document
-    .getElementById("wordsSortAlphaBtn")
-    .classList.toggle("active", sortType === "alpha");
-  document
-    .getElementById("wordsSortLengthBtn")
-    .classList.toggle("active", sortType === "length");
-}
-window.displayViableWords = displayViableWords;
-window.showViableWordsForPlate = showViableWordsForPlate;
 
 // Global function for Load button
 function loadSelectedDate() {
@@ -2204,19 +2046,19 @@ loadDictionary();
 loadDifficulty();
 
 // Auto-load today's leaderboard when page is fully loaded
-window.addEventListener('load', function() {
-    setTimeout(function() {
-        try {
-            const today = getTodayString();
-            const datePicker = document.getElementById('leaderboardDatePicker');
-            if (datePicker) {
-                datePicker.value = today;
-                datePicker.max = today;
-                displayLeaderboard(today);
-                // Auto-loaded
-            }
-        } catch (error) {
-            console.error('Error auto-loading leaderboard:', error);
-        }
-    }, 500); // Wait 2 seconds for Firebase to connect
+window.addEventListener("load", function () {
+  setTimeout(function () {
+    try {
+      const today = getTodayString();
+      const datePicker = document.getElementById("leaderboardDatePicker");
+      if (datePicker) {
+        datePicker.value = today;
+        datePicker.max = today;
+        displayLeaderboard(today);
+        // Auto-loaded
+      }
+    } catch (error) {
+      console.error("Error auto-loading leaderboard:", error);
+    }
+  }, 500); // Wait 2 seconds for Firebase to connect
 });
