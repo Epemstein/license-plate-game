@@ -637,7 +637,10 @@
         });
         
         // Refresh leaderboard to unlock View buttons and Compare button
-        displayLeaderboard(today);
+        // Small delay to ensure Firebase write propagates
+        setTimeout(() => {
+            displayLeaderboard(today);
+        }, 500);
     }
 
 
