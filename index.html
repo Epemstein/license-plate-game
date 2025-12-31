@@ -772,7 +772,7 @@
             }
             
             // Header row with plate names and stats
-            html += '<thead><tr style="background:#f3f4f6;">';
+            html += '<thead style="position:sticky;top:0;z-index:10;"><tr style="background:#f3f4f6;">';
             html += '<th style="padding:8px;text-align:left;position:sticky;left:0;background:#f3f4f6;z-index:2;min-width:120px;">Player</th>';
             for (let i = 0; i < maxPlates; i++) {
                 const stats = plateStats[i];
@@ -2595,7 +2595,7 @@ window.addEventListener('load', function() {
     </div>
     
     <!-- Comparison Table -->
-    <div id="comparisonTableContainer" style="margin-top:20px;background:white;padding:20px;border-radius:8px;display:none;overflow-x:auto;">
+    <div id="comparisonTableContainer" style="margin-top:20px;background:white;padding:20px;border-radius:8px;display:none;overflow-x:auto;max-height:600px;overflow-y:auto;">
         <h3 style="margin-top:0;">Run Comparison</h3>
         <div id="comparisonTable"></div>
     </div>
