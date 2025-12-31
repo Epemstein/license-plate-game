@@ -1673,6 +1673,10 @@
     }
 
     function renderWordsList(sortMode) {
+        // Clear comparison table data to prevent conflicts
+        window.currentViableWords = null;
+        window.currentPlateName = null;
+        
         wordsModalListEl.innerHTML = "";
 
         const plate = currentWordsModalPlate;
