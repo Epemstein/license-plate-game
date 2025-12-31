@@ -1402,6 +1402,10 @@
         resetGameState();
         gameStarted = true;
         gameOver = false;
+        
+        // Show difficulty bar when game starts
+        document.getElementById('difficultyLabel').style.display = 'block';
+        
         startTime = performance.now();
         timerIntervalId = setInterval(updateTimer, 100);
         updateProgressDisplay();
