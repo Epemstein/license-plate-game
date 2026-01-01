@@ -890,6 +890,7 @@
     async function displayLeaderboard(dateStr) {
         // displayLeaderboard called
         currentViewingDate = dateStr; // Track the date we're viewing
+        updateNavigationButtons(); // Update button states
         
         // Declare these at function level so they're accessible everywhere
         let userHasPlayed = false;
@@ -2499,6 +2500,37 @@
 
 
     // Global function for Today button (backup)
+
+    function changeDateBy(days) {
+        const picker = document.getElementById('leaderboardDatePicker');
+        const currentDate = new Date(picker.value + 'T00:00:00');
+        currentDate.setDate(currentDate.getDate() + days);
+        
+        // Format as YYYY-MM-DD
+        const newDateStr = currentDate.toISOString().split('T')[0];
+        
+        picker.value = newDateStr;
+        displayLeaderboard(newDateStr);
+        updateNavigationButtons();
+    }
+    
+    function updateNavigationButtons() {
+        const picker = document.getElementById('leaderboardDatePicker');
+        const nextBtn = document.getElementById('nextDayBtn');
+        const today = getTodayString();
+        
+        // Disable Next button if viewing today
+        if (picker.value === today) {
+            nextBtn.disabled = true;
+            nextBtn.style.opacity = '0.5';
+            nextBtn.style.cursor = 'not-allowed';
+        } else {
+            nextBtn.disabled = false;
+            nextBtn.style.opacity = '1';
+            nextBtn.style.cursor = 'pointer';
+        }
+    }
+    
     function loadTodayScores() {
         console.log('=== TODAY BUTTON CLICKED ===');
         const t = getTodayString();
@@ -2682,8 +2714,9 @@ window.addEventListener('load', function() {
     <div style="margin-bottom:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <label for="leaderboardDatePicker" style="font-weight:600;">Date:</label>
         <input type="date" id="leaderboardDatePicker" style="padding:8px;border:1px solid #d1d5db;border-radius:4px;" onchange="displayLeaderboard(this.value)">
-        
-        <button id="todayLeaderboardBtn" onclick="loadTodayScores()" style="padding:8px 16px;cursor:pointer;">Today</button>
+        <button id="prevDayBtn" onclick="changeDateBy(-1)" style="padding:8px 16px;cursor:pointer;margin-left:8px;">← Prev</button>
+        <button id="nextDayBtn" onclick="changeDateBy(1)" style="padding:8px 16px;cursor:pointer;">Next →</button>
+        <button id="todayLeaderboardBtn" onclick="loadTodayScores()" style="padding:8px 16px;cursor:pointer;margin-left:8px;">Today</button>
     </div>
     <div id="leaderboardDate" style="text-align:center;margin-bottom:16px;font-size:1.1rem;color:#6b7280;font-weight:600;"></div>
     <div id="leaderboardContent" style="background:white;padding:20px;border-radius:8px;min-height:200px;max-height:520px;overflow-y:auto;">
@@ -2774,5 +2807,9 @@ window.addEventListener('load', function() {
     </div>
 </div>
 
+
+    <footer style="text-align:center;padding:20px;margin-top:40px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:0.9rem;">
+        © 2026 Ezra Pemstein. All rights reserved.
+    </footer>
 </body>
 </html>
