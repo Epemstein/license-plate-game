@@ -505,15 +505,9 @@ let HARD_PLATES = [];
 let VERY_HARD_PLATES = [];
 let IMPOSSIBLE_PLATES = [];
 
-let usedPlates = new Set();
-let currentPlate = null;
-
 let gameStarted = false;
 let gameOver = false;
-let solvedCount = 0;
 let timerIntervalId = null;
-
-let plateLocked = false;
 
 let gameHistory = [];
 
@@ -913,9 +907,6 @@ async function beginNewRun(token) {
   gameStarted = true;
   gameOver = false;
 
-  currentPlate = null;
-  plateLocked = false;
-  usedPlates = new Set();
   gameHistory = [];
 
   if (timerIntervalId) clearInterval(timerIntervalId);
@@ -956,8 +947,6 @@ async function beginNewRun(token) {
 
   gameOver = true;
   gameStarted = false;
-  plateLocked = true;
-  currentPlate = null;
   plateEl.textContent = "---";
   updateDifficultyDisplay(null);
 
@@ -1002,10 +991,9 @@ async function playTimed(plates, genMorePlates, token) {
 
   while (solved < TOTAL_PLATES) {
     const chosen = plates[idx];
-    currentPlate = chosen;
+    const currentPlate = chosen;
     plateEl.textContent = chosen;
     resultEl.textContent = "";
-    plateLocked = false;
     checkButtonEl.disabled = false;
     skipButtonEl.disabled = false;
     wordInputEl.disabled = false;
@@ -1212,10 +1200,9 @@ async function playEndless() {
 
   while (true) {
     const chosen = plates[idx];
-    currentPlate = chosen;
+    const currentPlate = chosen;
     plateEl.textContent = chosen;
     resultEl.textContent = "";
-    plateLocked = false;
     checkButtonEl.disabled = false;
     skipButtonEl.disabled = false;
     wordInputEl.disabled = false;
