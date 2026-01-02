@@ -575,7 +575,7 @@ function tryBuildPlateList() {
     if (DICTIONARY.has(plate)) continue;
 
     let diff =
-      entry && typeof entry.percentile === "number" ? entry.percentile : 50;
+      entry && typeof entry.difficulty === "number" ? entry.difficulty : 50;
 
     all.push(plate);
 
@@ -702,7 +702,7 @@ function generatePlates(rng, max) {
       if (usedPlates.has(plate)) return false;
       const diff =
         PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate]
-          ? PLATE_DIFFICULTY[plate].percentile
+          ? PLATE_DIFFICULTY[plate].difficulty
           : null;
       if (!diff) return false;
 
@@ -794,7 +794,7 @@ function updateDifficultyDisplay(plate) {
     difficultyLabelEl.className = "difficulty diff-med";
   } else {
     const entry = PLATE_DIFFICULTY[plate];
-    const diff = entry.percentile;
+    const diff = entry.difficulty;
     if (!diff || diff <= 0) {
       difficultyLabelEl.textContent = "Difficulty: —";
       difficultyLabelEl.className = "difficulty diff-med";
@@ -814,7 +814,7 @@ function updateDifficultyDisplay(plate) {
 
 function getPlateDifficultyScore(plate) {
   if (!PLATE_DIFFICULTY || !PLATE_DIFFICULTY[plate]) return null;
-  const d = PLATE_DIFFICULTY[plate].percentile;
+  const d = PLATE_DIFFICULTY[plate].difficulty;
   if (!d || d <= 0) return null;
   return d;
 }
@@ -1042,7 +1042,7 @@ async function playDaily() {
       currentPlate,
       skip ? penaltyLabel : word,
       matchIndices,
-      PLATE_DIFFICULTY[currentPlate].percentile,
+      PLATE_DIFFICULTY[currentPlate].difficulty,
       `${thinkingSeconds.toFixed(1)}s`
     );
 
@@ -1150,7 +1150,7 @@ async function playPractice() {
       currentPlate,
       skip ? penaltyLabel : word,
       matchIndices,
-      PLATE_DIFFICULTY[currentPlate].percentile,
+      PLATE_DIFFICULTY[currentPlate].difficulty,
       `${thinkingSeconds.toFixed(1)}s`
     );
 
@@ -1248,7 +1248,7 @@ async function playEndless() {
       currentPlate,
       skip ? "Skipped" : word,
       matchIndices,
-      PLATE_DIFFICULTY[currentPlate].percentile,
+      PLATE_DIFFICULTY[currentPlate].difficulty,
       `${thinkingSeconds.toFixed(1)}s`
     );
 
