@@ -3861,19 +3861,13 @@ window.addEventListener('load', function() {
                     myTime = thinkingTime + penaltyTime;
                     
                     if (myEntry.skipped) {
-                        // Skipped plates: show X with total time
-                        myCell = `
-                            <div style="font-size:1.1rem;font-weight:600;color:#fff;margin-bottom:4px;">✗</div>
-                            <div style="font-size:0.9rem;color:#fff;">${myTime.toFixed(1)}s</div>
-                        `;
+                        // Skipped plates: show red X with time inline (smaller)
+                        myCell = `<div style="font-size:0.85rem;font-weight:600;color:#ef4444;">✗ &nbsp;${myTime.toFixed(1)}s</div>`;
                         myCellBg = '#000000';
                     } else {
-                        // Valid words: show word with total time
+                        // Valid words: show word with time inline (more spacing)
                         myCellBg = getTimeCellColor(thinkingTime);
-                        myCell = `
-                            <div style="font-size:0.95rem;font-weight:600;color:#000;margin-bottom:4px;">${myEntry.word || '—'}</div>
-                            <div style="font-size:0.8rem;color:#000;">${myTime.toFixed(1)}s</div>
-                        `;
+                        myCell = `<div style="font-size:0.9rem;font-weight:600;color:#000;">${myEntry.word || '—'} &nbsp;<span style="font-size:0.75rem;font-weight:400;">${myTime.toFixed(1)}s</span></div>`;
                     }
                     myTotalTime += myTime;
                 } else {
@@ -3891,19 +3885,13 @@ window.addEventListener('load', function() {
                     theirTime = thinkingTime + penaltyTime;
                     
                     if (theirEntry.skipped) {
-                        // Skipped plates: show X with total time
-                        theirCell = `
-                            <div style="font-size:1.1rem;font-weight:600;color:#fff;margin-bottom:4px;">✗</div>
-                            <div style="font-size:0.9rem;color:#fff;">${theirTime.toFixed(1)}s</div>
-                        `;
+                        // Skipped plates: show red X with time inline (smaller)
+                        theirCell = `<div style="font-size:0.85rem;font-weight:600;color:#ef4444;">✗ &nbsp;${theirTime.toFixed(1)}s</div>`;
                         theirCellBg = '#000000';
                     } else {
-                        // Valid words: show word with total time
+                        // Valid words: show word with time inline (more spacing)
                         theirCellBg = getTimeCellColor(thinkingTime);
-                        theirCell = `
-                            <div style="font-size:0.95rem;font-weight:600;color:#000;margin-bottom:4px;">${theirEntry.word || '—'}</div>
-                            <div style="font-size:0.8rem;color:#000;">${theirTime.toFixed(1)}s</div>
-                        `;
+                        theirCell = `<div style="font-size:0.9rem;font-weight:600;color:#000;">${theirEntry.word || '—'} &nbsp;<span style="font-size:0.75rem;font-weight:400;">${theirTime.toFixed(1)}s</span></div>`;
                     }
                     theirTotalTime += theirTime;
                 } else {
@@ -3929,10 +3917,10 @@ window.addEventListener('load', function() {
                 
                 tableRows += `
                     <tr>
-                        <td style="padding:12px 8px;font-weight:700;font-size:0.9rem;background:#f9fafb;border-right:2px solid #e5e7eb;text-align:center;">${plate}</td>
-                        <td style="padding:10px 8px;background:${myCellBg};border-right:2px solid #e5e7eb;text-align:center;">${myCell}</td>
-                        <td style="padding:10px 8px;background:${theirCellBg};border-right:2px solid #e5e7eb;text-align:center;">${theirCell}</td>
-                        <td style="padding:10px 8px;background:#ffffff;text-align:center;">${diffCell}</td>
+                        <td style="padding:8px 6px;font-weight:700;font-size:0.9rem;background:#f9fafb;border-right:2px solid #e5e7eb;text-align:center;">${plate}</td>
+                        <td style="padding:8px 6px;background:${myCellBg};border-right:2px solid #e5e7eb;text-align:center;">${myCell}</td>
+                        <td style="padding:8px 6px;background:${theirCellBg};border-right:2px solid #e5e7eb;text-align:center;">${theirCell}</td>
+                        <td style="padding:8px 6px;background:#ffffff;text-align:center;">${diffCell}</td>
                     </tr>
                 `;
             }
