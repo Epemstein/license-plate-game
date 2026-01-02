@@ -373,6 +373,21 @@
         .plate-name-clickable:hover {
             color: #7d5bbe !important;
         }
+        
+        @keyframes pulseGlow {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(147, 112, 219, 0.4);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 20px 5px rgba(147, 112, 219, 0.6);
+                transform: scale(1.02);
+            }
+        }
+        
+        .pulse-button {
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -540,7 +555,7 @@
     let dailyPlateSequence = null;
     let currentViewingDate = null; // Track which date we're viewing
 
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
         currentUser = user;
         const signInBtn = document.getElementById('signInBtn');
         const userInfo = document.getElementById('userInfo');
@@ -549,6 +564,36 @@
             document.getElementById('authPlaceholder').style.display = 'none';
                 userInfo.style.display = 'block';
             document.getElementById('userName').textContent = user.displayName || user.email;
+            
+            // Register user for H2H (without requiring permissions - will use users node later)
+            try {
+                await database.ref(`users/${user.uid}`).set({
+                    displayName: user.displayName || user.email,
+                    email: user.email,
+                    lastSeen: Date.now()
+                });
+            } catch (error) {
+                console.log('Could not register user (may need Firebase permissions)', error);
+            }
+            
+            // Check for abandoned challenges
+            checkAbandonedChallenges(user.uid);
+            
+            // Load H2H challenges to update notification badge
+            loadH2HChallenges();
+            
+            // Check if there's a challenge ID in the URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const challengeId = urlParams.get('challenge');
+            if (challengeId) {
+                // User just signed in with a challenge link - load the challenge
+                setTimeout(() => {
+                    document.getElementById('h2hTab').click();
+                    setTimeout(() => {
+                        playChallenge(challengeId);
+                    }, 500);
+                }, 500);
+            }
         } else {
             document.getElementById('authPlaceholder').style.display = 'none';
                 signInBtn.style.display = 'inline-block';
@@ -1287,8 +1332,9 @@
             resultEl.style.color = "red";
             return;
         }
-        if (gameMode==='daily' && dailyPlateSequence && dailyPlateSequence.length) {
+        if ((gameMode==='daily' || gameMode==='h2h_challenge') && dailyPlateSequence && dailyPlateSequence.length) {
             const idx = usedPlates.size;
+            console.log('Using sequence mode! Index:', idx, 'Sequence length:', dailyPlateSequence.length);
             
             // Check if we've run out of plates
             if (idx>=dailyPlateSequence.length) { 
@@ -1301,7 +1347,7 @@
             }
             
             // Check if we've SOLVED enough (this is the real end condition)
-            console.log('Daily mode - solvedCount:', solvedCount, 'TOTAL_PLATES:', TOTAL_PLATES);
+            console.log('Daily/H2H mode - solvedCount:', solvedCount, 'TOTAL_PLATES:', TOTAL_PLATES);
             if (solvedCount >= TOTAL_PLATES) {
                 console.log('Ending game - solved 10!');
                 endGame();
@@ -1476,7 +1522,15 @@
         historyEmptyEl.style.display = "block";
     }
 
-    function beginNewRun() {
+    async function beginNewRun() {
+        // If this is a new H2H challenge (pending opponent), create it now
+        if (gameMode === 'h2h_challenge' && pendingOpponent && !currentChallengeId) {
+            await createChallengeWithOpponent();
+        }
+        
+        // Remove pulse animation from start button
+        startButtonEl.classList.remove('pulse-button');
+        
         resetGameState();
         gameStarted = true;
         gameOver = false;
@@ -1488,14 +1542,14 @@
         timerIntervalId = setInterval(updateTimer, 100);
         updateProgressDisplay();
         
-        // Only disable buttons during daily challenge (not practice)
-        if (gameMode === 'daily') {
+        // Only disable buttons during daily challenge or H2H (not practice)
+        if (gameMode === 'daily' || gameMode === 'h2h_challenge') {
             document.getElementById('dailyChallengeBtn').disabled = true;
             document.getElementById('practiceBtn').disabled = true;
         }
         
-        // Hide restart button during daily challenge
-        if (gameMode === 'daily') {
+        // Hide restart button during daily challenge or H2H
+        if (gameMode === 'daily' || gameMode === 'h2h_challenge') {
             startButtonEl.style.display = 'none';
         }
         
@@ -1514,10 +1568,27 @@
                 }
             };
         }
+        
+        // H2H Challenge - mark as in_progress when actually starting
+        if (gameMode === 'h2h_challenge' && currentChallengeId && currentUser) {
+            challengeStartTime = Date.now();
+            database.ref(`challenges/${currentChallengeId}/results/${currentUser.uid}`).set({
+                status: 'in_progress',
+                startedAt: challengeStartTime
+            });
+            
+            window.onbeforeunload = e => {
+                if (gameStarted && !gameOver && gameMode==='h2h_challenge') {
+                    e.preventDefault();
+                    return 'Leave? Challenge will be marked as Abandoned!';
+                }
+            };
+        }
+        
         pickRandomPlate();
     }
 
-    function startGameFromModal() {
+    async function startGameFromModal() {
         const ready = dictionaryReady && difficultyReady && platesReady;
         if (!ready) {
             resultEl.textContent = "Still loading…";
@@ -1535,12 +1606,15 @@
         hideChartButton();
 
         hasStartedOnce = true;
-        showRestartGameButton();
+        // Only show restart for practice mode, not daily or H2H
+        if (gameMode !== 'daily' && gameMode !== 'h2h_challenge') {
+            showRestartGameButton();
+        }
 
-        beginNewRun();
+        await beginNewRun();
     }
 
-    function startOrRestartFromMain() {
+    async function startOrRestartFromMain() {
         const ready = dictionaryReady && difficultyReady && platesReady;
         if (!ready) {
             resultEl.textContent = "Still loading…";
@@ -1555,10 +1629,13 @@
         }
 
         hasStartedOnce = true;
-        showRestartGameButton();
+        // Only show restart for practice mode, not daily or H2H
+        if (gameMode !== 'daily' && gameMode !== 'h2h_challenge') {
+            showRestartGameButton();
+        }
         hideChartButton();
 
-        beginNewRun();
+        await beginNewRun();
     }
 
     function updateTimer() {
@@ -1566,6 +1643,14 @@
         const baseElapsedSec = (performance.now() - startTime) / 1000;
         const totalSec = baseElapsedSec + penaltySeconds;
         timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
+        
+        // Check for H2H challenge timeout
+        if (gameMode === 'h2h_challenge' && currentChallengeId && challengeStartTime) {
+            const elapsed = (Date.now() - challengeStartTime) / 1000;
+            if (elapsed >= CHALLENGE_TIMEOUT) {
+                markChallengeDNF();
+            }
+        }
     }
 
     function endGame() {
@@ -1594,16 +1679,24 @@
         wordInputEl.readOnly = true;
 
         openEndModal(totalSec);
-        // Don't show restart for daily challenge
-        if (gameMode !== 'daily') {
+        // Don't show restart for daily challenge or H2H
+        if (gameMode !== 'daily' && gameMode !== 'h2h_challenge') {
             showRestartGameButton();
         }
         showChartButton();
-        // Re-enable buttons (they're only disabled during daily challenge)
+        // Re-enable buttons
         document.getElementById('dailyChallengeBtn').disabled = false;
         document.getElementById('practiceBtn').disabled = false;
         window.onbeforeunload = null;
-        if (gameMode==='daily' && currentUser) saveScore(totalSec,solvedCount,skipCount);
+        
+        // Save score based on game mode
+        if (currentUser) {
+            if (gameMode === 'daily') {
+                saveScore(totalSec, solvedCount, skipCount);
+            } else if (gameMode === 'h2h_challenge' && currentChallengeId) {
+                saveChallengeResult(totalSec, solvedCount, skipCount);
+            }
+        }
     }
 
     // --------- FLOATING LABELS & HISTORY ---------
@@ -1869,10 +1962,11 @@
             <strong>${finalTimeSec.toFixed(1)} seconds</strong> (including skip penalties).</p>
             <p>You can view a breakdown chart of each plate's time, or close this and inspect the table.</p>
             ${gameMode === 'daily' ? '<p style="margin-top:1rem; color:#92400e; background:#fef3c7; padding:8px; border-radius:4px;"><strong>Daily Challenge Complete!</strong> Come back tomorrow for a new challenge.</p>' : ''}
+            ${gameMode === 'h2h_challenge' ? '<p style="margin-top:1rem; color:#92400e; background:#fef3c7; padding:8px; border-radius:4px;"><strong>⚔️ H2H Challenge Complete!</strong> Check the H2H Results tab to see if you won!</p>' : ''}
         `;
 
         // Only show "Play again" for practice mode
-        if (gameMode === 'daily') {
+        if (gameMode === 'daily' || gameMode === 'h2h_challenge') {
             gameModalPrimaryBtnEl.style.display = "none";
         } else {
             gameModalPrimaryBtnEl.disabled = false;
@@ -2666,9 +2760,808 @@
         document.getElementById('leaderboardDatePicker').value = t;
         displayLeaderboard(t);
     });
+    
     document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
     });
     // === END FIREBASE HANDLERS ===
+
+    // ========== HEAD-TO-HEAD FEATURE ==========
+    let currentChallengeId = null;
+    let challengeStartTime = null;
+    let pendingOpponent = null;
+    const CHALLENGE_TIMEOUT = 2000; // 2000 seconds
+    
+    // Prepare challenge (don't create yet - wait for Start button)
+    function prepareChallenge(opponent) {
+        pendingOpponent = opponent;
+        gameMode = 'h2h_challenge';
+        
+        // Update button styles - fully grayed out
+        const practiceBtn = document.getElementById('practiceBtn');
+        const dailyBtn = document.getElementById('dailyChallengeBtn');
+        
+        practiceBtn.style.background = '#e5e7eb';
+        practiceBtn.style.border = '2px solid #9ca3af';
+        practiceBtn.style.color = '#6b7280';
+        practiceBtn.style.cursor = 'not-allowed';
+        practiceBtn.disabled = true;
+        
+        dailyBtn.style.background = '#e5e7eb';
+        dailyBtn.style.border = '2px solid #9ca3af';
+        dailyBtn.style.color = '#6b7280';
+        dailyBtn.style.cursor = 'not-allowed';
+        dailyBtn.disabled = true;
+        
+        // Update banner with back button embedded
+        const mi = document.getElementById('modeIndicator');
+        mi.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span>⚔️ Ready to challenge ${opponent.name}</span>
+                <button 
+                    onclick="cancelPendingChallenge()" 
+                    style="padding:6px 12px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;"
+                >
+                    ← Back
+                </button>
+            </div>
+        `;
+        mi.style.background = '#fef3c7';
+        mi.style.color = '#92400e';
+        mi.style.border = '2px solid #fbbf24';
+        
+        // Show Start Challenge button with pulse animation
+        const startBtn = document.getElementById('startButton');
+        startBtn.textContent = 'Start Challenge';
+        startBtn.style.display = 'inline-block';
+        startBtn.classList.add('pulse-button');
+        
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // Cancel pending challenge
+    window.cancelPendingChallenge = function() {
+        pendingOpponent = null;
+        gameMode = 'practice';
+        
+        const practiceBtn = document.getElementById('practiceBtn');
+        const dailyBtn = document.getElementById('dailyChallengeBtn');
+        
+        practiceBtn.disabled = false;
+        practiceBtn.style.background = '#e9d5ff';
+        practiceBtn.style.border = '2px solid #9370db';
+        practiceBtn.style.color = '#000';
+        practiceBtn.style.cursor = 'pointer';
+        
+        dailyBtn.disabled = false;
+        dailyBtn.style.background = '#fbbf24';
+        dailyBtn.style.border = '2px solid #f59e0b';
+        dailyBtn.style.color = '#000';
+        dailyBtn.style.cursor = 'pointer';
+        
+        const mi = document.getElementById('modeIndicator');
+        mi.textContent = 'Select a game mode above to begin';
+        mi.style.background = '#f3f4f6';
+        mi.style.color = '#000000';
+        mi.style.border = '2px dashed #d1d5db';
+        
+        const startBtn = document.getElementById('startButton');
+        startBtn.style.display = 'none';
+        startBtn.classList.remove('pulse-button');
+    };
+    
+    // Create challenge with pending opponent (called when Start Challenge is clicked)
+    async function createChallengeWithOpponent() {
+        if (!pendingOpponent) return;
+        
+        const opponent = pendingOpponent;
+        
+        try {
+            const challengeId = database.ref('challenges').push().key;
+            const plateSequence = generateChallengeSequence();
+            
+            if (plateSequence.length < 100) {
+                alert('Error generating plates');
+                return;
+            }
+            
+            await database.ref(`challenges/${challengeId}`).set({
+                createdBy: currentUser.uid,
+                creatorName: currentUser.displayName || currentUser.email,
+                challengedUser: opponent.uid,
+                opponentName: opponent.name,
+                plateSequence: plateSequence,
+                createdAt: Date.now(),
+                expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000),
+                status: 'pending',
+                results: {}
+            });
+            
+            // Copy link to clipboard silently
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${challengeId}`;
+            try {
+                await navigator.clipboard.writeText(challengeUrl);
+            } catch (err) {
+                console.log('Could not copy to clipboard');
+            }
+            
+            // Set challenge variables (don't call playChallenge - we're already starting)
+            currentChallengeId = challengeId;
+            dailyPlateSequence = plateSequence;
+            
+            // Update banner
+            const mi = document.getElementById('modeIndicator');
+            mi.textContent = `⚔️ H2H Challenge vs ${opponent.name} - One attempt only!`;
+            
+        } catch (error) {
+            console.error('Error creating challenge:', error);
+            alert('Error creating challenge: ' + error.message);
+        }
+    }
+    
+    // Generate random plate sequence for challenge (100 plates)
+    function generateChallengeSequence() {
+        if (!platesReady || !ALL_PLATES.length) return [];
+        
+        const sequence = [];
+        const usedPlates = new Set();
+        
+        while (sequence.length < 100 && usedPlates.size < ALL_PLATES.length) {
+            const r = Math.random();
+            let band;
+            if (r < VERY_EASY_PROB) band = "very_easy";
+            else if (r < VERY_EASY_PROB + EASY_PROB) band = "easy";
+            else if (r < VERY_EASY_PROB + EASY_PROB + MEDIUM_PROB) band = "medium";
+            else if (r < VERY_EASY_PROB + EASY_PROB + MEDIUM_PROB + DIFFICULT_PROB) band = "difficult";
+            else if (r < VERY_EASY_PROB + EASY_PROB + MEDIUM_PROB + DIFFICULT_PROB + HARD_PROB) band = "hard";
+            else if (r < VERY_EASY_PROB + EASY_PROB + MEDIUM_PROB + DIFFICULT_PROB + HARD_PROB + VERY_HARD_PROB) band = "very_hard";
+            else band = "impossible";
+            
+            const bandPlates = ALL_PLATES.filter(plate => {
+                if (usedPlates.has(plate)) return false;
+                const diff = PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate] ? PLATE_DIFFICULTY[plate].difficulty : null;
+                if (!diff) return false;
+                
+                if (band === "very_easy" && diff >= 0 && diff <= 10) return true;
+                if (band === "easy" && diff >= 11 && diff <= 34) return true;
+                if (band === "medium" && diff >= 35 && diff <= 49) return true;
+                if (band === "difficult" && diff >= 50 && diff <= 79) return true;
+                if (band === "hard" && diff >= 80 && diff <= 88) return true;
+                if (band === "very_hard" && diff >= 89 && diff <= 96) return true;
+                if (band === "impossible" && diff >= 97 && diff <= 100) return true;
+                return false;
+            });
+            
+            if (bandPlates.length > 0) {
+                const plate = bandPlates[Math.floor(Math.random() * bandPlates.length)];
+                sequence.push(plate);
+                usedPlates.add(plate);
+            }
+        }
+        
+        return sequence;
+    }
+    
+    // Load H2H challenges
+    async function loadH2HChallenges() {
+        if (!currentUser) {
+            document.getElementById('incomingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('outgoingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('h2hResults').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see results</p>';
+            return;
+        }
+        
+        try {
+            const challengesSnapshot = await database.ref('challenges').once('value');
+            const allChallenges = challengesSnapshot.val() || {};
+            
+            // Clean up expired challenges and check for completion
+            const now = Date.now();
+            const activeChallenges = {};
+            
+            for (const [id, challenge] of Object.entries(allChallenges)) {
+                if (challenge.expiresAt && challenge.expiresAt < now && challenge.status !== 'completed') {
+                    await database.ref(`challenges/${id}`).remove();
+                } else {
+                    // Check if challenge should be marked as completed
+                    if (challenge.status !== 'completed' && challenge.results) {
+                        const creatorResult = challenge.results[challenge.createdBy];
+                        const challengedResult = challenge.results[challenge.challengedUser];
+                        
+                        if (creatorResult && challengedResult && 
+                            (creatorResult.status === 'completed' || creatorResult.status === 'DNF') &&
+                            (challengedResult.status === 'completed' || challengedResult.status === 'DNF')) {
+                            
+                            // If both abandoned, delete the challenge
+                            if (creatorResult.status === 'DNF' && challengedResult.status === 'DNF') {
+                                await database.ref(`challenges/${id}`).remove();
+                                console.log('Both players abandoned - challenge deleted:', id);
+                                continue; // Skip adding to activeChallenges
+                            } else {
+                                // Otherwise mark as completed
+                                await database.ref(`challenges/${id}`).update({
+                                    status: 'completed',
+                                    completedAt: Date.now()
+                                });
+                                challenge.status = 'completed';
+                                challenge.completedAt = Date.now();
+                            }
+                        }
+                    }
+                    activeChallenges[id] = challenge;
+                }
+            }
+            
+            displayIncomingChallenges(activeChallenges);
+            displayOutgoingChallenges(activeChallenges);
+            displayH2HResults(activeChallenges);
+            
+        } catch (error) {
+            console.error('Error loading H2H challenges:', error);
+        }
+    }
+    
+    function displayIncomingChallenges(allChallenges) {
+        const container = document.getElementById('incomingChallenges');
+        
+        const incoming = Object.entries(allChallenges)
+            .filter(([id, c]) => {
+                if (c.challengedUser !== currentUser.uid) return false;
+                if (c.status === 'completed') return false;
+                
+                // Only show if creator has already played
+                const creatorResult = c.results && c.results[c.createdBy];
+                return creatorResult && (creatorResult.time || creatorResult.status === 'DNF');
+            });
+        
+        // Update notification badge
+        const badge = document.getElementById('h2hNotificationBadge');
+        if (incoming.length > 0) {
+            badge.textContent = incoming.length;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+        }
+        
+        if (incoming.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No incoming challenges</p>';
+            return;
+        }
+        
+        // Sort by creation date (newest first)
+        incoming.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+        
+        let html = '';
+        incoming.forEach(([id, challenge]) => {
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            
+            // Format date
+            const createdDate = challenge.createdAt ? new Date(challenge.createdAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            }) : 'Unknown';
+            
+            let statusText = '';
+            if (myResult && myResult.status === 'DNF') {
+                statusText = 'You: <span style="color:#ef4444;">Abandoned</span>';
+            } else if (myResult && myResult.time) {
+                statusText = `You: ${myResult.time.toFixed(1)}s`;
+            } else {
+                statusText = '';
+            }
+            
+            const canPlay = !myResult || (!myResult.time && myResult.status !== 'DNF' && myResult.status !== 'in_progress');
+            // Can only decline if you haven't started at all (no result exists)
+            const canDecline = !myResult;
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <div style="min-width:140px;">
+                        <div style="font-size:0.85rem;color:#6b7280;">${createdDate}</div>
+                    </div>
+                    <span style="flex:1;"><strong>${challenge.creatorName}</strong> challenged you${statusText ? ' — ' + statusText : ''}</span>
+                    ${canPlay ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>` : ''}
+                    ${canDecline ? `<button onclick="declineChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Decline</button>` : ''}
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayOutgoingChallenges(allChallenges) {
+        const container = document.getElementById('outgoingChallenges');
+        
+        const outgoing = Object.entries(allChallenges)
+            .filter(([id, c]) => c.createdBy === currentUser.uid && c.status !== 'completed');
+        
+        if (outgoing.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>';
+            return;
+        }
+        
+        // Sort by creation date (newest first)
+        outgoing.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+        
+        let html = '';
+        outgoing.forEach(([id, challenge]) => {
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.challengedUser];
+            
+            // Format date
+            const createdDate = challenge.createdAt ? new Date(challenge.createdAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            }) : 'Unknown';
+            
+            // Check if open challenge
+            const isOpen = challenge.isOpen && challenge.challengedUser === null;
+            const opponentDisplay = isOpen ? '<strong>Open Challenge</strong> <span style="color:#10b981;font-size:0.85rem;">(unclaimed)</span>' : `<strong>${challenge.opponentName}</strong>`;
+            
+            let statusText = '';
+            if (myResult && myResult.status === 'DNF') {
+                statusText = 'You: <span style="color:#ef4444;">Abandoned</span>';
+            } else if (myResult && myResult.time) {
+                statusText = `You: ${myResult.time.toFixed(1)}s`;
+            } else {
+                statusText = '';
+            }
+            
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
+            const canPlay = !myResult || (!myResult.time && myResult.status !== 'DNF' && myResult.status !== 'in_progress');
+            const canCancel = canPlay; // Can cancel if you haven't played yet
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;flex-shrink:0;">Copy Link</button>
+                    <div style="min-width:140px;">
+                        <div style="font-size:0.85rem;color:#6b7280;">${createdDate}</div>
+                    </div>
+                    <span style="flex:1;">You vs. ${opponentDisplay}${statusText ? ' — ' + statusText : ''}</span>
+                    ${canPlay ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>` : ''}
+                    ${canCancel ? `<button onclick="cancelChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Cancel</button>` : ''}
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayH2HResults(allChallenges) {
+        const container = document.getElementById('h2hResults');
+        
+        const completed = Object.entries(allChallenges)
+            .filter(([id, c]) => {
+                if (c.status !== 'completed') return false;
+                
+                // Filter out challenges where both players abandoned (already deleted by loadH2HChallenges)
+                const creatorResult = c.results && c.results[c.createdBy];
+                const challengedResult = c.results && c.results[c.challengedUser];
+                
+                if (creatorResult && challengedResult && 
+                    creatorResult.status === 'DNF' && 
+                    challengedResult.status === 'DNF') {
+                    return false; // Don't display (should already be deleted)
+                }
+                
+                return true;
+            });
+        
+        if (completed.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges</p>';
+            return;
+        }
+        
+        completed.sort((a, b) => (b[1].completedAt || 0) - (a[1].completedAt || 0));
+        
+        let html = `
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Completed</th>
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Opponent</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Your Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Their Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Result</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        completed.forEach(([id, challenge]) => {
+            const isCreator = challenge.createdBy === currentUser.uid;
+            const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
+            const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
+            
+            // Format completion date
+            const completedDate = challenge.completedAt ? new Date(challenge.completedAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            }) : 'Unknown';
+            
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[opponentId];
+            
+            let myTimeText = '—';
+            let theirTimeText = '—';
+            let resultText = '';
+            let resultColor = '';
+            
+            if (myResult) {
+                myTimeText = myResult.status === 'DNF' ? '<span style="color:#ef4444;">Abandoned</span>' : (myResult.time ? myResult.time.toFixed(1) + 's' : '—');
+            }
+            
+            if (theirResult) {
+                theirTimeText = theirResult.status === 'DNF' ? '<span style="color:#ef4444;">Abandoned</span>' : (theirResult.time ? theirResult.time.toFixed(1) + 's' : '—');
+            }
+            
+            if (myResult && theirResult) {
+                const myDNF = myResult.status === 'DNF';
+                const theirDNF = theirResult.status === 'DNF';
+                
+                if (myDNF && theirDNF) {
+                    resultText = 'Both Abandoned';
+                    resultColor = '#6b7280';
+                } else if (myDNF) {
+                    resultText = '❌ Loss';
+                    resultColor = '#ef4444';
+                } else if (theirDNF) {
+                    resultText = '🏆 Win';
+                    resultColor = '#10b981';
+                } else if (myResult.time && theirResult.time) {
+                    const diff = myResult.time - theirResult.time;
+                    if (diff < -0.05) {
+                        resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
+                        resultColor = '#10b981';
+                    } else if (diff > 0.05) {
+                        resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
+                        resultColor = '#ef4444';
+                    } else {
+                        resultText = '🤝 Tie';
+                        resultColor = '#6b7280';
+                    }
+                }
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 8px;font-size:0.85rem;color:#6b7280;">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;">${opponentName}</td>
+                    <td style="padding:12px 8px;text-align:center;">${myTimeText}</td>
+                    <td style="padding:12px 8px;text-align:center;">${theirTimeText}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
+                    <td style="padding:12px 8px;text-align:center;">
+                        <button onclick="viewH2HComparison('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">View</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+    
+    window.copyToClipboard = function(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Challenge link copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link');
+        });
+    };
+    
+    window.declineChallenge = async function(challengeId) {
+        console.log('declineChallenge called for:', challengeId);
+        console.log('currentChallengeId:', currentChallengeId);
+        console.log('gameStarted:', gameStarted);
+        console.log('gameOver:', gameOver);
+        
+        // Check if challenge is active (you're currently playing it)
+        if (currentChallengeId === challengeId && gameStarted && !gameOver) {
+            alert('Cannot decline a challenge while playing it!');
+            return;
+        }
+        
+        // Check if you've already started this challenge
+        try {
+            const snapshot = await database.ref(`challenges/${challengeId}/results/${currentUser.uid}`).once('value');
+            const myResult = snapshot.val();
+            console.log('My result from Firebase:', myResult);
+            if (myResult) {
+                alert('Cannot decline a challenge you have already started!');
+                return;
+            }
+        } catch (error) {
+            console.error('Error checking challenge status:', error);
+        }
+        
+        if (!confirm('Are you sure you want to decline this challenge?')) return;
+        
+        try {
+            await database.ref(`challenges/${challengeId}`).remove();
+            loadH2HChallenges();
+        } catch (error) {
+            console.error('Error declining challenge:', error);
+            alert('Failed to decline challenge');
+        }
+    };
+    
+    window.cancelChallenge = async function(challengeId) {
+        // Check if challenge is active (you're currently playing it)
+        if (currentChallengeId === challengeId && gameStarted && !gameOver) {
+            alert('Cannot cancel a challenge while playing it!');
+            return;
+        }
+        
+        // Check if you've already started this challenge
+        try {
+            const snapshot = await database.ref(`challenges/${challengeId}/results/${currentUser.uid}`).once('value');
+            const myResult = snapshot.val();
+            if (myResult) {
+                alert('Cannot cancel a challenge you have already started!');
+                return;
+            }
+        } catch (error) {
+            console.error('Error checking challenge status:', error);
+        }
+        
+        if (!confirm('Are you sure you want to cancel this challenge?')) return;
+        
+        try {
+            await database.ref(`challenges/${challengeId}`).remove();
+            loadH2HChallenges();
+        } catch (error) {
+            console.error('Error canceling challenge:', error);
+            alert('Failed to cancel challenge');
+        }
+    };
+    
+    window.playChallenge = async function(challengeId) {
+        if (!currentUser) {
+            alert('Please sign in to play challenges');
+            return;
+        }
+        
+        currentChallengeId = challengeId;
+        
+        const challengeSnapshot = await database.ref(`challenges/${challengeId}`).once('value');
+        const challenge = challengeSnapshot.val();
+        
+        if (!challenge) {
+            alert('Challenge not found');
+            return;
+        }
+        
+        // Check if this is an open challenge (handle both null and undefined)
+        const isOpenChallenge = challenge.isOpen === true && (challenge.challengedUser === null || challenge.challengedUser === undefined);
+        
+        // Validate that current user can play this challenge
+        const isCreator = challenge.createdBy === currentUser.uid;
+        const isChallenged = challenge.challengedUser === currentUser.uid;
+        
+        console.log('Challenge check:', {
+            isOpen: challenge.isOpen,
+            challengedUser: challenge.challengedUser,
+            isOpenChallenge,
+            isCreator,
+            isChallenged,
+            currentUserUid: currentUser.uid
+        });
+        
+        if (!isCreator && !isChallenged && !isOpenChallenge) {
+            alert('This challenge is not for you. You can only play challenges that you created or that were sent to you.');
+            return;
+        }
+        
+        // If open challenge, claim it for this user
+        if (isOpenChallenge && !isCreator) {
+            try {
+                await database.ref(`challenges/${challengeId}`).update({
+                    challengedUser: currentUser.uid,
+                    opponentName: currentUser.displayName || currentUser.email,
+                    isOpen: false,
+                    claimedAt: Date.now()
+                });
+                console.log('Open challenge claimed by:', currentUser.displayName || currentUser.email);
+            } catch (error) {
+                console.error('Error claiming challenge:', error);
+                alert('Error claiming challenge');
+                return;
+            }
+        }
+        
+        const userResult = challenge.results && challenge.results[currentUser.uid];
+        if (userResult && (userResult.status === 'DNF' || userResult.time)) {
+            alert('You have already completed this challenge');
+            return;
+        }
+        
+        if (userResult && userResult.status === 'in_progress') {
+            alert('You already started this challenge and it was marked as Abandoned');
+            return;
+        }
+        
+        // Set up challenge mode (but don't start yet - wait for Start button)
+        gameMode = 'h2h_challenge';
+        dailyPlateSequence = challenge.plateSequence;
+        console.log('H2H Challenge loaded! Sequence length:', dailyPlateSequence?.length);
+        console.log('First 5 plates:', dailyPlateSequence?.slice(0, 5));
+        
+        // Update mode indicator for H2H
+        const opponentName = isCreator ? (challenge.opponentName || 'Open Challenge') : challenge.creatorName;
+        
+        // Update button styles - both grey
+        document.getElementById('practiceBtn').style.background = '#e5e7eb';
+        document.getElementById('practiceBtn').style.border = '2px solid #9ca3af';
+        document.getElementById('dailyChallengeBtn').style.background = '#e5e7eb';
+        document.getElementById('dailyChallengeBtn').style.border = '2px solid #9ca3af';
+        
+        // Disable mode buttons during H2H challenge
+        document.getElementById('practiceBtn').disabled = true;
+        document.getElementById('dailyChallengeBtn').disabled = true;
+        
+        // Update banner
+        const mi = document.getElementById('modeIndicator');
+        mi.textContent = `⚔️ H2H Challenge vs ${opponentName} - One attempt only!`;
+        mi.style.background = '#fef3c7';
+        mi.style.color = '#92400e';
+        mi.style.border = '2px solid #fbbf24';
+        
+        // Scroll to top to show the game area
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Show Start Game button
+        const startBtn = document.getElementById('startButton');
+        startBtn.textContent = 'Start Challenge';
+        startBtn.style.display = 'inline-block';
+    };
+    
+    async function markChallengeDNF() {
+        if (!currentChallengeId) return;
+        
+        try {
+            await database.ref(`challenges/${currentChallengeId}/results/${currentUser.uid}`).update({
+                status: 'DNF',
+                completedAt: Date.now()
+            });
+            
+            // Check if both players are done and mark challenge as completed
+            const challengeSnapshot = await database.ref(`challenges/${currentChallengeId}`).once('value');
+            const challenge = challengeSnapshot.val();
+            
+            if (challenge && challenge.results) {
+                const creatorResult = challenge.results[challenge.createdBy];
+                const challengedResult = challenge.results[challenge.challengedUser];
+                
+                // Check if both players have completed or abandoned
+                if (creatorResult && challengedResult && 
+                    (creatorResult.status === 'completed' || creatorResult.status === 'DNF') &&
+                    (challengedResult.status === 'completed' || challengedResult.status === 'DNF')) {
+                    
+                    // If both abandoned, delete the challenge
+                    if (creatorResult.status === 'DNF' && challengedResult.status === 'DNF') {
+                        await database.ref(`challenges/${currentChallengeId}`).remove();
+                        console.log('Both players abandoned - challenge deleted');
+                    } else {
+                        // Otherwise just mark as completed
+                        await database.ref(`challenges/${currentChallengeId}`).update({
+                            status: 'completed',
+                            completedAt: Date.now()
+                        });
+                    }
+                }
+            }
+            
+            alert('Challenge timed out - marked as Abandoned');
+            currentChallengeId = null;
+            challengeStartTime = null;
+            gameMode = 'practice';
+            resetGame();
+            
+            // Reload H2H challenges
+            setTimeout(() => {
+                loadH2HChallenges();
+            }, 500);
+        } catch (error) {
+            console.error('Error marking DNF:', error);
+        }
+    }
+    
+    async function saveChallengeResult(time, solved, skipped) {
+        if (!currentUser || !currentChallengeId || gameMode !== 'h2h_challenge') return;
+        
+        const historyData = gameHistory.map(entry => ({
+            plate: entry.plate,
+            word: entry.word,
+            skipped: entry.skipped || false,
+            thinkingSeconds: Math.floor(entry.thinkingSeconds * 10) / 10,
+            penaltySeconds: entry.penaltySeconds || 0
+        }));
+        
+        await database.ref(`challenges/${currentChallengeId}/results/${currentUser.uid}`).set({
+            time: Math.floor(time * 10) / 10,
+            solved: solved,
+            skipped: skipped,
+            completedAt: Date.now(),
+            history: historyData,
+            status: 'completed'
+        });
+        
+        const challengeSnapshot = await database.ref(`challenges/${currentChallengeId}`).once('value');
+        const challenge = challengeSnapshot.val();
+        
+        if (challenge && challenge.results) {
+            const creatorResult = challenge.results[challenge.createdBy];
+            const challengedResult = challenge.results[challenge.challengedUser];
+            
+            if (creatorResult && challengedResult && 
+                (creatorResult.status === 'completed' || creatorResult.status === 'DNF') &&
+                (challengedResult.status === 'completed' || challengedResult.status === 'DNF')) {
+                await database.ref(`challenges/${currentChallengeId}`).update({
+                    status: 'completed',
+                    completedAt: Date.now()
+                });
+            }
+        }
+        
+        currentChallengeId = null;
+        challengeStartTime = null;
+        gameMode = 'practice';
+        
+        // Reload H2H challenges to update the display
+        setTimeout(() => {
+            loadH2HChallenges();
+        }, 500);
+    }
+    
+    async function checkAbandonedChallenges(userId) {
+        try {
+            const challengesSnapshot = await database.ref('challenges').once('value');
+            const allChallenges = challengesSnapshot.val() || {};
+            
+            for (const [challengeId, challenge] of Object.entries(allChallenges)) {
+                const userResult = challenge.results && challenge.results[userId];
+                
+                if (userResult && userResult.status === 'in_progress' && !userResult.time) {
+                    await database.ref(`challenges/${challengeId}/results/${userId}`).update({
+                        status: 'DNF',
+                        completedAt: Date.now()
+                    });
+                    
+                    // Re-fetch challenge to get updated results
+                    const updatedSnapshot = await database.ref(`challenges/${challengeId}`).once('value');
+                    const updatedChallenge = updatedSnapshot.val();
+                    
+                    if (updatedChallenge && updatedChallenge.results) {
+                        const creatorResult = updatedChallenge.results[updatedChallenge.createdBy];
+                        const challengedResult = updatedChallenge.results[updatedChallenge.challengedUser];
+                        
+                        if (creatorResult && challengedResult && 
+                            (creatorResult.status === 'completed' || creatorResult.status === 'DNF') &&
+                            (challengedResult.status === 'completed' || challengedResult.status === 'DNF')) {
+                            await database.ref(`challenges/${challengeId}`).update({
+                                status: 'completed',
+                                completedAt: Date.now()
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error checking abandoned challenges:', error);
+        }
+    }
+    // ========== END HEAD-TO-HEAD FEATURE ==========
 
     loadDictionary();
     loadDifficulty();
@@ -2677,6 +3570,469 @@
 <script>
 // Auto-load today's leaderboard when page is fully loaded
 window.addEventListener('load', function() {
+    // Tab switching - must be after DOM is loaded
+    document.getElementById('dailyLeaderboardTab').addEventListener('click', function() {
+        console.log('Daily tab clicked');
+        document.getElementById('dailyLeaderboardContent').style.display = 'block';
+        document.getElementById('h2hContent').style.display = 'none';
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('h2hTab').style.borderBottom = 'none';
+        document.getElementById('h2hTab').style.color = '#9ca3af';
+        document.getElementById('h2hTab').style.fontWeight = '400';
+    });
+    
+    document.getElementById('h2hTab').addEventListener('click', function() {
+        console.log('H2H tab clicked');
+        document.getElementById('dailyLeaderboardContent').style.display = 'none';
+        document.getElementById('h2hContent').style.display = 'block';
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('dailyLeaderboardTab').style.borderBottom = 'none';
+        document.getElementById('dailyLeaderboardTab').style.color = '#9ca3af';
+        document.getElementById('dailyLeaderboardTab').style.fontWeight = '400';
+        
+        // Load H2H challenges when tab is clicked
+        loadH2HChallenges();
+    });
+    
+    // Create Challenge button
+    document.getElementById('createChallengeBtn').addEventListener('click', async function() {
+        if (!currentUser) {
+            alert('Please sign in to create challenges');
+            return;
+        }
+        
+        try {
+            const usersSnapshot = await database.ref('users').once('value');
+            const users = usersSnapshot.val();
+            
+            if (!users) {
+                alert('No other users found');
+                return;
+            }
+            
+            const userList = Object.entries(users)
+                .filter(([uid, data]) => uid !== currentUser.uid)
+                .map(([uid, data]) => ({ uid, name: data.displayName || data.email || 'Unknown' }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+            
+            if (userList.length === 0) {
+                alert('No other users found');
+                return;
+            }
+            
+            // Show opponent selection modal
+            showOpponentModal(userList);
+            
+        } catch (error) {
+            console.error('Error loading users:', error);
+            alert('Error loading users: ' + error.message);
+        }
+    });
+    
+    // Create Open Challenge button
+    document.getElementById('createOpenChallengeBtn').addEventListener('click', async function() {
+        if (!currentUser) {
+            alert('Please sign in to create challenges');
+            return;
+        }
+        
+        // Ask for optional label
+        const label = prompt('Who are you challenging? This is just for your reference.');
+        
+        // If user clicks Cancel on prompt, stop
+        if (label === null) {
+            return;
+        }
+        
+        try {
+            const challengeId = database.ref('challenges').push().key;
+            const plateSequence = generateChallengeSequence();
+            
+            if (plateSequence.length < 100) {
+                alert('Error generating plates');
+                return;
+            }
+            
+            const opponentName = label && label.trim() ? label.trim() : 'Open Challenge';
+            
+            await database.ref(`challenges/${challengeId}`).set({
+                createdBy: currentUser.uid,
+                creatorName: currentUser.displayName || currentUser.email,
+                challengedUser: null, // Open challenge - no specific user
+                opponentName: opponentName,
+                isOpen: true,
+                plateSequence: plateSequence,
+                createdAt: Date.now(),
+                expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000),
+                status: 'pending',
+                results: {}
+            });
+            
+            // Copy link to clipboard
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${challengeId}`;
+            try {
+                await navigator.clipboard.writeText(challengeUrl);
+                alert(`Open challenge created${label && label.trim() ? ` for "${label.trim()}"` : ''}! Link copied to clipboard.`);
+            } catch (err) {
+                alert(`Open challenge created! Share this link:\n${challengeUrl}`);
+            }
+            
+            loadH2HChallenges();
+            
+        } catch (error) {
+            console.error('Error creating open challenge:', error);
+            alert('Error creating open challenge: ' + error.message);
+        }
+    });
+    
+    // Show opponent selection modal
+    function showOpponentModal(userList) {
+        const modal = document.getElementById('opponentModalBackdrop');
+        const listContainer = document.getElementById('opponentList');
+        const searchInput = document.getElementById('opponentSearchInput');
+        
+        // Render user list
+        function renderUserList(filter = '') {
+            const filtered = filter 
+                ? userList.filter(u => u.name.toLowerCase().startsWith(filter.toLowerCase()))
+                : userList;
+            
+            if (filtered.length === 0) {
+                listContainer.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;">No users found</p>';
+                return;
+            }
+            
+            listContainer.innerHTML = filtered.map(user => `
+                <div 
+                    class="opponent-item" 
+                    data-uid="${user.uid}"
+                    style="padding:12px 16px;cursor:pointer;border-bottom:1px solid #f3f4f6;transition:background 0.2s;"
+                    onmouseover="this.style.background='#f9fafb'"
+                    onmouseout="this.style.background='white'"
+                >
+                    <div style="font-weight:500;color:#1f2937;">${user.name}</div>
+                </div>
+            `).join('');
+            
+            // Add click handlers
+            document.querySelectorAll('.opponent-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const uid = this.dataset.uid;
+                    const user = userList.find(u => u.uid === uid);
+                    modal.classList.remove('show');
+                    searchInput.value = '';
+                    prepareChallenge(user);
+                });
+            });
+        }
+        
+        // Search functionality
+        searchInput.value = '';
+        searchInput.oninput = (e) => renderUserList(e.target.value);
+        
+        renderUserList();
+        modal.classList.add('show');
+        searchInput.focus();
+    }
+    
+    // Modal close handlers
+    document.getElementById('opponentModalCloseBtn').addEventListener('click', () => {
+        document.getElementById('opponentModalBackdrop').classList.remove('show');
+        document.getElementById('opponentSearchInput').value = '';
+    });
+    
+    document.getElementById('opponentModalBackdrop').addEventListener('click', (e) => {
+        if (e.target.id === 'opponentModalBackdrop') {
+            document.getElementById('opponentModalBackdrop').classList.remove('show');
+            document.getElementById('opponentSearchInput').value = '';
+        }
+    });
+    
+    // H2H Comparison Modal
+    document.getElementById('h2hComparisonCloseBtn').addEventListener('click', () => {
+        document.getElementById('h2hComparisonModalBackdrop').classList.remove('show');
+    });
+    
+    document.getElementById('h2hComparisonModalBackdrop').addEventListener('click', (e) => {
+        if (e.target.id === 'h2hComparisonModalBackdrop') {
+            document.getElementById('h2hComparisonModalBackdrop').classList.remove('show');
+        }
+    });
+    
+    // View H2H Comparison
+    window.viewH2HComparison = async function(challengeId) {
+        try {
+            console.log('viewH2HComparison called with challengeId:', challengeId);
+            console.log('currentUser:', currentUser);
+            
+            if (!currentUser) {
+                alert('Please sign in to view challenges');
+                return;
+            }
+            
+            const snapshot = await database.ref(`challenges/${challengeId}`).once('value');
+            const challenge = snapshot.val();
+            
+            console.log('Challenge data:', challenge);
+            
+            if (!challenge) {
+                alert('Challenge not found');
+                return;
+            }
+            
+            const isCreator = challenge.createdBy === currentUser.uid;
+            const myName = currentUser.displayName || currentUser.email;
+            const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
+            const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
+            
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[opponentId];
+            
+            console.log('My result:', myResult);
+            console.log('Their result:', theirResult);
+            
+            // Update title
+            document.getElementById('h2hComparisonTitle').textContent = `${myName} vs ${opponentName}`;
+            
+            // Build unified comparison table
+            const content = document.getElementById('h2hComparisonContent');
+            
+            if (!myResult || !theirResult) {
+                content.innerHTML = '<p style="text-align:center;color:#6b7280;">Incomplete challenge data</p>';
+                document.getElementById('h2hComparisonModalBackdrop').classList.add('show');
+                return;
+            }
+            
+            // Get histories (should be same length for H2H)
+            const myHistory = myResult.history || [];
+            const theirHistory = theirResult.history || [];
+            const maxLength = Math.max(myHistory.length, theirHistory.length);
+            
+            console.log('My history length:', myHistory.length);
+            console.log('Their history length:', theirHistory.length);
+            console.log('My stored time:', myResult.time);
+            console.log('Their stored time:', theirResult.time);
+            
+            let tableRows = '';
+            let myTotalTime = 0;
+            let theirTotalTime = 0;
+            
+            for (let i = 0; i < maxLength; i++) {
+                const myEntry = myHistory[i];
+                const theirEntry = theirHistory[i];
+                
+                const plate = myEntry?.plate || theirEntry?.plate || '—';
+                
+                // Helper function for time-based gradient color
+                function getTimeCellColor(seconds) {
+                    if (seconds <= 0) return '#f3f4f6'; // Gray for no entry
+                    if (seconds <= 1.5) return '#22c55e'; // Green (under 1.5s)
+                    if (seconds >= 30) return '#ef4444'; // Dark red (30s+)
+                    
+                    if (seconds <= 6) {
+                        // Green to white (1.5s → 6s)
+                        const ratio = (seconds - 1.5) / 4.5;
+                        const r = Math.round(34 + (255 - 34) * ratio);
+                        const g = Math.round(197 + (255 - 197) * ratio);
+                        const b = Math.round(94 + (255 - 94) * ratio);
+                        return `rgb(${r},${g},${b})`;
+                    } else {
+                        // White to red (6s → 30s)
+                        const ratio = (seconds - 6) / 24;
+                        const r = 255;
+                        const g = Math.round(255 - (255 - 68) * ratio);
+                        const b = Math.round(255 - (255 - 68) * ratio);
+                        return `rgb(${r},${g},${b})`;
+                    }
+                }
+                
+                // My cell content
+                let myCell = '';
+                let myTime = 0;
+                let myCellBg = '#f3f4f6';
+                if (myEntry) {
+                    // Always add thinking time + penalty time
+                    const thinkingTime = myEntry.thinkingSeconds || 0;
+                    const penaltyTime = myEntry.penaltySeconds || 0;
+                    myTime = thinkingTime + penaltyTime;
+                    
+                    if (myEntry.skipped) {
+                        // Skipped plates: show X with total time
+                        myCell = `
+                            <div style="font-size:1.1rem;font-weight:600;color:#fff;margin-bottom:4px;">✗</div>
+                            <div style="font-size:0.9rem;color:#fff;">${myTime.toFixed(1)}s</div>
+                        `;
+                        myCellBg = '#000000';
+                    } else {
+                        // Valid words: show word with total time
+                        myCellBg = getTimeCellColor(thinkingTime);
+                        myCell = `
+                            <div style="font-size:0.95rem;font-weight:600;color:#000;margin-bottom:4px;">${myEntry.word || '—'}</div>
+                            <div style="font-size:0.8rem;color:#000;">${myTime.toFixed(1)}s</div>
+                        `;
+                    }
+                    myTotalTime += myTime;
+                } else {
+                    myCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
+                }
+                
+                // Their cell content
+                let theirCell = '';
+                let theirTime = 0;
+                let theirCellBg = '#f3f4f6';
+                if (theirEntry) {
+                    // Always add thinking time + penalty time
+                    const thinkingTime = theirEntry.thinkingSeconds || 0;
+                    const penaltyTime = theirEntry.penaltySeconds || 0;
+                    theirTime = thinkingTime + penaltyTime;
+                    
+                    if (theirEntry.skipped) {
+                        // Skipped plates: show X with total time
+                        theirCell = `
+                            <div style="font-size:1.1rem;font-weight:600;color:#fff;margin-bottom:4px;">✗</div>
+                            <div style="font-size:0.9rem;color:#fff;">${theirTime.toFixed(1)}s</div>
+                        `;
+                        theirCellBg = '#000000';
+                    } else {
+                        // Valid words: show word with total time
+                        theirCellBg = getTimeCellColor(thinkingTime);
+                        theirCell = `
+                            <div style="font-size:0.95rem;font-weight:600;color:#000;margin-bottom:4px;">${theirEntry.word || '—'}</div>
+                            <div style="font-size:0.8rem;color:#000;">${theirTime.toFixed(1)}s</div>
+                        `;
+                    }
+                    theirTotalTime += theirTime;
+                } else {
+                    theirCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
+                }
+                
+                // Differential cell - always white background, colored text
+                const diff = myTime - theirTime;
+                let diffCell = '';
+                if (myEntry && theirEntry && myTime > 0 && theirTime > 0) {
+                    if (Math.abs(diff) < 0.05) {
+                        diffCell = '<div style="font-size:0.95rem;font-weight:600;color:#6b7280;">0.0s</div>';
+                    } else if (diff < 0) {
+                        // Faster = green text
+                        diffCell = `<div style="font-size:0.95rem;font-weight:700;color:#16a34a;">${diff.toFixed(1)}s</div>`;
+                    } else {
+                        // Slower = red text
+                        diffCell = `<div style="font-size:0.95rem;font-weight:700;color:#dc2626;">+${diff.toFixed(1)}s</div>`;
+                    }
+                } else {
+                    diffCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
+                }
+                
+                tableRows += `
+                    <tr>
+                        <td style="padding:12px 8px;font-weight:700;font-size:0.9rem;background:#f9fafb;border-right:2px solid #e5e7eb;text-align:center;">${plate}</td>
+                        <td style="padding:10px 8px;background:${myCellBg};border-right:2px solid #e5e7eb;text-align:center;">${myCell}</td>
+                        <td style="padding:10px 8px;background:${theirCellBg};border-right:2px solid #e5e7eb;text-align:center;">${theirCell}</td>
+                        <td style="padding:10px 8px;background:#ffffff;text-align:center;">${diffCell}</td>
+                    </tr>
+                `;
+            }
+            
+            console.log('Calculated myTotalTime:', myTotalTime);
+            console.log('Calculated theirTotalTime:', theirTotalTime);
+            
+            // Determine win/loss/tie
+            const finalDiff = myTotalTime - theirTotalTime;
+            let resultText = '';
+            let headerBg = '#e5e7eb';
+            let finalDiffText = '';
+            let finalDiffColor = '#6b7280';
+            
+            if (myResult.status === 'DNF' && theirResult.status === 'DNF') {
+                resultText = 'Both Abandoned';
+                headerBg = '#e5e7eb';
+            } else if (myResult.status === 'DNF') {
+                resultText = 'Loss';
+                headerBg = '#fca5a5';
+                finalDiffText = 'Abandoned';
+            } else if (theirResult.status === 'DNF') {
+                resultText = 'Win';
+                headerBg = '#86efac';
+                finalDiffText = 'Opponent Abandoned';
+            } else if (Math.abs(finalDiff) < 0.05) {
+                resultText = 'Tie';
+                finalDiffText = '0.0s';
+            } else if (finalDiff < 0) {
+                resultText = 'Win';
+                headerBg = '#86efac';
+                finalDiffText = `${finalDiff.toFixed(1)}s`;
+                finalDiffColor = '#16a34a';
+            } else {
+                resultText = 'Loss';
+                headerBg = '#fca5a5';
+                finalDiffText = `+${finalDiff.toFixed(1)}s`;
+                finalDiffColor = '#dc2626';
+            }
+            
+            // Format completed date
+            const completedDate = challenge.completedAt ? new Date(challenge.completedAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            }) : 'Unknown';
+            
+            const myStatus = myResult.status === 'DNF' ? 'Abandoned' : `${myTotalTime.toFixed(1)}s`;
+            const theirStatus = theirResult.status === 'DNF' ? 'Abandoned' : `${theirTotalTime.toFixed(1)}s`;
+            
+            // Update modal title with stats
+            document.getElementById('h2hComparisonTitle').innerHTML = `
+                <div style="font-size:1.1rem;font-weight:700;">${resultText} vs ${opponentName}</div>
+                <div style="font-size:0.85rem;font-weight:400;margin-top:4px;">${completedDate} • ${myStatus} vs ${theirStatus} • Margin: ${finalDiffText}</div>
+            `;
+            document.querySelector('#h2hComparisonModalBackdrop .modal-header').style.background = headerBg;
+            
+            content.innerHTML = `
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;background:white;border:2px solid #e5e7eb;">
+                        <thead>
+                            <tr style="background:#e5e7eb;">
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:12%;">Plate</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:32%;">${myName}</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:32%;">${opponentName}</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;width:24%;">Diff</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                            <tr style="border-top:3px solid #9370db;">
+                                <td style="padding:12px 8px;font-weight:700;font-size:0.9rem;background:#f3f4f6;border-right:2px solid #e5e7eb;text-align:center;">TOTAL</td>
+                                <td style="padding:10px 8px;background:#e5e7eb;border-right:2px solid #e5e7eb;text-align:center;font-weight:600;font-size:0.95rem;">${myStatus}</td>
+                                <td style="padding:10px 8px;background:#e5e7eb;border-right:2px solid #e5e7eb;text-align:center;font-weight:600;font-size:0.95rem;">${theirStatus}</td>
+                                <td style="padding:10px 8px;background:#ffffff;text-align:center;">
+                                    <div style="font-size:1rem;font-weight:700;color:${finalDiffColor};">${finalDiffText}</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            
+            // Show modal
+            document.getElementById('h2hComparisonModalBackdrop').classList.add('show');
+            
+        } catch (error) {
+            console.error('Error loading challenge comparison:', error);
+            alert('Error loading challenge data');
+        }
+    };
+    
+    // Check for challenge URL parameter
+    
+    // Check for abandoned challenges when user logs in
+    if (currentUser) {
+        checkAbandonedChallenges(currentUser.uid);
+    }
+    
     setTimeout(function() {
         try {
             const today = getTodayString();
@@ -2714,33 +4070,118 @@ window.addEventListener('load', function() {
 </div>
 
 <div style="margin-top:40px;padding:20px;background:#f9fafb;border-radius:8px;">
-    <h2 style="margin-top:0;" id="leaderboardTitle">🏆 Daily Leaderboard</h2>
-    <div style="margin-bottom:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <label for="leaderboardDatePicker" style="font-weight:600;">Date:</label>
-        <input type="date" id="leaderboardDatePicker" style="padding:8px;border:1px solid #d1d5db;border-radius:4px;" onchange="displayLeaderboard(this.value)">
-        <button id="prevDayBtn" onclick="changeDateBy(-1)" style="padding:8px 16px;cursor:pointer;margin-left:8px;">← Prev</button>
-        <button id="nextDayBtn" onclick="changeDateBy(1)" style="padding:8px 16px;cursor:pointer;">Next →</button>
-        <button id="todayLeaderboardBtn" onclick="loadTodayScores()" style="padding:8px 16px;cursor:pointer;margin-left:8px;">Today</button>
-    </div>
-    <div id="leaderboardDate" style="text-align:center;margin-bottom:16px;font-size:1.1rem;color:#6b7280;font-weight:600;"></div>
-    <div id="leaderboardContent" style="background:white;padding:20px;border-radius:8px;min-height:200px;max-height:520px;overflow-y:auto;">
-        <p style="text-align:center;color:#6b7280;">Click a button above to view scores</p>
+    <!-- Tab Headers -->
+    <div style="display:flex;gap:10px;border-bottom:2px solid #e5e7eb;margin-bottom:20px;">
+        <h2 id="dailyLeaderboardTab" style="margin:0;padding:10px 20px;cursor:pointer;border-bottom:3px solid #9370db;color:#9370db;font-weight:600;">🏆 Daily Leaderboard</h2>
+        <h2 id="h2hTab" style="margin:0;padding:10px 20px;cursor:pointer;color:#9ca3af;font-weight:400;border-bottom:none;position:relative;">
+            ⚔️ Head-to-Head
+            <span id="h2hNotificationBadge" style="display:none;position:absolute;top:8px;right:8px;background:#ef4444;color:white;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;text-align:center;font-weight:600;"></span>
+        </h2>
     </div>
     
-    <!-- Compare Runs Button -->
-    <div id="compareRunsContainer" style="margin-top:20px;text-align:center;display:block;">
-        <button id="compareRunsBtn" onclick="toggleCompareTable()" style="padding:12px 24px;font-size:1rem;background:#9370db;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
-            Compare All Runs
-        </button>
+    <!-- Daily Leaderboard Content (keep ALL original elements) -->
+    <div id="dailyLeaderboardContent">
+        <h2 style="margin-top:0;display:none;" id="leaderboardTitle">🏆 Daily Leaderboard</h2>
+        <div style="margin-bottom:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <label for="leaderboardDatePicker" style="font-weight:600;">Date:</label>
+            <input type="date" id="leaderboardDatePicker" style="padding:8px;border:1px solid #d1d5db;border-radius:4px;" onchange="displayLeaderboard(this.value)">
+            <button id="prevDayBtn" onclick="changeDateBy(-1)" style="padding:8px 16px;cursor:pointer;margin-left:8px;">← Prev</button>
+            <button id="nextDayBtn" onclick="changeDateBy(1)" style="padding:8px 16px;cursor:pointer;">Next →</button>
+            <button id="todayLeaderboardBtn" onclick="loadTodayScores()" style="padding:8px 16px;cursor:pointer;margin-left:8px;">Today</button>
+        </div>
+        <div id="leaderboardDate" style="text-align:center;margin-bottom:16px;font-size:1.1rem;color:#6b7280;font-weight:600;"></div>
+        <div id="leaderboardContent" style="background:white;padding:20px;border-radius:8px;min-height:200px;max-height:520px;overflow-y:auto;">
+            <p style="text-align:center;color:#6b7280;">Click a button above to view scores</p>
+        </div>
+        
+        <!-- Compare Runs Button -->
+        <div id="compareRunsContainer" style="margin-top:20px;text-align:center;display:block;">
+            <button id="compareRunsBtn" onclick="toggleCompareTable()" style="padding:12px 24px;font-size:1rem;background:#9370db;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+                Compare All Runs
+            </button>
+        </div>
+        
+        <!-- Comparison Table -->
+        <div id="comparisonTableContainer" style="margin-top:20px;background:white;padding:20px;border-radius:8px;display:none;width:950px;">
+            <h3 style="margin-top:0;">Run Comparison</h3>
+            <div id="comparisonTable"></div>
+        </div>
     </div>
     
-    <!-- Comparison Table -->
-    <div id="comparisonTableContainer" style="margin-top:20px;background:white;padding:20px;border-radius:8px;display:none;width:950px;">
-        <h3 style="margin-top:0;">Run Comparison</h3>
-        <div id="comparisonTable"></div>
+    <!-- H2H Content (hidden by default) -->
+    <div id="h2hContent" style="display:none;">
+        <!-- Create Challenge Buttons -->
+        <div style="margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap;">
+            <button id="createChallengeBtn" style="padding:12px 24px;font-size:1rem;background:#9370db;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+                ⚔️ Challenge a Player
+            </button>
+            <button id="createOpenChallengeBtn" style="padding:12px 24px;font-size:1rem;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+                🌐 Create Open Challenge
+            </button>
+        </div>
+        
+        <!-- Incoming Challenges -->
+        <div style="margin-bottom:30px;">
+            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">📥 Incoming Challenges</h3>
+            <div id="incomingChallenges" style="background:white;border-radius:8px;padding:16px;min-height:100px;">
+                <p style="color:#9ca3af;text-align:center;">No incoming challenges</p>
+            </div>
+        </div>
+        
+        <!-- Outgoing Challenges -->
+        <div style="margin-bottom:30px;">
+            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">📤 Outgoing Challenges</h3>
+            <div id="outgoingChallenges" style="background:white;border-radius:8px;padding:16px;min-height:100px;">
+                <p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>
+            </div>
+        </div>
+        
+        <!-- Completed Challenges / Results -->
+        <div style="margin-bottom:30px;">
+            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">🏆 Challenge Results</h3>
+            <div id="h2hResults" style="background:white;border-radius:8px;padding:16px;min-height:100px;overflow-x:auto;">
+                <p style="color:#9ca3af;text-align:center;">No completed challenges</p>
+            </div>
+        </div>
     </div>
 </div>
 
+
+<!-- MODAL: Select Opponent for H2H Challenge -->
+<div id="opponentModalBackdrop" class="modal-backdrop">
+    <div class="modal" style="max-width:500px;">
+        <div class="modal-header" style="background:#9370db;">
+            <div class="modal-title">Select Opponent</div>
+            <button class="modal-close-btn" id="opponentModalCloseBtn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input 
+                type="text" 
+                id="opponentSearchInput" 
+                placeholder="Search by name..." 
+                style="width:100%;padding:10px;margin-bottom:16px;border:2px solid #e5e7eb;border-radius:6px;font-size:15px;box-sizing:border-box;"
+            />
+            <div id="opponentList" style="max-height:300px;overflow-y:auto;">
+                <!-- User list will be populated here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: H2H Challenge Comparison -->
+<div id="h2hComparisonModalBackdrop" class="modal-backdrop">
+    <div class="modal" style="max-width:650px;">
+        <div class="modal-header" style="background:#9370db;">
+            <div class="modal-title" id="h2hComparisonTitle">H2H Challenge</div>
+            <button class="modal-close-btn" id="h2hComparisonCloseBtn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:20px;">
+            <div id="h2hComparisonContent">
+                <!-- Comparison table will be populated here -->
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- MODAL: Rules -->
 <div id="rulesModalBackdrop" class="modal-backdrop">
