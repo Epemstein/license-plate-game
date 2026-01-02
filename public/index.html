@@ -13,23 +13,26 @@
 </head>
 <body>
 
-<h1>The License Plate Game v47</h1>
-<div style="margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;">
-    <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:none;font-weight:bold;margin-right:10px;">Daily Challenge</button>
-    <button id="practiceBtn" style="padding:10px 20px;background:#e9d5ff;border:none;margin-right:10px;font-weight:bold;">Practice Mode</button>
-    <button id="endlessBtn" style="padding:10px 20px;background:#cae4ffff;border:none;margin-right:10px;font-weight:bold;">Endless Mode</button>
-    <button id="rulesBtn" style="padding:10px 20px;background:#e5e7eb;border:none;font-weight:bold;">How to Play</button>
-
-    <div id="authSection" style="margin-left:auto;">
-        <div id="authPlaceholder" style="padding:10px;background:#f3f4f6;border-radius:4px;color:#9ca3af;">
+<div style="display:flex;align-items:center;justify-content:space-between">
+    <h1>The License Plate Game v47</h1>
+    <div id="authSection">
+        <div id="authPlaceholder">
             Loading...
         </div>
         <button id="signInBtn" onclick="signInWithGoogle()" style="display:none;padding:8px 16px;cursor:pointer;background:#4285f4;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Google</button>
-        <div id="userInfo" style="display:none;padding:10px;background:#f3f4f6;border-radius:4px;">
+        <div id="userInfo" style="display:none;">
             Signed in: <strong id="userName"></strong>
             <button id="signOutBtn" onclick="firebase.auth().signOut()" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
         </div>
     </div>
+</div>
+
+<div style="margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;">
+    <button id="dailyChallengeBtn" class="gameModeButton" style="padding:10px 20px;background:#fbbf24;border:none;font-weight:bold;margin-right:10px;">Daily Challenge</button>
+    <button id="practiceBtn" class="gameModeButton" style="padding:10px 20px;background:#e9d5ff;border:none;margin-right:10px;font-weight:bold;">Practice Mode</button>
+    <button id="h2hBtn" class="gameModeButton" style="padding:10px 20px;background:#a60000ff;color:white;border:none;margin-right:10px;font-weight:bold;">Head-to-head</button>
+    <button id="endlessBtn" class="gameModeButton" style="padding:10px 20px;background:#cae4ffff;border:none;margin-right:10px;font-weight:bold;">Endless Mode</button>
+    <button id="rulesBtn" style="padding:10px 20px;background:#e5e7eb;border:none;font-weight:bold;">How to Play</button>
 </div>
 <div id="modeIndicator" style="padding:8px;background:#f3f4f6;border-radius:4px;margin-bottom:10px;font-weight:600;text-align:left;color:#000000;">Select a game mode above to begin</div>
 
@@ -65,7 +68,11 @@
     </div>
 
     <!-- RIGHT PANEL -->
-    <div class="right-panel">
+    <div id="game-status-panel" class="right-panel">
+        <div id="challenging-player-indicator" style="align-items:center;justify-content:space-between;display:none;">
+            <span id="challenging-player-text" style="font-weight:bold;"></span>
+            <button id="challenging-player-text" onclick="cancelPendingChallenge(true)" style="padding:.25em .5em;">Cancel</button>
+        </div>
         <div id="timerRow">
             <span id="timerDisplay">Time: 0.0 s</span>
             <span id="progressDisplay">Solved: 0 / 10</span>
@@ -85,6 +92,42 @@
         </table>
         <div id="historyEmpty" class="history-empty">
             No solved plates yet.
+        </div>
+    </div>
+
+    <div id="h2h-panel" class="right-panel" style="display:none;">
+        <!-- Create Challenge Buttons -->
+        <div style="margin-bottom:1em;display:flex;gap:1em;flex-wrap:wrap;justify-content:center;">
+            <button id="createChallengeBtn" style="font-size:1rem;background:#9370db;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+                ⚔️ Challenge a Player
+            </button>
+            <button id="createOpenChallengeBtn" style="font-size:1rem;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+                🌐 Create Open Challenge
+            </button>
+        </div>
+        
+        <!-- Incoming Challenges -->
+        <div style="margin-bottom:30px;">
+            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">📥 Incoming Challenges</h3>
+            <div id="incomingChallenges" style="background:white;border-radius:8px;padding:16px;min-height:100px;">
+                <p style="color:#9ca3af;text-align:center;">No incoming challenges</p>
+            </div>
+        </div>
+        
+        <!-- Outgoing Challenges -->
+        <div style="margin-bottom:30px;">
+            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">📤 Outgoing Challenges</h3>
+            <div id="outgoingChallenges" style="background:white;border-radius:8px;padding:16px;min-height:100px;">
+                <p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>
+            </div>
+        </div>
+        
+        <!-- Completed Challenges / Results -->
+        <div style="margin-bottom:30px;">
+            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">🏆 Challenge Results</h3>
+            <div id="h2hResults" style="background:white;border-radius:8px;padding:16px;min-height:100px;overflow-x:auto;">
+                <p style="color:#9ca3af;text-align:center;">No completed challenges</p>
+            </div>
         </div>
     </div>
 </div>
@@ -241,6 +284,42 @@
 
             
             <button id="rulesModalCloseBtnBottom" style="width:100%;padding:14px;background:#9370db;color:white;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:24px;">Got it!</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Select Opponent for H2H Challenge -->
+<div id="opponentModalBackdrop" class="modal-backdrop">
+    <div class="modal" style="max-width:500px;">
+        <div class="modal-header" style="background:#9370db;">
+            <div class="modal-title">Select Opponent</div>
+            <button class="modal-close-btn" id="opponentModalCloseBtn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input 
+                type="text" 
+                id="opponentSearchInput" 
+                placeholder="Search by name..." 
+                style="width:100%;padding:10px;margin-bottom:16px;border:2px solid #e5e7eb;border-radius:6px;font-size:15px;box-sizing:border-box;"
+            />
+            <div id="opponentList" style="max-height:300px;overflow-y:auto;">
+                <!-- User list will be populated here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: H2H Challenge Comparison -->
+<div id="h2hComparisonModalBackdrop" class="modal-backdrop">
+    <div class="modal" style="max-width:650px;">
+        <div class="modal-header" style="background:#9370db;">
+            <div class="modal-title" id="h2hComparisonTitle">H2H Challenge</div>
+            <button class="modal-close-btn" id="h2hComparisonCloseBtn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:20px;">
+            <div id="h2hComparisonContent">
+                <!-- Comparison table will be populated here -->
+            </div>
         </div>
     </div>
 </div>

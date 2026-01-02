@@ -12,6 +12,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const database = firebase.database();
 let gameMode = "practice";
+let challengeMode = null;
 let currentUser = null;
 let currentViewingDate = null; // Track which date we're viewing
 
@@ -63,12 +64,12 @@ async function checkIfPlayedToday() {
   return s2.exists();
 }
 
-async function saveScore(time, solved, skipped) {
+async function saveScore(time, solved, skipped, history) {
   if (!currentUser || gameMode !== "daily") return;
   const today = getTodayString();
 
   // Prepare game history for saving
-  const historyData = gameHistory.map((entry) => ({
+  const historyData = history.map((entry) => ({
     plate: entry.plate,
     word: entry.word,
     skipped: entry.skipped || false,
@@ -465,7 +466,6 @@ let startTime = null;
 let penaltySeconds = 0;
 let timerIntervalId = null;
 
-let skipCount = 0;
 let plateLocked = false;
 
 let gameHistory = [];
@@ -881,12 +881,11 @@ async function beginNewRun() {
   // Show difficulty bar when game starts
   document.getElementById("difficultyLabel").style.display = "block";
 
+  for (let e of document.getElementsByClassName("gameModeButton")) {
+    e.disabled = true;
+  }
   startTime = performance.now();
   timerIntervalId = setInterval(updateTimer, 100);
-
-  document.getElementById("dailyChallengeBtn").disabled = true;
-  document.getElementById("practiceBtn").disabled = true;
-  document.getElementById("endlessBtn").disabled = true;
 
   switch (gameMode) {
     case "daily":
@@ -899,6 +898,10 @@ async function beginNewRun() {
 
     case "endless":
       await playEndless();
+      break;
+
+    case "challenge":
+      await playChallenge(challengeMode);
       break;
   }
 
@@ -924,9 +927,112 @@ async function beginNewRun() {
   wordInputEl.readOnly = true;
 
   chartButtonEl.style.display = "inline-block";
-  document.getElementById("dailyChallengeBtn").disabled = false;
-  document.getElementById("practiceBtn").disabled = false;
-  document.getElementById("endlessBtn").disabled = false;
+  for (let e of document.getElementsByClassName("gameModeButton")) {
+    e.disabled = false;
+  }
+}
+
+async function playTimed(plates, genMorePlates) {
+  let idx = 0;
+  let solved = 0;
+  let skipped = 0;
+  let nextPenalty = 5;
+
+  // Update buttons
+  skipButtonEl.textContent = `Skip +${nextPenalty}s`;
+  progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
+
+  while (solved < TOTAL_PLATES) {
+    const chosen = plates[idx];
+    currentPlate = chosen;
+    plateEl.textContent = chosen;
+    resultEl.textContent = "";
+    plateLocked = false;
+    checkButtonEl.disabled = false;
+    skipButtonEl.disabled = false;
+    wordInputEl.disabled = false;
+    wordInputEl.readOnly = false;
+    let plateStartTime = performance.now();
+    updateDifficultyDisplay(chosen);
+    wordInputEl.value = "";
+    wordInputEl.focus();
+
+    // Check if we've run out of plates
+    if (idx >= plates.length) {
+      console.log("generating more plates...");
+      plates.push(...genMorePlates());
+      continue;
+    }
+
+    let exit = false;
+    let word = "";
+    let matchIndices = null;
+    let skip = false;
+    let penalty = 0;
+    let penaltyLabel = "";
+    while (!exit) {
+      await getPromiseFromEvent(window, "action", (e) => {
+        switch (e.detail.action) {
+          case "submitWord":
+            word = wordInputEl.value.trim();
+            let [ok, indices, reason] = checkWord(currentPlate, word);
+            matchIndices = indices;
+
+            if (ok) {
+              solved++;
+              progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
+              exit = true;
+            }
+
+            resultEl.innerHTML = `${ok ? "✅" : "❌"} ${reason}`;
+            resultEl.style.color = ok ? "green" : "red";
+            break;
+
+          case "skipWord":
+            exit = true;
+            skip = true;
+            skipped++;
+            penalty = nextPenalty;
+            penaltyLabel = `Skipped (+${penalty}s)`;
+
+            nextPenalty += 5;
+            skipButtonEl.textContent = `Skip +${nextPenalty}s`;
+            break;
+        }
+      });
+    }
+
+    let thinkingSeconds = (performance.now() - plateStartTime) / 1000;
+
+    gameHistory.push({
+      plate: currentPlate,
+      word,
+      skipped: skip,
+      thinkingSeconds,
+      penaltySeconds: penalty,
+    });
+
+    addToHistoryWithAnimation(
+      currentPlate,
+      skip ? penaltyLabel : word,
+      matchIndices,
+      PLATE_DIFFICULTY[currentPlate].difficulty,
+      `${thinkingSeconds.toFixed(1)}s`
+    );
+
+    idx++;
+  }
+
+  console.log("Ending game - solved 10!");
+
+  const baseElapsedSec = (performance.now() - startTime) / 1000;
+  const totalSec = baseElapsedSec + penaltySeconds;
+
+  resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
+  resultEl.style.color = "green";
+  startButtonEl.textContent = "Play again";
+
+  return [totalSec, solved, skipped, gameHistory];
 }
 
 async function playDaily() {
@@ -934,371 +1040,86 @@ async function playDaily() {
     return;
   }
 
+  // Save started flag to Firebase
+  // database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({
+  //   userName: currentUser.displayName || currentUser.email,
+  //   timestamp: Date.now(),
+  //   started: true,
+  // });
+
+  // window.onbeforeunload = (e) => {
+  //   if (gameStarted && !gameOver && gameMode === "daily") {
+  //     e.preventDefault();
+  //     return "Leave? Daily attempt will be used!";
+  //   }
+  // };
+
   const date = new Date();
   let seed = date.getDate() + date.getMonth() * 100 + date.getFullYear() * 1000;
 
   let rng = seededRandom(seed);
   let plates = generatePlates(rng, 2);
 
-  let idx = 0;
-  let solved = 0;
-  let nextPenalty = 5;
+  let genMorePlates = () => {
+    seed *= 10;
+    let rng = seededRandom(seed);
+    return generatePlates(rng, 200);
+  };
 
-  // Update buttons
   startButtonEl.style.display = "none";
-  skipButtonEl.textContent = `Skip +${nextPenalty}s`;
-  progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
 
-  {
-    {
-      /* // Save started flag to Firebase
-        database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({
-            userName: currentUser.displayName || currentUser.email,
-            timestamp: Date.now(),
-            started: true
-        });
-        
-        window.onbeforeunload = e => {
-            if (gameStarted && !gameOver && gameMode==='daily') {
-                e.preventDefault();
-                return 'Leave? Daily attempt will be used!';
-            }
-        }; */
-    }
-  }
+  let [totalSec, solved, skipped, history] = await playTimed(
+    plates,
+    genMorePlates
+  );
 
-  while (solved < TOTAL_PLATES) {
-    const chosen = plates[idx];
-    currentPlate = chosen;
-    plateEl.textContent = chosen;
-    resultEl.textContent = "";
-    plateLocked = false;
-    checkButtonEl.disabled = false;
-    skipButtonEl.disabled = false;
-    wordInputEl.disabled = false;
-    wordInputEl.readOnly = false;
-    let plateStartTime = performance.now();
-    updateDifficultyDisplay(chosen);
-    wordInputEl.value = "";
-    wordInputEl.focus();
-
-    // Check if we've run out of plates
-    if (idx >= plates.length) {
-      console.log("generating more plates...");
-      seed *= 10;
-      let rng = seededRandom(seed);
-      plates.push(...generatePlates(rng, 200));
-      continue;
-    }
-
-    let exit = false;
-    let word = "";
-    let matchIndices = null;
-    let skip = false;
-    let penalty = 0;
-    let penaltyLabel = "";
-    while (!exit) {
-      await getPromiseFromEvent(window, "action", (e) => {
-        switch (e.detail.action) {
-          case "submitWord":
-            word = wordInputEl.value.trim();
-            let [ok, indices, reason] = checkWord(currentPlate, word);
-            matchIndices = indices;
-
-            if (ok) {
-              solved++;
-              progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
-              exit = true;
-            }
-
-            resultEl.innerHTML = `${ok ? "✅" : "❌"} ${reason}`;
-            resultEl.style.color = ok ? "green" : "red";
-            break;
-
-          case "skipWord":
-            exit = true;
-            skip = true;
-            penalty = nextPenalty;
-            penaltyLabel = `Skipped (+${penalty}s)`;
-
-            nextPenalty += 5;
-            skipButtonEl.textContent = `Skip +${nextPenalty}s`;
-            break;
-        }
-      });
-    }
-
-    let thinkingSeconds = (performance.now() - plateStartTime) / 1000;
-
-    gameHistory.push({
-      plate: currentPlate,
-      word,
-      skipped: skip,
-      thinkingSeconds,
-      penaltySeconds: penalty,
-    });
-
-    addToHistoryWithAnimation(
-      currentPlate,
-      skip ? penaltyLabel : word,
-      matchIndices,
-      PLATE_DIFFICULTY[currentPlate].difficulty,
-      `${thinkingSeconds.toFixed(1)}s`
-    );
-
-    idx++;
-  }
-
-  console.log("Ending game - solved 10!");
-
-  const baseElapsedSec = (performance.now() - startTime) / 1000;
-  const totalSec = baseElapsedSec + penaltySeconds;
-
-  {
-    {
-      /* if (currentUser) saveScore(totalSec,solvedCount,skipCount); */
-    }
-  }
+  // if (currentUser) saveScore(totalSec, solved, skipped, history);
   window.onbeforeunload = null;
-
-  resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
-  resultEl.style.color = "green";
-  startButtonEl.textContent = "Play again";
 }
 
 async function playPractice() {
   let plates = generatePlates(Math.random, 200);
-  let idx = 0;
-  let solved = 0;
-  let nextPenalty = 5;
-
-  // Update buttons
+  let genMorePlates = () => {
+    return generatePlates(Math.random, 200);
+  };
   startButtonEl.textContent = "Restart game";
-  skipButtonEl.textContent = `Skip +${nextPenalty}s`;
-  progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
 
-  while (solved < TOTAL_PLATES) {
-    const chosen = plates[idx];
-    currentPlate = chosen;
-    plateEl.textContent = chosen;
-    resultEl.textContent = "";
-    plateLocked = false;
-    checkButtonEl.disabled = false;
-    skipButtonEl.disabled = false;
-    wordInputEl.disabled = false;
-    wordInputEl.readOnly = false;
-    let plateStartTime = performance.now();
-    updateDifficultyDisplay(chosen);
-    wordInputEl.value = "";
-    wordInputEl.focus();
-
-    // Check if we've run out of plates
-    if (idx >= plates.length) {
-      console.log("generating more plates...");
-      plates.push(...generatePlates(Math.random, 200));
-      continue;
-    }
-
-    let exit = false;
-    let word = "";
-    let matchIndices = null;
-    let skip = false;
-    let penalty = 0;
-    let penaltyLabel = "";
-    while (!exit) {
-      await getPromiseFromEvent(window, "action", (e) => {
-        switch (e.detail.action) {
-          case "submitWord":
-            word = wordInputEl.value.trim();
-            let [ok, indices, reason] = checkWord(currentPlate, word);
-            matchIndices = indices;
-
-            if (ok) {
-              solved++;
-              progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
-              exit = true;
-            }
-
-            resultEl.innerHTML = `${ok ? "✅" : "❌"} ${reason}`;
-            resultEl.style.color = ok ? "green" : "red";
-            break;
-
-          case "skipWord":
-            exit = true;
-            skip = true;
-            penalty = nextPenalty;
-            penaltyLabel = `Skipped (+${penalty}s)`;
-
-            nextPenalty += 5;
-            skipButtonEl.textContent = `Skip +${nextPenalty}s`;
-            break;
-        }
-      });
-    }
-
-    let thinkingSeconds = (performance.now() - plateStartTime) / 1000;
-
-    gameHistory.push({
-      plate: currentPlate,
-      word,
-      skipped: skip,
-      thinkingSeconds,
-      penaltySeconds: penalty,
-    });
-
-    addToHistoryWithAnimation(
-      currentPlate,
-      skip ? penaltyLabel : word,
-      matchIndices,
-      PLATE_DIFFICULTY[currentPlate].difficulty,
-      `${thinkingSeconds.toFixed(1)}s`
-    );
-
-    idx++;
-  }
-
-  const baseElapsedSec = (performance.now() - startTime) / 1000;
-  const totalSec = baseElapsedSec + penaltySeconds;
-
-  resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
-  resultEl.style.color = "green";
+  await playTimed(plates, genMorePlates);
 }
 
-async function playH2H() {
-  if (!currentUser) {
+async function playChallenge() {
+  startButtonEl.style.display = "none";
+
+  switch (challengeMode) {
+    case "h2h":
+      if (!currentChallengeId) {
+        currentChallengeId = await createChallengeWithOpponent(pendingOpponent);
+      }
+      break;
+
+    case "open":
+      alert("Not implemented");
+      return;
+  }
+
+  let challenge = await checkChallenge(currentChallengeId);
+  if (!challenge) {
     return;
   }
 
-  const date = new Date();
-  let seed = date.getDate() + date.getMonth() * 100 + date.getFullYear() * 1000;
+  let [totalSec, solved, skipped, history] = await playTimed(challenge.plateSequence, () =>
+    alert("BUG! Not enough plates")
+  );
 
-  let rng = seededRandom(seed);
-  let plates = generatePlates(rng, 2);
-
-  let idx = 0;
-  let solved = 0;
-  let nextPenalty = 5;
-
-  // Update buttons
-  startButtonEl.style.display = "none";
-  skipButtonEl.textContent = `Skip +${nextPenalty}s`;
-  progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
-
-  {
-    {
-      /* // Save started flag to Firebase
-        database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({
-            userName: currentUser.displayName || currentUser.email,
-            timestamp: Date.now(),
-            started: true
-        });
-        
-        window.onbeforeunload = e => {
-            if (gameStarted && !gameOver && gameMode==='daily') {
-                e.preventDefault();
-                return 'Leave? Daily attempt will be used!';
-            }
-        }; */
-    }
-  }
-
-  while (solved < TOTAL_PLATES) {
-    const chosen = plates[idx];
-    currentPlate = chosen;
-    plateEl.textContent = chosen;
-    resultEl.textContent = "";
-    plateLocked = false;
-    checkButtonEl.disabled = false;
-    skipButtonEl.disabled = false;
-    wordInputEl.disabled = false;
-    wordInputEl.readOnly = false;
-    let plateStartTime = performance.now();
-    updateDifficultyDisplay(chosen);
-    wordInputEl.value = "";
-    wordInputEl.focus();
-
-    // Check if we've run out of plates
-    if (idx >= plates.length) {
-      console.log("generating more plates...");
-      seed *= 10;
-      let rng = seededRandom(seed);
-      plates.push(...generatePlates(rng, 200));
-      continue;
-    }
-
-    let exit = false;
-    let word = "";
-    let matchIndices = null;
-    let skip = false;
-    let penalty = 0;
-    let penaltyLabel = "";
-    while (!exit) {
-      await getPromiseFromEvent(window, "action", (e) => {
-        switch (e.detail.action) {
-          case "submitWord":
-            word = wordInputEl.value.trim();
-            let [ok, indices, reason] = checkWord(currentPlate, word);
-            matchIndices = indices;
-
-            if (ok) {
-              solved++;
-              progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
-              exit = true;
-            }
-
-            resultEl.innerHTML = `${ok ? "✅" : "❌"} ${reason}`;
-            resultEl.style.color = ok ? "green" : "red";
-            break;
-
-          case "skipWord":
-            exit = true;
-            skip = true;
-            penalty = nextPenalty;
-            penaltyLabel = `Skipped (+${penalty}s)`;
-
-            nextPenalty += 5;
-            skipButtonEl.textContent = `Skip +${nextPenalty}s`;
-            break;
-        }
-      });
-    }
-
-    let thinkingSeconds = (performance.now() - plateStartTime) / 1000;
-
-    gameHistory.push({
-      plate: currentPlate,
-      word,
-      skipped: skip,
-      thinkingSeconds,
-      penaltySeconds: penalty,
-    });
-
-    addToHistoryWithAnimation(
-      currentPlate,
-      skip ? penaltyLabel : word,
-      matchIndices,
-      PLATE_DIFFICULTY[currentPlate].difficulty,
-      `${thinkingSeconds.toFixed(1)}s`
-    );
-
-    idx++;
-  }
-
-  console.log("Ending game - solved 10!");
-
-  const baseElapsedSec = (performance.now() - startTime) / 1000;
-  const totalSec = baseElapsedSec + penaltySeconds;
-
-  {
-    {
-      /* if (currentUser) saveScore(totalSec,solvedCount,skipCount); */
-    }
-  }
-  window.onbeforeunload = null;
-
-  resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
-  resultEl.style.color = "green";
-  startButtonEl.textContent = "Play again";
+  await saveChallengeResult(
+    currentChallengeId,
+    totalSec,
+    solved,
+    skipped,
+    history
+  );
+  
+  currentChallengeId = null;
 }
 
 async function playEndless() {
@@ -1536,7 +1357,7 @@ function addToHistoryWithAnimation(
 }
 
 // --------- WORDS MODAL (SORTING) ---------
-function renderWordsList(sortMode,) {
+function renderWordsList(sortMode) {
   wordsModalListEl.innerHTML = "";
 
   const plate = currentWordsModalPlate;
@@ -2021,6 +1842,8 @@ window.addEventListener("DOMContentLoaded", function () {
   document
     .getElementById("dailyChallengeBtn")
     .addEventListener("click", async () => {
+      cancelPendingChallenge();
+
       // Check if game data is loaded
       if (
         !platesReady ||
@@ -2048,16 +1871,21 @@ window.addEventListener("DOMContentLoaded", function () {
       gameMode = "daily";
 
       // Set mode
+      for (let e of document.getElementsByClassName("gameModeButton")) {
+        e.style.borderBottom = "none";
+      }
       document.getElementById("dailyChallengeBtn").style.borderBottom =
         "5px solid #92400e";
-      document.getElementById("practiceBtn").style.borderBottom = "none";
-      document.getElementById("endlessBtn").style.borderBottom = "none";
 
       // Update banner
       const mi = document.getElementById("modeIndicator");
       mi.textContent = "Daily Challenge - 1 attempt per day";
       mi.style.background = "#fef3c7";
       mi.style.color = "#92400e";
+
+      document.getElementById("game-status-panel").style.display =
+        "inline-block";
+      document.getElementById("h2h-panel").style.display = "none";
 
       // Show Start Game button
       startButtonEl.textContent = "Start Game";
@@ -2066,19 +1894,25 @@ window.addEventListener("DOMContentLoaded", function () {
     });
 
   document.getElementById("practiceBtn").addEventListener("click", () => {
+    cancelPendingChallenge();
+
     // Set mode
     gameMode = "practice";
 
-    document.getElementById("dailyChallengeBtn").style.borderBottom = "none";
+    for (let e of document.getElementsByClassName("gameModeButton")) {
+      e.style.borderBottom = "none";
+    }
     document.getElementById("practiceBtn").style.borderBottom =
       "5px solid #6b21a8";
-    document.getElementById("endlessBtn").style.borderBottom = "none";
 
     // Update banner
     const mi = document.getElementById("modeIndicator");
     mi.textContent = "Practice Mode - Unlimited attempts";
     mi.style.background = "#f3e8ff";
     mi.style.color = "#6b21a8";
+
+    document.getElementById("game-status-panel").style.display = "inline-block";
+    document.getElementById("h2h-panel").style.display = "none";
 
     // Show Start Game button
     const startBtn = document.getElementById("startButton");
@@ -2087,12 +1921,41 @@ window.addEventListener("DOMContentLoaded", function () {
     endButtonEl.style.display = "none";
   });
 
+  document.getElementById("h2hBtn").addEventListener("click", () => {
+    // Set mode
+    gameMode = "challenge";
+
+    for (let e of document.getElementsByClassName("gameModeButton")) {
+      e.style.borderBottom = "none";
+    }
+    document.getElementById("h2hBtn").style.borderBottom =
+      "5px solid #840000ff";
+
+    // Update banner
+    const mi = document.getElementById("modeIndicator");
+    mi.textContent = "Challenge mode - Challenge an opponent";
+    mi.style.background = "#a60000ff";
+    mi.style.color = "#ffffffff";
+
+    document.getElementById("game-status-panel").style.display = "none";
+    document.getElementById("h2h-panel").style.display = "inline-block";
+
+    // Show Start Game button
+    const startBtn = document.getElementById("startButton");
+    startBtn.textContent = "Start Challenge";
+    startBtn.style.display = "none";
+    endButtonEl.style.display = "none";
+  });
+
   document.getElementById("endlessBtn").addEventListener("click", () => {
+    cancelPendingChallenge();
+
     // Set mode
     gameMode = "endless";
 
-    document.getElementById("dailyChallengeBtn").style.borderBottom = "none";
-    document.getElementById("practiceBtn").style.borderBottom = "none";
+    for (let e of document.getElementsByClassName("gameModeButton")) {
+      e.style.borderBottom = "none";
+    }
     document.getElementById("endlessBtn").style.borderBottom =
       "5px solid #020069ff";
 
@@ -2101,6 +1964,9 @@ window.addEventListener("DOMContentLoaded", function () {
     mi.textContent = "Endless mode - play forever";
     mi.style.background = "#cae4ffff";
     mi.style.color = "#020069ff";
+
+    document.getElementById("game-status-panel").style.display = "inline-block";
+    document.getElementById("h2h-panel").style.display = "none";
 
     // Show Start Game button
     const startBtn = document.getElementById("startButton");
@@ -2199,3 +2065,1228 @@ window.addEventListener("load", function () {
     }
   }, 500); // Wait 2 seconds for Firebase to connect
 });
+
+// ========== HEAD-TO-HEAD FEATURE ==========
+let currentChallengeId = null;
+let challengeStartTime = null;
+let pendingOpponent = null;
+const CHALLENGE_TIMEOUT = 2000; // 2000 seconds
+
+// Create Challenge button
+document
+  .getElementById("createChallengeBtn")
+  .addEventListener("click", async function () {
+    if (!currentUser) {
+      alert("Please sign in to create challenges");
+      return;
+    }
+
+    try {
+      const usersSnapshot = await database.ref("users").once("value");
+      const users = usersSnapshot.val();
+
+      if (!users) {
+        alert("No other users found");
+        return;
+      }
+
+      const userList = Object.entries(users)
+        .filter(([uid, data]) => uid !== currentUser.uid)
+        .map(([uid, data]) => ({
+          uid,
+          name: data.displayName || data.email || "Unknown",
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (userList.length === 0) {
+        alert("No other users found");
+        return;
+      }
+
+      // Show opponent selection modal
+      showOpponentModal(userList);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      alert("Error loading users: " + error.message);
+    }
+  });
+
+// Create Open Challenge button
+document
+  .getElementById("createOpenChallengeBtn")
+  .addEventListener("click", async function () {
+    if (!currentUser) {
+      alert("Please sign in to create challenges");
+      return;
+    }
+
+    // Ask for optional label
+    const label = prompt(
+      "Who are you challenging? This is just for your reference."
+    );
+
+    // If user clicks Cancel on prompt, stop
+    if (label === null) {
+      return;
+    }
+
+    try {
+      const challengeId = database.ref("challenges").push().key;
+      const plateSequence = generateChallengeSequence();
+
+      if (plateSequence.length < 100) {
+        alert("Error generating plates");
+        return;
+      }
+
+      const opponentName =
+        label && label.trim() ? label.trim() : "Open Challenge";
+
+      await database.ref(`challenges/${challengeId}`).set({
+        createdBy: currentUser.uid,
+        creatorName: currentUser.displayName || currentUser.email,
+        challengedUser: null, // Open challenge - no specific user
+        opponentName: opponentName,
+        isOpen: true,
+        plateSequence: plateSequence,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        status: "pending",
+        results: {},
+      });
+
+      // Copy link to clipboard
+      const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${challengeId}`;
+      try {
+        await navigator.clipboard.writeText(challengeUrl);
+        alert(
+          `Open challenge created${
+            label && label.trim() ? ` for "${label.trim()}"` : ""
+          }! Link copied to clipboard.`
+        );
+      } catch (err) {
+        alert(`Open challenge created! Share this link:\n${challengeUrl}`);
+      }
+
+      loadH2HChallenges();
+    } catch (error) {
+      console.error("Error creating open challenge:", error);
+      alert("Error creating open challenge: " + error.message);
+    }
+  });
+
+// Show opponent selection modal
+function showOpponentModal(userList) {
+  const modal = document.getElementById("opponentModalBackdrop");
+  const listContainer = document.getElementById("opponentList");
+  const searchInput = document.getElementById("opponentSearchInput");
+
+  // Render user list
+  function renderUserList(filter = "") {
+    const filtered = filter
+      ? userList.filter((u) =>
+          u.name.toLowerCase().startsWith(filter.toLowerCase())
+        )
+      : userList;
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML =
+        '<p style="text-align:center;color:#9ca3af;padding:20px;">No users found</p>';
+      return;
+    }
+
+    listContainer.innerHTML = filtered
+      .map(
+        (user) => `
+                <div 
+                    class="opponent-item" 
+                    data-uid="${user.uid}"
+                    style="padding:12px 16px;cursor:pointer;border-bottom:1px solid #f3f4f6;transition:background 0.2s;"
+                    onmouseover="this.style.background='#f9fafb'"
+                    onmouseout="this.style.background='white'"
+                >
+                    <div style="font-weight:500;color:#1f2937;">${user.name}</div>
+                </div>
+            `
+      )
+      .join("");
+
+    // Add click handlers
+    document.querySelectorAll(".opponent-item").forEach((item) => {
+      item.addEventListener("click", function () {
+        const uid = this.dataset.uid;
+        const user = userList.find((u) => u.uid === uid);
+        modal.classList.remove("show");
+        searchInput.value = "";
+        prepareChallenge(user);
+      });
+    });
+  }
+
+  // Search functionality
+  searchInput.value = "";
+  searchInput.oninput = (e) => renderUserList(e.target.value);
+
+  renderUserList();
+  modal.classList.add("show");
+  searchInput.focus();
+}
+
+// Modal close handlers
+document
+  .getElementById("opponentModalCloseBtn")
+  .addEventListener("click", () => {
+    document.getElementById("opponentModalBackdrop").classList.remove("show");
+    document.getElementById("opponentSearchInput").value = "";
+  });
+
+document
+  .getElementById("opponentModalBackdrop")
+  .addEventListener("click", (e) => {
+    if (e.target.id === "opponentModalBackdrop") {
+      document.getElementById("opponentModalBackdrop").classList.remove("show");
+      document.getElementById("opponentSearchInput").value = "";
+    }
+  });
+
+// H2H Comparison Modal
+document
+  .getElementById("h2hComparisonCloseBtn")
+  .addEventListener("click", () => {
+    document
+      .getElementById("h2hComparisonModalBackdrop")
+      .classList.remove("show");
+  });
+
+document
+  .getElementById("h2hComparisonModalBackdrop")
+  .addEventListener("click", (e) => {
+    if (e.target.id === "h2hComparisonModalBackdrop") {
+      document
+        .getElementById("h2hComparisonModalBackdrop")
+        .classList.remove("show");
+    }
+  });
+
+// Check for abandoned challenges when user logs in
+if (currentUser) {
+  checkAbandonedChallenges(currentUser.uid);
+}
+
+// Prepare challenge (don't create yet - wait for Start button)
+function prepareChallenge(opponent) {
+  pendingOpponent = opponent;
+  challengeMode = opponent ? "h2h" : "open";
+
+  // Update banner with back button embedded
+  document.getElementById("challenging-player-indicator").style.display =
+    "flex";
+  document.getElementById("challenging-player-text").textContent = opponent
+    ? `⚔️ Challenging ${opponent.name}`
+    : "⚔️ Issuing open challenge";
+  document.getElementById("game-status-panel").style.display = "inline-block";
+  document.getElementById("h2h-panel").style.display = "none";
+
+  // Show Start Challenge button with pulse animation
+  const startBtn = document.getElementById("startButton");
+  startBtn.textContent = "Start Challenge";
+  startBtn.style.display = "inline-block";
+  startBtn.classList.add("pulse-button");
+
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// Cancel pending challenge
+cancelPendingChallenge = function (showChallengePanel) {
+  pendingOpponent = null;
+
+  document.getElementById("challenging-player-indicator").style.display =
+    "none";
+
+  for (let e of document.getElementsByClassName("gameModeButton")) {
+    e.disabled = false;
+  }
+
+  if (showChallengePanel) {
+    document.getElementById("game-status-panel").style.display = "none";
+    document.getElementById("h2h-panel").style.display = "inline-block";
+  }
+};
+window.cancelPendingChallenge = cancelPendingChallenge;
+
+/** Create challenge with pending opponent (called when Start Challenge is clicked).
+Returns the challenge ID */
+async function createChallengeWithOpponent(opponent) {
+  try {
+    const challengeId = database.ref("challenges").push().key;
+    const plateSequence = generatePlates(Math.random, 200);
+
+    if (plateSequence.length < 100) {
+      alert("Error generating plates");
+      return;
+    }
+
+    await database.ref(`challenges/${challengeId}`).set({
+      createdBy: currentUser.uid,
+      creatorName: currentUser.displayName || currentUser.email,
+      challengedUser: opponent.uid,
+      opponentName: opponent.name,
+      plateSequence: plateSequence,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 1 week
+      status: "pending",
+      results: {},
+    });
+
+    return challengeId;
+  } catch (error) {
+    console.error("Error creating challenge:", error);
+    alert("Error creating challenge: " + error.message);
+  }
+}
+
+/**
+ * Gets a challenge by its ID and checks whether it's playable. May update the challenge
+ * to claim it if it's an open challenge issued by someone else.
+ * @param {*} challengeId 
+ * @returns The challenge object, or undefined if the challenge is not playable
+ */
+async function checkChallenge(challengeId) {
+  if (!currentUser) {
+    alert("Please sign in to play challenges");
+    return;
+  }
+
+  const challengeSnapshot = await database
+    .ref(`challenges/${challengeId}`)
+    .once("value");
+  let challenge = challengeSnapshot.val();
+
+  if (!challenge) {
+    alert("Challenge not found");
+    return;
+  }
+
+  // Check if this is an open challenge (handle both null and undefined)
+  const isOpenChallenge =
+    challenge.isOpen === true &&
+    (challenge.challengedUser === null ||
+      challenge.challengedUser === undefined);
+
+  // Validate that current user can play this challenge
+  const isCreator = challenge.createdBy === currentUser.uid;
+  const isChallenged = challenge.challengedUser === currentUser.uid;
+
+  if (!isCreator && !isChallenged && !isOpenChallenge) {
+    alert(
+      "This challenge is not for you. You can only play challenges that you created or that were sent to you."
+    );
+    return;
+  }
+
+  // If open challenge, claim it for this user
+  if (isOpenChallenge && !isCreator) {
+    try {
+      challenge = await database.ref(`challenges/${challengeId}`).update({
+        challengedUser: currentUser.uid,
+        opponentName: currentUser.displayName || currentUser.email,
+        isOpen: false,
+        claimedAt: Date.now(),
+      });
+    } catch (error) {
+      console.error("Error claiming challenge:", error);
+      alert("Error claiming challenge");
+      return;
+    }
+  }
+
+  const userResult = challenge.results && challenge.results[currentUser.uid];
+  if (userResult && (userResult.status === "DNF" || userResult.time)) {
+    alert("You have already completed this challenge");
+    return;
+  }
+
+  if (userResult && userResult.status === "in_progress") {
+    alert("You already started this challenge and it was marked as Abandoned");
+    return;
+  }
+
+  return challenge;
+}
+
+// Load H2H challenges
+async function loadH2HChallenges() {
+  if (!currentUser) {
+    document.getElementById("incomingChallenges").innerHTML =
+      '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+    document.getElementById("outgoingChallenges").innerHTML =
+      '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+    document.getElementById("h2hResults").innerHTML =
+      '<p style="color:#9ca3af;text-align:center;">Sign in to see results</p>';
+    return;
+  }
+
+  try {
+    const challengesSnapshot = await database.ref("challenges").once("value");
+    const allChallenges = challengesSnapshot.val() || {};
+
+    // Clean up expired challenges and check for completion
+    const now = Date.now();
+    const activeChallenges = {};
+
+    for (const [id, challenge] of Object.entries(allChallenges)) {
+      if (
+        challenge.expiresAt &&
+        challenge.expiresAt < now &&
+        challenge.status !== "completed"
+      ) {
+        await database.ref(`challenges/${id}`).remove();
+      } else {
+        // Check if challenge should be marked as completed
+        if (challenge.status !== "completed" && challenge.results) {
+          const creatorResult = challenge.results[challenge.createdBy];
+          const challengedResult = challenge.results[challenge.challengedUser];
+
+          if (
+            creatorResult &&
+            challengedResult &&
+            (creatorResult.status === "completed" ||
+              creatorResult.status === "DNF") &&
+            (challengedResult.status === "completed" ||
+              challengedResult.status === "DNF")
+          ) {
+            // If both abandoned, delete the challenge
+            if (
+              creatorResult.status === "DNF" &&
+              challengedResult.status === "DNF"
+            ) {
+              await database.ref(`challenges/${id}`).remove();
+              console.log("Both players abandoned - challenge deleted:", id);
+              continue; // Skip adding to activeChallenges
+            } else {
+              // Otherwise mark as completed
+              await database.ref(`challenges/${id}`).update({
+                status: "completed",
+                completedAt: Date.now(),
+              });
+              challenge.status = "completed";
+              challenge.completedAt = Date.now();
+            }
+          }
+        }
+        activeChallenges[id] = challenge;
+      }
+    }
+
+    displayIncomingChallenges(activeChallenges);
+    displayOutgoingChallenges(activeChallenges);
+    displayH2HResults(activeChallenges);
+  } catch (error) {
+    console.error("Error loading H2H challenges:", error);
+  }
+}
+
+function displayIncomingChallenges(allChallenges) {
+  const container = document.getElementById("incomingChallenges");
+
+  const incoming = Object.entries(allChallenges).filter(([id, c]) => {
+    if (c.challengedUser !== currentUser.uid) return false;
+    if (c.status === "completed") return false;
+
+    // Only show if creator has already played
+    const creatorResult = c.results && c.results[c.createdBy];
+    return (
+      creatorResult && (creatorResult.time || creatorResult.status === "DNF")
+    );
+  });
+
+  // Update notification badge
+  const badge = document.getElementById("h2hNotificationBadge");
+  if (incoming.length > 0) {
+    badge.textContent = incoming.length;
+    badge.style.display = "block";
+  } else {
+    badge.style.display = "none";
+  }
+
+  if (incoming.length === 0) {
+    container.innerHTML =
+      '<p style="color:#9ca3af;text-align:center;">No incoming challenges</p>';
+    return;
+  }
+
+  // Sort by creation date (newest first)
+  incoming.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+
+  let html = "";
+  incoming.forEach(([id, challenge]) => {
+    const myResult = challenge.results && challenge.results[currentUser.uid];
+
+    // Format date
+    const createdDate = challenge.createdAt
+      ? new Date(challenge.createdAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "Unknown";
+
+    let statusText = "";
+    if (myResult && myResult.status === "DNF") {
+      statusText = 'You: <span style="color:#ef4444;">Abandoned</span>';
+    } else if (myResult && myResult.time) {
+      statusText = `You: ${myResult.time.toFixed(1)}s`;
+    } else {
+      statusText = "";
+    }
+
+    const canPlay =
+      !myResult ||
+      (!myResult.time &&
+        myResult.status !== "DNF" &&
+        myResult.status !== "in_progress");
+    // Can only decline if you haven't started at all (no result exists)
+    const canDecline = !myResult;
+
+    html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <div style="min-width:140px;">
+                        <div style="font-size:0.85rem;color:#6b7280;">${createdDate}</div>
+                    </div>
+                    <span style="flex:1;"><strong>${
+                      challenge.creatorName
+                    }</strong> challenged you${
+      statusText ? " — " + statusText : ""
+    }</span>
+                    ${
+                      canPlay
+                        ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>`
+                        : ""
+                    }
+                    ${
+                      canDecline
+                        ? `<button onclick="declineChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Decline</button>`
+                        : ""
+                    }
+                </div>
+            `;
+  });
+
+  container.innerHTML = html;
+}
+
+function displayOutgoingChallenges(allChallenges) {
+  const container = document.getElementById("outgoingChallenges");
+
+  const outgoing = Object.entries(allChallenges).filter(
+    ([id, c]) => c.createdBy === currentUser.uid && c.status !== "completed"
+  );
+
+  if (outgoing.length === 0) {
+    container.innerHTML =
+      '<p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>';
+    return;
+  }
+
+  // Sort by creation date (newest first)
+  outgoing.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+
+  let html = "";
+  outgoing.forEach(([id, challenge]) => {
+    const myResult = challenge.results && challenge.results[currentUser.uid];
+    const theirResult =
+      challenge.results && challenge.results[challenge.challengedUser];
+
+    // Format date
+    const createdDate = challenge.createdAt
+      ? new Date(challenge.createdAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "Unknown";
+
+    // Check if open challenge
+    const isOpen = challenge.isOpen && challenge.challengedUser === null;
+    const opponentDisplay = isOpen
+      ? '<strong>Open Challenge</strong> <span style="color:#10b981;font-size:0.85rem;">(unclaimed)</span>'
+      : `<strong>${challenge.opponentName}</strong>`;
+
+    let statusText = "";
+    if (myResult && myResult.status === "DNF") {
+      statusText = 'You: <span style="color:#ef4444;">Abandoned</span>';
+    } else if (myResult && myResult.time) {
+      statusText = `You: ${myResult.time.toFixed(1)}s`;
+    } else {
+      statusText = "";
+    }
+
+    const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
+    const canPlay =
+      !myResult ||
+      (!myResult.time &&
+        myResult.status !== "DNF" &&
+        myResult.status !== "in_progress");
+    const canCancel = canPlay; // Can cancel if you haven't played yet
+
+    html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;flex-shrink:0;">Copy Link</button>
+                    <div style="min-width:140px;">
+                        <div style="font-size:0.85rem;color:#6b7280;">${createdDate}</div>
+                    </div>
+                    <span style="flex:1;">You vs. ${opponentDisplay}${
+      statusText ? " — " + statusText : ""
+    }</span>
+                    ${
+                      canPlay
+                        ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>`
+                        : ""
+                    }
+                    ${
+                      canCancel
+                        ? `<button onclick="cancelChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Cancel</button>`
+                        : ""
+                    }
+                </div>
+            `;
+  });
+
+  container.innerHTML = html;
+}
+
+// View H2H Comparison
+window.viewH2HComparison = async function (challengeId) {
+  try {
+    console.log("viewH2HComparison called with challengeId:", challengeId);
+    console.log("currentUser:", currentUser);
+
+    if (!currentUser) {
+      alert("Please sign in to view challenges");
+      return;
+    }
+
+    const snapshot = await database
+      .ref(`challenges/${challengeId}`)
+      .once("value");
+    const challenge = snapshot.val();
+
+    console.log("Challenge data:", challenge);
+
+    if (!challenge) {
+      alert("Challenge not found");
+      return;
+    }
+
+    const isCreator = challenge.createdBy === currentUser.uid;
+    const myName = currentUser.displayName || currentUser.email;
+    const opponentName = isCreator
+      ? challenge.opponentName
+      : challenge.creatorName;
+    const opponentId = isCreator
+      ? challenge.challengedUser
+      : challenge.createdBy;
+
+    const myResult = challenge.results && challenge.results[currentUser.uid];
+    const theirResult = challenge.results && challenge.results[opponentId];
+
+    console.log("My result:", myResult);
+    console.log("Their result:", theirResult);
+
+    // Update title
+    document.getElementById(
+      "h2hComparisonTitle"
+    ).textContent = `${myName} vs ${opponentName}`;
+
+    // Build unified comparison table
+    const content = document.getElementById("h2hComparisonContent");
+
+    if (!myResult || !theirResult) {
+      content.innerHTML =
+        '<p style="text-align:center;color:#6b7280;">Incomplete challenge data</p>';
+      document
+        .getElementById("h2hComparisonModalBackdrop")
+        .classList.add("show");
+      return;
+    }
+
+    // Get histories (should be same length for H2H)
+    const myHistory = myResult.history || [];
+    const theirHistory = theirResult.history || [];
+    const maxLength = Math.max(myHistory.length, theirHistory.length);
+
+    console.log("My history length:", myHistory.length);
+    console.log("Their history length:", theirHistory.length);
+    console.log("My stored time:", myResult.time);
+    console.log("Their stored time:", theirResult.time);
+
+    let tableRows = "";
+    let myTotalTime = 0;
+    let theirTotalTime = 0;
+
+    for (let i = 0; i < maxLength; i++) {
+      const myEntry = myHistory[i];
+      const theirEntry = theirHistory[i];
+
+      const plate = myEntry?.plate || theirEntry?.plate || "—";
+
+      // Helper function for time-based gradient color
+      function getTimeCellColor(seconds) {
+        if (seconds <= 0) return "#f3f4f6"; // Gray for no entry
+        if (seconds <= 1.5) return "#22c55e"; // Green (under 1.5s)
+        if (seconds >= 30) return "#ef4444"; // Dark red (30s+)
+
+        if (seconds <= 6) {
+          // Green to white (1.5s → 6s)
+          const ratio = (seconds - 1.5) / 4.5;
+          const r = Math.round(34 + (255 - 34) * ratio);
+          const g = Math.round(197 + (255 - 197) * ratio);
+          const b = Math.round(94 + (255 - 94) * ratio);
+          return `rgb(${r},${g},${b})`;
+        } else {
+          // White to red (6s → 30s)
+          const ratio = (seconds - 6) / 24;
+          const r = 255;
+          const g = Math.round(255 - (255 - 68) * ratio);
+          const b = Math.round(255 - (255 - 68) * ratio);
+          return `rgb(${r},${g},${b})`;
+        }
+      }
+
+      // My cell content
+      let myCell = "";
+      let myTime = 0;
+      let myCellBg = "#f3f4f6";
+      if (myEntry) {
+        // Always add thinking time + penalty time
+        const thinkingTime = myEntry.thinkingSeconds || 0;
+        const penaltyTime = myEntry.penaltySeconds || 0;
+        myTime = thinkingTime + penaltyTime;
+
+        if (myEntry.skipped) {
+          // Skipped plates: show X with total time
+          myCell = `
+                            <div style="font-size:1.1rem;font-weight:600;color:#fff;margin-bottom:4px;">✗</div>
+                            <div style="font-size:0.9rem;color:#fff;">${myTime.toFixed(
+                              1
+                            )}s</div>
+                        `;
+          myCellBg = "#000000";
+        } else {
+          // Valid words: show word with total time
+          myCellBg = getTimeCellColor(thinkingTime);
+          myCell = `
+                            <div style="font-size:0.95rem;font-weight:600;color:#000;margin-bottom:4px;">${
+                              myEntry.word || "—"
+                            }</div>
+                            <div style="font-size:0.8rem;color:#000;">${myTime.toFixed(
+                              1
+                            )}s</div>
+                        `;
+        }
+        myTotalTime += myTime;
+      } else {
+        myCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
+      }
+
+      // Their cell content
+      let theirCell = "";
+      let theirTime = 0;
+      let theirCellBg = "#f3f4f6";
+      if (theirEntry) {
+        // Always add thinking time + penalty time
+        const thinkingTime = theirEntry.thinkingSeconds || 0;
+        const penaltyTime = theirEntry.penaltySeconds || 0;
+        theirTime = thinkingTime + penaltyTime;
+
+        if (theirEntry.skipped) {
+          // Skipped plates: show X with total time
+          theirCell = `
+                            <div style="font-size:1.1rem;font-weight:600;color:#fff;margin-bottom:4px;">✗</div>
+                            <div style="font-size:0.9rem;color:#fff;">${theirTime.toFixed(
+                              1
+                            )}s</div>
+                        `;
+          theirCellBg = "#000000";
+        } else {
+          // Valid words: show word with total time
+          theirCellBg = getTimeCellColor(thinkingTime);
+          theirCell = `
+                            <div style="font-size:0.95rem;font-weight:600;color:#000;margin-bottom:4px;">${
+                              theirEntry.word || "—"
+                            }</div>
+                            <div style="font-size:0.8rem;color:#000;">${theirTime.toFixed(
+                              1
+                            )}s</div>
+                        `;
+        }
+        theirTotalTime += theirTime;
+      } else {
+        theirCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
+      }
+
+      // Differential cell - always white background, colored text
+      const diff = myTime - theirTime;
+      let diffCell = "";
+      if (myEntry && theirEntry && myTime > 0 && theirTime > 0) {
+        if (Math.abs(diff) < 0.05) {
+          diffCell =
+            '<div style="font-size:0.95rem;font-weight:600;color:#6b7280;">0.0s</div>';
+        } else if (diff < 0) {
+          // Faster = green text
+          diffCell = `<div style="font-size:0.95rem;font-weight:700;color:#16a34a;">${diff.toFixed(
+            1
+          )}s</div>`;
+        } else {
+          // Slower = red text
+          diffCell = `<div style="font-size:0.95rem;font-weight:700;color:#dc2626;">+${diff.toFixed(
+            1
+          )}s</div>`;
+        }
+      } else {
+        diffCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
+      }
+
+      tableRows += `
+                    <tr>
+                        <td style="padding:12px 8px;font-weight:700;font-size:0.9rem;background:#f9fafb;border-right:2px solid #e5e7eb;text-align:center;">${plate}</td>
+                        <td style="padding:10px 8px;background:${myCellBg};border-right:2px solid #e5e7eb;text-align:center;">${myCell}</td>
+                        <td style="padding:10px 8px;background:${theirCellBg};border-right:2px solid #e5e7eb;text-align:center;">${theirCell}</td>
+                        <td style="padding:10px 8px;background:#ffffff;text-align:center;">${diffCell}</td>
+                    </tr>
+                `;
+    }
+
+    console.log("Calculated myTotalTime:", myTotalTime);
+    console.log("Calculated theirTotalTime:", theirTotalTime);
+
+    // Determine win/loss/tie
+    const finalDiff = myTotalTime - theirTotalTime;
+    let resultText = "";
+    let headerBg = "#e5e7eb";
+    let finalDiffText = "";
+    let finalDiffColor = "#6b7280";
+
+    if (myResult.status === "DNF" && theirResult.status === "DNF") {
+      resultText = "Both Abandoned";
+      headerBg = "#e5e7eb";
+    } else if (myResult.status === "DNF") {
+      resultText = "Loss";
+      headerBg = "#fca5a5";
+      finalDiffText = "Abandoned";
+    } else if (theirResult.status === "DNF") {
+      resultText = "Win";
+      headerBg = "#86efac";
+      finalDiffText = "Opponent Abandoned";
+    } else if (Math.abs(finalDiff) < 0.05) {
+      resultText = "Tie";
+      finalDiffText = "0.0s";
+    } else if (finalDiff < 0) {
+      resultText = "Win";
+      headerBg = "#86efac";
+      finalDiffText = `${finalDiff.toFixed(1)}s`;
+      finalDiffColor = "#16a34a";
+    } else {
+      resultText = "Loss";
+      headerBg = "#fca5a5";
+      finalDiffText = `+${finalDiff.toFixed(1)}s`;
+      finalDiffColor = "#dc2626";
+    }
+
+    // Format completed date
+    const completedDate = challenge.completedAt
+      ? new Date(challenge.completedAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "Unknown";
+
+    const myStatus =
+      myResult.status === "DNF" ? "Abandoned" : `${myTotalTime.toFixed(1)}s`;
+    const theirStatus =
+      theirResult.status === "DNF"
+        ? "Abandoned"
+        : `${theirTotalTime.toFixed(1)}s`;
+
+    // Update modal title with stats
+    document.getElementById("h2hComparisonTitle").innerHTML = `
+                <div style="font-size:1.1rem;font-weight:700;">${resultText} vs ${opponentName}</div>
+                <div style="font-size:0.85rem;font-weight:400;margin-top:4px;">${completedDate} • ${myStatus} vs ${theirStatus} • Margin: ${finalDiffText}</div>
+            `;
+    document.querySelector(
+      "#h2hComparisonModalBackdrop .modal-header"
+    ).style.background = headerBg;
+
+    content.innerHTML = `
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;background:white;border:2px solid #e5e7eb;">
+                        <thead>
+                            <tr style="background:#e5e7eb;">
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:12%;">Plate</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:32%;">${myName}</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:32%;">${opponentName}</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;width:24%;">Diff</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                            <tr style="border-top:3px solid #9370db;">
+                                <td style="padding:12px 8px;font-weight:700;font-size:0.9rem;background:#f3f4f6;border-right:2px solid #e5e7eb;text-align:center;">TOTAL</td>
+                                <td style="padding:10px 8px;background:#e5e7eb;border-right:2px solid #e5e7eb;text-align:center;font-weight:600;font-size:0.95rem;">${myStatus}</td>
+                                <td style="padding:10px 8px;background:#e5e7eb;border-right:2px solid #e5e7eb;text-align:center;font-weight:600;font-size:0.95rem;">${theirStatus}</td>
+                                <td style="padding:10px 8px;background:#ffffff;text-align:center;">
+                                    <div style="font-size:1rem;font-weight:700;color:${finalDiffColor};">${finalDiffText}</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+    // Show modal
+    document.getElementById("h2hComparisonModalBackdrop").classList.add("show");
+  } catch (error) {
+    console.error("Error loading challenge comparison:", error);
+    alert("Error loading challenge data");
+  }
+};
+
+function displayH2HResults(allChallenges) {
+  const container = document.getElementById("h2hResults");
+
+  const completed = Object.entries(allChallenges).filter(([id, c]) => {
+    if (c.status !== "completed") return false;
+
+    // Filter out challenges where both players abandoned (already deleted by loadH2HChallenges)
+    const creatorResult = c.results && c.results[c.createdBy];
+    const challengedResult = c.results && c.results[c.challengedUser];
+
+    if (
+      creatorResult &&
+      challengedResult &&
+      creatorResult.status === "DNF" &&
+      challengedResult.status === "DNF"
+    ) {
+      return false; // Don't display (should already be deleted)
+    }
+
+    return true;
+  });
+
+  if (completed.length === 0) {
+    container.innerHTML =
+      '<p style="color:#9ca3af;text-align:center;">No completed challenges</p>';
+    return;
+  }
+
+  completed.sort((a, b) => (b[1].completedAt || 0) - (a[1].completedAt || 0));
+
+  let html = `
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Completed</th>
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Opponent</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Your Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Their Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Result</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+  completed.forEach(([id, challenge]) => {
+    const isCreator = challenge.createdBy === currentUser.uid;
+    const opponentId = isCreator
+      ? challenge.challengedUser
+      : challenge.createdBy;
+    const opponentName = isCreator
+      ? challenge.opponentName
+      : challenge.creatorName;
+
+    // Format completion date
+    const completedDate = challenge.completedAt
+      ? new Date(challenge.completedAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "Unknown";
+
+    const myResult = challenge.results && challenge.results[currentUser.uid];
+    const theirResult = challenge.results && challenge.results[opponentId];
+
+    let myTimeText = "—";
+    let theirTimeText = "—";
+    let resultText = "";
+    let resultColor = "";
+
+    if (myResult) {
+      myTimeText =
+        myResult.status === "DNF"
+          ? '<span style="color:#ef4444;">Abandoned</span>'
+          : myResult.time
+          ? myResult.time.toFixed(1) + "s"
+          : "—";
+    }
+
+    if (theirResult) {
+      theirTimeText =
+        theirResult.status === "DNF"
+          ? '<span style="color:#ef4444;">Abandoned</span>'
+          : theirResult.time
+          ? theirResult.time.toFixed(1) + "s"
+          : "—";
+    }
+
+    if (myResult && theirResult) {
+      const myDNF = myResult.status === "DNF";
+      const theirDNF = theirResult.status === "DNF";
+
+      if (myDNF && theirDNF) {
+        resultText = "Both Abandoned";
+        resultColor = "#6b7280";
+      } else if (myDNF) {
+        resultText = "❌ Loss";
+        resultColor = "#ef4444";
+      } else if (theirDNF) {
+        resultText = "🏆 Win";
+        resultColor = "#10b981";
+      } else if (myResult.time && theirResult.time) {
+        const diff = myResult.time - theirResult.time;
+        if (diff < -0.05) {
+          resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
+          resultColor = "#10b981";
+        } else if (diff > 0.05) {
+          resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
+          resultColor = "#ef4444";
+        } else {
+          resultText = "🤝 Tie";
+          resultColor = "#6b7280";
+        }
+      }
+    }
+
+    html += `
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 8px;font-size:0.85rem;color:#6b7280;">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;">${opponentName}</td>
+                    <td style="padding:12px 8px;text-align:center;">${myTimeText}</td>
+                    <td style="padding:12px 8px;text-align:center;">${theirTimeText}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
+                    <td style="padding:12px 8px;text-align:center;">
+                        <button onclick="viewH2HComparison('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">View</button>
+                    </td>
+                </tr>
+            `;
+  });
+
+  html += "</tbody></table>";
+  container.innerHTML = html;
+}
+
+window.copyToClipboard = function (text) {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      alert("Challenge link copied to clipboard!");
+    })
+    .catch((err) => {
+      console.error("Failed to copy:", err);
+      alert("Failed to copy link");
+    });
+};
+
+window.declineChallenge = async function (challengeId) {
+  console.log("declineChallenge called for:", challengeId);
+  console.log("currentChallengeId:", currentChallengeId);
+  console.log("gameStarted:", gameStarted);
+  console.log("gameOver:", gameOver);
+
+  // Check if challenge is active (you're currently playing it)
+  if (currentChallengeId === challengeId && gameStarted && !gameOver) {
+    alert("Cannot decline a challenge while playing it!");
+    return;
+  }
+
+  // Check if you've already started this challenge
+  try {
+    const snapshot = await database
+      .ref(`challenges/${challengeId}/results/${currentUser.uid}`)
+      .once("value");
+    const myResult = snapshot.val();
+    console.log("My result from Firebase:", myResult);
+    if (myResult) {
+      alert("Cannot decline a challenge you have already started!");
+      return;
+    }
+  } catch (error) {
+    console.error("Error checking challenge status:", error);
+  }
+
+  if (!confirm("Are you sure you want to decline this challenge?")) return;
+
+  try {
+    await database.ref(`challenges/${challengeId}`).remove();
+    loadH2HChallenges();
+  } catch (error) {
+    console.error("Error declining challenge:", error);
+    alert("Failed to decline challenge");
+  }
+};
+
+window.cancelChallenge = async function (challengeId) {
+  // Check if challenge is active (you're currently playing it)
+  if (currentChallengeId === challengeId && gameStarted && !gameOver) {
+    alert("Cannot cancel a challenge while playing it!");
+    return;
+  }
+
+  // Check if you've already started this challenge
+  try {
+    const snapshot = await database
+      .ref(`challenges/${challengeId}/results/${currentUser.uid}`)
+      .once("value");
+    const myResult = snapshot.val();
+    if (myResult) {
+      alert("Cannot cancel a challenge you have already started!");
+      return;
+    }
+  } catch (error) {
+    console.error("Error checking challenge status:", error);
+  }
+
+  if (!confirm("Are you sure you want to cancel this challenge?")) return;
+
+  try {
+    await database.ref(`challenges/${challengeId}`).remove();
+    loadH2HChallenges();
+  } catch (error) {
+    console.error("Error canceling challenge:", error);
+    alert("Failed to cancel challenge");
+  }
+};
+
+async function saveChallengeResult(
+  challengeId,
+  time,
+  solved,
+  skipped,
+  history
+) {
+  if (!currentUser || !challengeId || gameMode !== "h2h_challenge") return;
+
+  const historyData = history.map((entry) => ({
+    plate: entry.plate,
+    word: entry.word,
+    skipped: entry.skipped || false,
+    thinkingSeconds: Math.floor(entry.thinkingSeconds * 10) / 10,
+    penaltySeconds: entry.penaltySeconds || 0,
+  }));
+
+  await database
+    .ref(`challenges/${challengeId}/results/${currentUser.uid}`)
+    .set({
+      time: Math.floor(time * 10) / 10,
+      solved: solved,
+      skipped: skipped,
+      completedAt: Date.now(),
+      history: historyData,
+      status: "completed",
+    });
+
+  const challengeSnapshot = await database
+    .ref(`challenges/${challengeId}`)
+    .once("value");
+  const challenge = challengeSnapshot.val();
+
+  if (challenge && challenge.results) {
+    const creatorResult = challenge.results[challenge.createdBy];
+    const challengedResult = challenge.results[challenge.challengedUser];
+
+    if (
+      creatorResult &&
+      challengedResult &&
+      (creatorResult.status === "completed" ||
+        creatorResult.status === "DNF") &&
+      (challengedResult.status === "completed" ||
+        challengedResult.status === "DNF")
+    ) {
+      await database.ref(`challenges/${challengeId}`).update({
+        status: "completed",
+        completedAt: Date.now(),
+      });
+    }
+  }
+
+  challengeStartTime = null;
+  gameMode = "practice";
+
+  // Reload H2H challenges to update the display
+  setTimeout(() => {
+    loadH2HChallenges();
+  }, 500);
+}
+
+async function checkAbandonedChallenges(userId) {
+  try {
+    const challengesSnapshot = await database.ref("challenges").once("value");
+    const allChallenges = challengesSnapshot.val() || {};
+
+    for (const [challengeId, challenge] of Object.entries(allChallenges)) {
+      const userResult = challenge.results && challenge.results[userId];
+
+      if (
+        userResult &&
+        userResult.status === "in_progress" &&
+        !userResult.time
+      ) {
+        await database
+          .ref(`challenges/${challengeId}/results/${userId}`)
+          .update({
+            status: "DNF",
+            completedAt: Date.now(),
+          });
+
+        // Re-fetch challenge to get updated results
+        const updatedSnapshot = await database
+          .ref(`challenges/${challengeId}`)
+          .once("value");
+        const updatedChallenge = updatedSnapshot.val();
+
+        if (updatedChallenge && updatedChallenge.results) {
+          const creatorResult =
+            updatedChallenge.results[updatedChallenge.createdBy];
+          const challengedResult =
+            updatedChallenge.results[updatedChallenge.challengedUser];
+
+          if (
+            creatorResult &&
+            challengedResult &&
+            (creatorResult.status === "completed" ||
+              creatorResult.status === "DNF") &&
+            (challengedResult.status === "completed" ||
+              challengedResult.status === "DNF")
+          ) {
+            await database.ref(`challenges/${challengeId}`).update({
+              status: "completed",
+              completedAt: Date.now(),
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error checking abandoned challenges:", error);
+  }
+}
+// ========== END HEAD-TO-HEAD FEATURE ==========

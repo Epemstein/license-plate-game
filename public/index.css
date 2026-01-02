@@ -29,6 +29,7 @@ h1 {
 .left-panel {
   flex: 0 0 55%;
 }
+
 .right-panel {
   flex: 1;
 }
@@ -338,15 +339,7 @@ tr:nth-child(even) td {
   }
 }
 
-button#dailyChallengeBtn:hover {
-  filter: brightness(0.9);
-}
-
-button#practiceBtn:hover {
-  filter: brightness(0.9);
-}
-
-button#endlessBtn:hover {
+button.gameModeButton:hover {
   filter: brightness(0.9);
 }
 
