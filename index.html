@@ -375,10 +375,1154 @@
         }
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js">
+    // ========== HEAD-TO-HEAD FEATURE CODE ==========
+    
+    // Show H2H tab
+    document.getElementById('h2hTab').style.display = 'block';
+    
+    // Tab switching
+    document.getElementById('dailyLeaderboardTab').addEventListener('click', function() {
+        // Switch to Daily Leaderboard tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'block';
+        document.getElementById('h2hContent').style.display = 'none';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('h2hTab').style.borderBottom = 'none';
+        document.getElementById('h2hTab').style.color = '#9ca3af';
+        document.getElementById('h2hTab').style.fontWeight = '400';
+    });
+    
+    document.getElementById('h2hTab').addEventListener('click', function() {
+        // Switch to H2H tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'none';
+        document.getElementById('h2hContent').style.display = 'block';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('dailyLeaderboardTab').style.borderBottom = 'none';
+        document.getElementById('dailyLeaderboardTab').style.color = '#9ca3af';
+        document.getElementById('dailyLeaderboardTab').style.fontWeight = '400';
+        
+        // Load H2H challenges
+        loadH2HChallenges();
+    });
+    
+    // Load H2H challenges
+    async function loadH2HChallenges() {
+        if (!currentUser) {
+            document.getElementById('incomingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('outgoingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('h2hResults').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see results</p>';
+            return;
+        }
+        
+        try {
+            // Load incoming challenges
+            const incomingRef = database.ref('challenges').orderByChild('challengedUser').equalTo(currentUser.uid);
+            const incomingSnap = await incomingRef.once('value');
+            displayIncomingChallenges(incomingSnap.val());
+            
+            // Load outgoing challenges
+            const outgoingRef = database.ref('challenges').orderByChild('createdBy').equalTo(currentUser.uid);
+            const outgoingSnap = await outgoingRef.once('value');
+            displayOutgoingChallenges(outgoingSnap.val());
+            
+            // Load completed challenges (need both incoming and outgoing)
+            const allChallenges = {...(incomingSnap.val() || {}), ...(outgoingSnap.val() || {})};
+            displayH2HResults(allChallenges);
+            
+        } catch (error) {
+            console.error('Error loading H2H challenges:', error);
+        }
+    }
+    
+    function displayIncomingChallenges(challenges) {
+        const container = document.getElementById('incomingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No incoming challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending incoming challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const creatorName = challenge.creatorName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.createdBy];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: ${myResult.time.toFixed(1)}s`;
+            } else if (theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: —`;
+            } else if (myResult) {
+                statusText = `${creatorName}: —, You: ${myResult.time.toFixed(1)}s`;
+            } else {
+                statusText = '';
+            }
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• <strong>${creatorName}</strong> challenged you ${statusText ? '— ' + statusText : ''}</span>
+                    <button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>
+                    <button onclick="declineChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Decline</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayOutgoingChallenges(challenges) {
+        const container = document.getElementById('outgoingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending outgoing challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const opponentName = challenge.opponentName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.challengedUser];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else if (myResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: —`;
+            } else if (theirResult) {
+                statusText = `You: —, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else {
+                statusText = 'Waiting for both';
+            }
+            
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• You vs. <strong>${opponentName}</strong> — ${statusText}</span>
+                    ${!myResult ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>` : ''}
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;">Copy Link</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayH2HResults(challenges) {
+        const container = document.getElementById('h2hResults');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges</p>';
+            return;
+        }
+        
+        // Filter for completed challenges only
+        const completed = Object.entries(challenges).filter(([id, c]) => c.status === 'completed');
+        
+        if (completed.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges yet</p>';
+            return;
+        }
+        
+        // Sort by completion date (most recent first)
+        completed.sort((a, b) => (b[1].completedAt || 0) - (a[1].completedAt || 0));
+        
+        let html = `
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Completed</th>
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Opponent</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Your Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Their Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        completed.forEach(([id, challenge]) => {
+            const completedDate = new Date(challenge.completedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+            
+            const isCreator = challenge.createdBy === currentUser.uid;
+            const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
+            const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
+            
+            const myResult = challenge.results[currentUser.uid];
+            const theirResult = challenge.results[opponentId];
+            
+            let resultText = '';
+            let resultColor = '';
+            if (myResult && theirResult) {
+                const diff = myResult.time - theirResult.time;
+                if (diff < -0.05) {
+                    resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
+                    resultColor = '#10b981';
+                } else if (diff > 0.05) {
+                    resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
+                    resultColor = '#ef4444';
+                } else {
+                    resultText = `🤝 Tie`;
+                    resultColor = '#6b7280';
+                }
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 8px;">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;">${opponentName || 'Unknown'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${myResult ? myResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${theirResult ? theirResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+    
+    function getTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        return new Date(timestamp).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    }
+    
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Challenge link copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link');
+        });
+    }
+    
+    async function declineChallenge(challengeId) {
+        if (!confirm('Are you sure you want to decline this challenge?')) return;
+        
+        try {
+            await database.ref(`challenges/${challengeId}`).remove();
+            alert('Challenge declined');
+            loadH2HChallenges();
+        } catch (error) {
+            console.error('Error declining challenge:', error);
+            alert('Failed to decline challenge');
+        }
+    }
+    
+    // Placeholder functions - will implement in next step
+    async function playChallenge(challengeId) {
+        alert('Challenge play functionality coming in next update!');
+        // TODO: Implement challenge play
+    }
+    
+    document.getElementById('createChallengeBtn').addEventListener('click', function() {
+        alert('Create challenge functionality coming in next update!');
+        // TODO: Show player selection modal
+    });
+    
+    // ========== END HEAD-TO-HEAD CODE ==========
+    
+</script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
+    // ========== HEAD-TO-HEAD FEATURE CODE ==========
+    
+    // Show H2H tab
+    document.getElementById('h2hTab').style.display = 'block';
+    
+    // Tab switching
+    document.getElementById('dailyLeaderboardTab').addEventListener('click', function() {
+        // Switch to Daily Leaderboard tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'block';
+        document.getElementById('h2hContent').style.display = 'none';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('h2hTab').style.borderBottom = 'none';
+        document.getElementById('h2hTab').style.color = '#9ca3af';
+        document.getElementById('h2hTab').style.fontWeight = '400';
+    });
+    
+    document.getElementById('h2hTab').addEventListener('click', function() {
+        // Switch to H2H tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'none';
+        document.getElementById('h2hContent').style.display = 'block';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('dailyLeaderboardTab').style.borderBottom = 'none';
+        document.getElementById('dailyLeaderboardTab').style.color = '#9ca3af';
+        document.getElementById('dailyLeaderboardTab').style.fontWeight = '400';
+        
+        // Load H2H challenges
+        loadH2HChallenges();
+    });
+    
+    // Load H2H challenges
+    async function loadH2HChallenges() {
+        if (!currentUser) {
+            document.getElementById('incomingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('outgoingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('h2hResults').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see results</p>';
+            return;
+        }
+        
+        try {
+            // Load incoming challenges
+            const incomingRef = database.ref('challenges').orderByChild('challengedUser').equalTo(currentUser.uid);
+            const incomingSnap = await incomingRef.once('value');
+            displayIncomingChallenges(incomingSnap.val());
+            
+            // Load outgoing challenges
+            const outgoingRef = database.ref('challenges').orderByChild('createdBy').equalTo(currentUser.uid);
+            const outgoingSnap = await outgoingRef.once('value');
+            displayOutgoingChallenges(outgoingSnap.val());
+            
+            // Load completed challenges (need both incoming and outgoing)
+            const allChallenges = {...(incomingSnap.val() || {}), ...(outgoingSnap.val() || {})};
+            displayH2HResults(allChallenges);
+            
+        } catch (error) {
+            console.error('Error loading H2H challenges:', error);
+        }
+    }
+    
+    function displayIncomingChallenges(challenges) {
+        const container = document.getElementById('incomingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No incoming challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending incoming challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const creatorName = challenge.creatorName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.createdBy];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: ${myResult.time.toFixed(1)}s`;
+            } else if (theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: —`;
+            } else if (myResult) {
+                statusText = `${creatorName}: —, You: ${myResult.time.toFixed(1)}s`;
+            } else {
+                statusText = '';
+            }
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• <strong>${creatorName}</strong> challenged you ${statusText ? '— ' + statusText : ''}</span>
+                    <button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>
+                    <button onclick="declineChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Decline</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayOutgoingChallenges(challenges) {
+        const container = document.getElementById('outgoingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending outgoing challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const opponentName = challenge.opponentName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.challengedUser];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else if (myResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: —`;
+            } else if (theirResult) {
+                statusText = `You: —, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else {
+                statusText = 'Waiting for both';
+            }
+            
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• You vs. <strong>${opponentName}</strong> — ${statusText}</span>
+                    ${!myResult ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>` : ''}
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;">Copy Link</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayH2HResults(challenges) {
+        const container = document.getElementById('h2hResults');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges</p>';
+            return;
+        }
+        
+        // Filter for completed challenges only
+        const completed = Object.entries(challenges).filter(([id, c]) => c.status === 'completed');
+        
+        if (completed.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges yet</p>';
+            return;
+        }
+        
+        // Sort by completion date (most recent first)
+        completed.sort((a, b) => (b[1].completedAt || 0) - (a[1].completedAt || 0));
+        
+        let html = `
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Completed</th>
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Opponent</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Your Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Their Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        completed.forEach(([id, challenge]) => {
+            const completedDate = new Date(challenge.completedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+            
+            const isCreator = challenge.createdBy === currentUser.uid;
+            const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
+            const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
+            
+            const myResult = challenge.results[currentUser.uid];
+            const theirResult = challenge.results[opponentId];
+            
+            let resultText = '';
+            let resultColor = '';
+            if (myResult && theirResult) {
+                const diff = myResult.time - theirResult.time;
+                if (diff < -0.05) {
+                    resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
+                    resultColor = '#10b981';
+                } else if (diff > 0.05) {
+                    resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
+                    resultColor = '#ef4444';
+                } else {
+                    resultText = `🤝 Tie`;
+                    resultColor = '#6b7280';
+                }
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 8px;">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;">${opponentName || 'Unknown'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${myResult ? myResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${theirResult ? theirResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+    
+    function getTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        return new Date(timestamp).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    }
+    
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Challenge link copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link');
+        });
+    }
+    
+    async function declineChallenge(challengeId) {
+        if (!confirm('Are you sure you want to decline this challenge?')) return;
+        
+        try {
+            await database.ref(`challenges/${challengeId}`).remove();
+            alert('Challenge declined');
+            loadH2HChallenges();
+        } catch (error) {
+            console.error('Error declining challenge:', error);
+            alert('Failed to decline challenge');
+        }
+    }
+    
+    // Placeholder functions - will implement in next step
+    async function playChallenge(challengeId) {
+        alert('Challenge play functionality coming in next update!');
+        // TODO: Implement challenge play
+    }
+    
+    document.getElementById('createChallengeBtn').addEventListener('click', function() {
+        alert('Create challenge functionality coming in next update!');
+        // TODO: Show player selection modal
+    });
+    
+    // ========== END HEAD-TO-HEAD CODE ==========
+    
+</script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js">
+    // ========== HEAD-TO-HEAD FEATURE CODE ==========
+    
+    // Show H2H tab
+    document.getElementById('h2hTab').style.display = 'block';
+    
+    // Tab switching
+    document.getElementById('dailyLeaderboardTab').addEventListener('click', function() {
+        // Switch to Daily Leaderboard tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'block';
+        document.getElementById('h2hContent').style.display = 'none';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('h2hTab').style.borderBottom = 'none';
+        document.getElementById('h2hTab').style.color = '#9ca3af';
+        document.getElementById('h2hTab').style.fontWeight = '400';
+    });
+    
+    document.getElementById('h2hTab').addEventListener('click', function() {
+        // Switch to H2H tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'none';
+        document.getElementById('h2hContent').style.display = 'block';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('dailyLeaderboardTab').style.borderBottom = 'none';
+        document.getElementById('dailyLeaderboardTab').style.color = '#9ca3af';
+        document.getElementById('dailyLeaderboardTab').style.fontWeight = '400';
+        
+        // Load H2H challenges
+        loadH2HChallenges();
+    });
+    
+    // Load H2H challenges
+    async function loadH2HChallenges() {
+        if (!currentUser) {
+            document.getElementById('incomingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('outgoingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('h2hResults').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see results</p>';
+            return;
+        }
+        
+        try {
+            // Load incoming challenges
+            const incomingRef = database.ref('challenges').orderByChild('challengedUser').equalTo(currentUser.uid);
+            const incomingSnap = await incomingRef.once('value');
+            displayIncomingChallenges(incomingSnap.val());
+            
+            // Load outgoing challenges
+            const outgoingRef = database.ref('challenges').orderByChild('createdBy').equalTo(currentUser.uid);
+            const outgoingSnap = await outgoingRef.once('value');
+            displayOutgoingChallenges(outgoingSnap.val());
+            
+            // Load completed challenges (need both incoming and outgoing)
+            const allChallenges = {...(incomingSnap.val() || {}), ...(outgoingSnap.val() || {})};
+            displayH2HResults(allChallenges);
+            
+        } catch (error) {
+            console.error('Error loading H2H challenges:', error);
+        }
+    }
+    
+    function displayIncomingChallenges(challenges) {
+        const container = document.getElementById('incomingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No incoming challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending incoming challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const creatorName = challenge.creatorName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.createdBy];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: ${myResult.time.toFixed(1)}s`;
+            } else if (theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: —`;
+            } else if (myResult) {
+                statusText = `${creatorName}: —, You: ${myResult.time.toFixed(1)}s`;
+            } else {
+                statusText = '';
+            }
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• <strong>${creatorName}</strong> challenged you ${statusText ? '— ' + statusText : ''}</span>
+                    <button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>
+                    <button onclick="declineChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Decline</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayOutgoingChallenges(challenges) {
+        const container = document.getElementById('outgoingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending outgoing challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const opponentName = challenge.opponentName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.challengedUser];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else if (myResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: —`;
+            } else if (theirResult) {
+                statusText = `You: —, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else {
+                statusText = 'Waiting for both';
+            }
+            
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• You vs. <strong>${opponentName}</strong> — ${statusText}</span>
+                    ${!myResult ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>` : ''}
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;">Copy Link</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayH2HResults(challenges) {
+        const container = document.getElementById('h2hResults');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges</p>';
+            return;
+        }
+        
+        // Filter for completed challenges only
+        const completed = Object.entries(challenges).filter(([id, c]) => c.status === 'completed');
+        
+        if (completed.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges yet</p>';
+            return;
+        }
+        
+        // Sort by completion date (most recent first)
+        completed.sort((a, b) => (b[1].completedAt || 0) - (a[1].completedAt || 0));
+        
+        let html = `
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Completed</th>
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Opponent</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Your Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Their Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        completed.forEach(([id, challenge]) => {
+            const completedDate = new Date(challenge.completedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+            
+            const isCreator = challenge.createdBy === currentUser.uid;
+            const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
+            const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
+            
+            const myResult = challenge.results[currentUser.uid];
+            const theirResult = challenge.results[opponentId];
+            
+            let resultText = '';
+            let resultColor = '';
+            if (myResult && theirResult) {
+                const diff = myResult.time - theirResult.time;
+                if (diff < -0.05) {
+                    resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
+                    resultColor = '#10b981';
+                } else if (diff > 0.05) {
+                    resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
+                    resultColor = '#ef4444';
+                } else {
+                    resultText = `🤝 Tie`;
+                    resultColor = '#6b7280';
+                }
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 8px;">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;">${opponentName || 'Unknown'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${myResult ? myResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${theirResult ? theirResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+    
+    function getTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        return new Date(timestamp).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    }
+    
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Challenge link copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link');
+        });
+    }
+    
+    async function declineChallenge(challengeId) {
+        if (!confirm('Are you sure you want to decline this challenge?')) return;
+        
+        try {
+            await database.ref(`challenges/${challengeId}`).remove();
+            alert('Challenge declined');
+            loadH2HChallenges();
+        } catch (error) {
+            console.error('Error declining challenge:', error);
+            alert('Failed to decline challenge');
+        }
+    }
+    
+    // Placeholder functions - will implement in next step
+    async function playChallenge(challengeId) {
+        alert('Challenge play functionality coming in next update!');
+        // TODO: Implement challenge play
+    }
+    
+    document.getElementById('createChallengeBtn').addEventListener('click', function() {
+        alert('Create challenge functionality coming in next update!');
+        // TODO: Show player selection modal
+    });
+    
+    // ========== END HEAD-TO-HEAD CODE ==========
+    
+</script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
+    // ========== HEAD-TO-HEAD FEATURE CODE ==========
+    
+    // Show H2H tab
+    document.getElementById('h2hTab').style.display = 'block';
+    
+    // Tab switching
+    document.getElementById('dailyLeaderboardTab').addEventListener('click', function() {
+        // Switch to Daily Leaderboard tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'block';
+        document.getElementById('h2hContent').style.display = 'none';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('h2hTab').style.borderBottom = 'none';
+        document.getElementById('h2hTab').style.color = '#9ca3af';
+        document.getElementById('h2hTab').style.fontWeight = '400';
+    });
+    
+    document.getElementById('h2hTab').addEventListener('click', function() {
+        // Switch to H2H tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'none';
+        document.getElementById('h2hContent').style.display = 'block';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('dailyLeaderboardTab').style.borderBottom = 'none';
+        document.getElementById('dailyLeaderboardTab').style.color = '#9ca3af';
+        document.getElementById('dailyLeaderboardTab').style.fontWeight = '400';
+        
+        // Load H2H challenges
+        loadH2HChallenges();
+    });
+    
+    // Load H2H challenges
+    async function loadH2HChallenges() {
+        if (!currentUser) {
+            document.getElementById('incomingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('outgoingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('h2hResults').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see results</p>';
+            return;
+        }
+        
+        try {
+            // Load incoming challenges
+            const incomingRef = database.ref('challenges').orderByChild('challengedUser').equalTo(currentUser.uid);
+            const incomingSnap = await incomingRef.once('value');
+            displayIncomingChallenges(incomingSnap.val());
+            
+            // Load outgoing challenges
+            const outgoingRef = database.ref('challenges').orderByChild('createdBy').equalTo(currentUser.uid);
+            const outgoingSnap = await outgoingRef.once('value');
+            displayOutgoingChallenges(outgoingSnap.val());
+            
+            // Load completed challenges (need both incoming and outgoing)
+            const allChallenges = {...(incomingSnap.val() || {}), ...(outgoingSnap.val() || {})};
+            displayH2HResults(allChallenges);
+            
+        } catch (error) {
+            console.error('Error loading H2H challenges:', error);
+        }
+    }
+    
+    function displayIncomingChallenges(challenges) {
+        const container = document.getElementById('incomingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No incoming challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending incoming challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const creatorName = challenge.creatorName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.createdBy];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: ${myResult.time.toFixed(1)}s`;
+            } else if (theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: —`;
+            } else if (myResult) {
+                statusText = `${creatorName}: —, You: ${myResult.time.toFixed(1)}s`;
+            } else {
+                statusText = '';
+            }
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• <strong>${creatorName}</strong> challenged you ${statusText ? '— ' + statusText : ''}</span>
+                    <button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>
+                    <button onclick="declineChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Decline</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayOutgoingChallenges(challenges) {
+        const container = document.getElementById('outgoingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending outgoing challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const opponentName = challenge.opponentName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.challengedUser];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else if (myResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: —`;
+            } else if (theirResult) {
+                statusText = `You: —, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else {
+                statusText = 'Waiting for both';
+            }
+            
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• You vs. <strong>${opponentName}</strong> — ${statusText}</span>
+                    ${!myResult ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>` : ''}
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;">Copy Link</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayH2HResults(challenges) {
+        const container = document.getElementById('h2hResults');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges</p>';
+            return;
+        }
+        
+        // Filter for completed challenges only
+        const completed = Object.entries(challenges).filter(([id, c]) => c.status === 'completed');
+        
+        if (completed.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges yet</p>';
+            return;
+        }
+        
+        // Sort by completion date (most recent first)
+        completed.sort((a, b) => (b[1].completedAt || 0) - (a[1].completedAt || 0));
+        
+        let html = `
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Completed</th>
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Opponent</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Your Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Their Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        completed.forEach(([id, challenge]) => {
+            const completedDate = new Date(challenge.completedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+            
+            const isCreator = challenge.createdBy === currentUser.uid;
+            const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
+            const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
+            
+            const myResult = challenge.results[currentUser.uid];
+            const theirResult = challenge.results[opponentId];
+            
+            let resultText = '';
+            let resultColor = '';
+            if (myResult && theirResult) {
+                const diff = myResult.time - theirResult.time;
+                if (diff < -0.05) {
+                    resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
+                    resultColor = '#10b981';
+                } else if (diff > 0.05) {
+                    resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
+                    resultColor = '#ef4444';
+                } else {
+                    resultText = `🤝 Tie`;
+                    resultColor = '#6b7280';
+                }
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 8px;">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;">${opponentName || 'Unknown'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${myResult ? myResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${theirResult ? theirResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+    
+    function getTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        return new Date(timestamp).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    }
+    
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Challenge link copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link');
+        });
+    }
+    
+    async function declineChallenge(challengeId) {
+        if (!confirm('Are you sure you want to decline this challenge?')) return;
+        
+        try {
+            await database.ref(`challenges/${challengeId}`).remove();
+            alert('Challenge declined');
+            loadH2HChallenges();
+        } catch (error) {
+            console.error('Error declining challenge:', error);
+            alert('Failed to decline challenge');
+        }
+    }
+    
+    // Placeholder functions - will implement in next step
+    async function playChallenge(challengeId) {
+        alert('Challenge play functionality coming in next update!');
+        // TODO: Implement challenge play
+    }
+    
+    document.getElementById('createChallengeBtn').addEventListener('click', function() {
+        alert('Create challenge functionality coming in next update!');
+        // TODO: Show player selection modal
+    });
+    
+    // ========== END HEAD-TO-HEAD CODE ==========
+    
+</script>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -521,6 +1665,8 @@
 </div>
 
 <script>
+
+
 
     // === FIREBASE ===
     const firebaseConfig = {
@@ -2672,9 +3818,297 @@
 
     loadDictionary();
     loadDifficulty();
+
+    // ========== HEAD-TO-HEAD FEATURE CODE ==========
+    
+    // Show H2H tab
+    document.getElementById('h2hTab').style.display = 'block';
+    
+    // Tab switching
+    document.getElementById('dailyLeaderboardTab').addEventListener('click', function() {
+        // Switch to Daily Leaderboard tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'block';
+        document.getElementById('h2hContent').style.display = 'none';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('h2hTab').style.borderBottom = 'none';
+        document.getElementById('h2hTab').style.color = '#9ca3af';
+        document.getElementById('h2hTab').style.fontWeight = '400';
+    });
+    
+    document.getElementById('h2hTab').addEventListener('click', function() {
+        // Switch to H2H tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'none';
+        document.getElementById('h2hContent').style.display = 'block';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('dailyLeaderboardTab').style.borderBottom = 'none';
+        document.getElementById('dailyLeaderboardTab').style.color = '#9ca3af';
+        document.getElementById('dailyLeaderboardTab').style.fontWeight = '400';
+        
+        // Load H2H challenges
+        loadH2HChallenges();
+    });
+    
+    // Load H2H challenges
+    async function loadH2HChallenges() {
+        if (!currentUser) {
+            document.getElementById('incomingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('outgoingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('h2hResults').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see results</p>';
+            return;
+        }
+        
+        try {
+            // Load incoming challenges
+            const incomingRef = database.ref('challenges').orderByChild('challengedUser').equalTo(currentUser.uid);
+            const incomingSnap = await incomingRef.once('value');
+            displayIncomingChallenges(incomingSnap.val());
+            
+            // Load outgoing challenges
+            const outgoingRef = database.ref('challenges').orderByChild('createdBy').equalTo(currentUser.uid);
+            const outgoingSnap = await outgoingRef.once('value');
+            displayOutgoingChallenges(outgoingSnap.val());
+            
+            // Load completed challenges (need both incoming and outgoing)
+            const allChallenges = {...(incomingSnap.val() || {}), ...(outgoingSnap.val() || {})};
+            displayH2HResults(allChallenges);
+            
+        } catch (error) {
+            console.error('Error loading H2H challenges:', error);
+        }
+    }
+    
+    function displayIncomingChallenges(challenges) {
+        const container = document.getElementById('incomingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No incoming challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending incoming challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const creatorName = challenge.creatorName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.createdBy];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: ${myResult.time.toFixed(1)}s`;
+            } else if (theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: —`;
+            } else if (myResult) {
+                statusText = `${creatorName}: —, You: ${myResult.time.toFixed(1)}s`;
+            } else {
+                statusText = '';
+            }
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• <strong>${creatorName}</strong> challenged you ${statusText ? '— ' + statusText : ''}</span>
+                    <button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>
+                    <button onclick="declineChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Decline</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayOutgoingChallenges(challenges) {
+        const container = document.getElementById('outgoingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending outgoing challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const opponentName = challenge.opponentName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.challengedUser];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else if (myResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: —`;
+            } else if (theirResult) {
+                statusText = `You: —, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else {
+                statusText = 'Waiting for both';
+            }
+            
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• You vs. <strong>${opponentName}</strong> — ${statusText}</span>
+                    ${!myResult ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>` : ''}
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;">Copy Link</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayH2HResults(challenges) {
+        const container = document.getElementById('h2hResults');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges</p>';
+            return;
+        }
+        
+        // Filter for completed challenges only
+        const completed = Object.entries(challenges).filter(([id, c]) => c.status === 'completed');
+        
+        if (completed.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges yet</p>';
+            return;
+        }
+        
+        // Sort by completion date (most recent first)
+        completed.sort((a, b) => (b[1].completedAt || 0) - (a[1].completedAt || 0));
+        
+        let html = `
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Completed</th>
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Opponent</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Your Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Their Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        completed.forEach(([id, challenge]) => {
+            const completedDate = new Date(challenge.completedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+            
+            const isCreator = challenge.createdBy === currentUser.uid;
+            const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
+            const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
+            
+            const myResult = challenge.results[currentUser.uid];
+            const theirResult = challenge.results[opponentId];
+            
+            let resultText = '';
+            let resultColor = '';
+            if (myResult && theirResult) {
+                const diff = myResult.time - theirResult.time;
+                if (diff < -0.05) {
+                    resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
+                    resultColor = '#10b981';
+                } else if (diff > 0.05) {
+                    resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
+                    resultColor = '#ef4444';
+                } else {
+                    resultText = `🤝 Tie`;
+                    resultColor = '#6b7280';
+                }
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 8px;">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;">${opponentName || 'Unknown'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${myResult ? myResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${theirResult ? theirResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+    
+    function getTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        return new Date(timestamp).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    }
+    
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Challenge link copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link');
+        });
+    }
+    
+    async function declineChallenge(challengeId) {
+        if (!confirm('Are you sure you want to decline this challenge?')) return;
+        
+        try {
+            await database.ref(`challenges/${challengeId}`).remove();
+            alert('Challenge declined');
+            loadH2HChallenges();
+        } catch (error) {
+            console.error('Error declining challenge:', error);
+            alert('Failed to decline challenge');
+        }
+    }
+    
+    // Placeholder functions - will implement in next step
+    async function playChallenge(challengeId) {
+        alert('Challenge play functionality coming in next update!');
+        // TODO: Implement challenge play
+    }
+    
+    document.getElementById('createChallengeBtn').addEventListener('click', function() {
+        alert('Create challenge functionality coming in next update!');
+        // TODO: Show player selection modal
+    });
+    
+    // ========== END HEAD-TO-HEAD CODE ==========
+    
 </script>
 
 <script>
+
+
 // Auto-load today's leaderboard when page is fully loaded
 window.addEventListener('load', function() {
     setTimeout(function() {
@@ -2692,6 +4126,292 @@ window.addEventListener('load', function() {
         }
     }, 500); // Wait 2 seconds for Firebase to connect
 });
+
+    // ========== HEAD-TO-HEAD FEATURE CODE ==========
+    
+    // Show H2H tab
+    document.getElementById('h2hTab').style.display = 'block';
+    
+    // Tab switching
+    document.getElementById('dailyLeaderboardTab').addEventListener('click', function() {
+        // Switch to Daily Leaderboard tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'block';
+        document.getElementById('h2hContent').style.display = 'none';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('h2hTab').style.borderBottom = 'none';
+        document.getElementById('h2hTab').style.color = '#9ca3af';
+        document.getElementById('h2hTab').style.fontWeight = '400';
+    });
+    
+    document.getElementById('h2hTab').addEventListener('click', function() {
+        // Switch to H2H tab
+        document.getElementById('dailyLeaderboardContent').style.display = 'none';
+        document.getElementById('h2hContent').style.display = 'block';
+        
+        // Update tab styles
+        this.style.borderBottom = '3px solid #9370db';
+        this.style.color = '#9370db';
+        this.style.fontWeight = '600';
+        document.getElementById('dailyLeaderboardTab').style.borderBottom = 'none';
+        document.getElementById('dailyLeaderboardTab').style.color = '#9ca3af';
+        document.getElementById('dailyLeaderboardTab').style.fontWeight = '400';
+        
+        // Load H2H challenges
+        loadH2HChallenges();
+    });
+    
+    // Load H2H challenges
+    async function loadH2HChallenges() {
+        if (!currentUser) {
+            document.getElementById('incomingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('outgoingChallenges').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see challenges</p>';
+            document.getElementById('h2hResults').innerHTML = '<p style="color:#9ca3af;text-align:center;">Sign in to see results</p>';
+            return;
+        }
+        
+        try {
+            // Load incoming challenges
+            const incomingRef = database.ref('challenges').orderByChild('challengedUser').equalTo(currentUser.uid);
+            const incomingSnap = await incomingRef.once('value');
+            displayIncomingChallenges(incomingSnap.val());
+            
+            // Load outgoing challenges
+            const outgoingRef = database.ref('challenges').orderByChild('createdBy').equalTo(currentUser.uid);
+            const outgoingSnap = await outgoingRef.once('value');
+            displayOutgoingChallenges(outgoingSnap.val());
+            
+            // Load completed challenges (need both incoming and outgoing)
+            const allChallenges = {...(incomingSnap.val() || {}), ...(outgoingSnap.val() || {})};
+            displayH2HResults(allChallenges);
+            
+        } catch (error) {
+            console.error('Error loading H2H challenges:', error);
+        }
+    }
+    
+    function displayIncomingChallenges(challenges) {
+        const container = document.getElementById('incomingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No incoming challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending incoming challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const creatorName = challenge.creatorName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.createdBy];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: ${myResult.time.toFixed(1)}s`;
+            } else if (theirResult) {
+                statusText = `${creatorName}: ${theirResult.time.toFixed(1)}s, You: —`;
+            } else if (myResult) {
+                statusText = `${creatorName}: —, You: ${myResult.time.toFixed(1)}s`;
+            } else {
+                statusText = '';
+            }
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• <strong>${creatorName}</strong> challenged you ${statusText ? '— ' + statusText : ''}</span>
+                    <button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>
+                    <button onclick="declineChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Decline</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayOutgoingChallenges(challenges) {
+        const container = document.getElementById('outgoingChallenges');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>';
+            return;
+        }
+        
+        // Filter for incomplete challenges only
+        const incomplete = Object.entries(challenges).filter(([id, c]) => c.status !== 'completed');
+        
+        if (incomplete.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No pending outgoing challenges</p>';
+            return;
+        }
+        
+        let html = '';
+        incomplete.forEach(([id, challenge]) => {
+            const timeAgo = getTimeAgo(challenge.createdAt);
+            const opponentName = challenge.opponentName || 'Unknown';
+            const myResult = challenge.results && challenge.results[currentUser.uid];
+            const theirResult = challenge.results && challenge.results[challenge.challengedUser];
+            
+            let statusText = '';
+            if (myResult && theirResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else if (myResult) {
+                statusText = `You: ${myResult.time.toFixed(1)}s, ${opponentName}: —`;
+            } else if (theirResult) {
+                statusText = `You: —, ${opponentName}: ${theirResult.time.toFixed(1)}s`;
+            } else {
+                statusText = 'Waiting for both';
+            }
+            
+            const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
+            
+            html += `
+                <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
+                    <span style="color:#6b7280;font-size:0.9rem;min-width:100px;">${timeAgo}</span>
+                    <span style="flex:1;">• You vs. <strong>${opponentName}</strong> — ${statusText}</span>
+                    ${!myResult ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>` : ''}
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;">Copy Link</button>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function displayH2HResults(challenges) {
+        const container = document.getElementById('h2hResults');
+        
+        if (!challenges) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges</p>';
+            return;
+        }
+        
+        // Filter for completed challenges only
+        const completed = Object.entries(challenges).filter(([id, c]) => c.status === 'completed');
+        
+        if (completed.length === 0) {
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No completed challenges yet</p>';
+            return;
+        }
+        
+        // Sort by completion date (most recent first)
+        completed.sort((a, b) => (b[1].completedAt || 0) - (a[1].completedAt || 0));
+        
+        let html = `
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Completed</th>
+                        <th style="padding:12px 8px;text-align:left;font-weight:600;">Opponent</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Your Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Their Time</th>
+                        <th style="padding:12px 8px;text-align:center;font-weight:600;">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        completed.forEach(([id, challenge]) => {
+            const completedDate = new Date(challenge.completedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+            
+            const isCreator = challenge.createdBy === currentUser.uid;
+            const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
+            const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
+            
+            const myResult = challenge.results[currentUser.uid];
+            const theirResult = challenge.results[opponentId];
+            
+            let resultText = '';
+            let resultColor = '';
+            if (myResult && theirResult) {
+                const diff = myResult.time - theirResult.time;
+                if (diff < -0.05) {
+                    resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
+                    resultColor = '#10b981';
+                } else if (diff > 0.05) {
+                    resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
+                    resultColor = '#ef4444';
+                } else {
+                    resultText = `🤝 Tie`;
+                    resultColor = '#6b7280';
+                }
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:12px 8px;">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;">${opponentName || 'Unknown'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${myResult ? myResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;">${theirResult ? theirResult.time.toFixed(1) + 's' : '—'}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+    
+    function getTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        return new Date(timestamp).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    }
+    
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Challenge link copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link');
+        });
+    }
+    
+    async function declineChallenge(challengeId) {
+        if (!confirm('Are you sure you want to decline this challenge?')) return;
+        
+        try {
+            await database.ref(`challenges/${challengeId}`).remove();
+            alert('Challenge declined');
+            loadH2HChallenges();
+        } catch (error) {
+            console.error('Error declining challenge:', error);
+            alert('Failed to decline challenge');
+        }
+    }
+    
+    // Placeholder functions - will implement in next step
+    async function playChallenge(challengeId) {
+        alert('Challenge play functionality coming in next update!');
+        // TODO: Implement challenge play
+    }
+    
+    document.getElementById('createChallengeBtn').addEventListener('click', function() {
+        alert('Create challenge functionality coming in next update!');
+        // TODO: Show player selection modal
+    });
+    
+    // ========== END HEAD-TO-HEAD CODE ==========
+    
 </script>
 
 
@@ -2714,8 +4434,12 @@ window.addEventListener('load', function() {
 </div>
 
 <div style="margin-top:40px;padding:20px;background:#f9fafb;border-radius:8px;">
-    <h2 style="margin-top:0;" id="leaderboardTitle">🏆 Daily Leaderboard</h2>
+    <div style="display:flex;gap:10px;border-bottom:2px solid #e5e7eb;margin-bottom:20px;">
+        <h2 id="dailyLeaderboardTab" style="margin:0;padding:10px 20px;cursor:pointer;border-bottom:3px solid #9370db;color:#9370db;font-weight:600;">🏆 Daily Leaderboard</h2>
+        <h2 id="h2hTab" style="margin:0;padding:10px 20px;cursor:pointer;color:#9ca3af;font-weight:400;">⚔️ Head-to-Head</h2>
+    </div>
     <div style="margin-bottom:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div id="dailyLeaderboardContent">
         <label for="leaderboardDatePicker" style="font-weight:600;">Date:</label>
         <input type="date" id="leaderboardDatePicker" style="padding:8px;border:1px solid #d1d5db;border-radius:4px;" onchange="displayLeaderboard(this.value)">
         <button id="prevDayBtn" onclick="changeDateBy(-1)" style="padding:8px 16px;cursor:pointer;margin-left:8px;">← Prev</button>
