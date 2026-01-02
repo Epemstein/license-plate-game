@@ -196,16 +196,16 @@
     </div>
 </div>
 
-<div style="margin-top:40px;padding:20px;background:#f9fafb;border-radius:8px;">
+<div style="margin-top:40px;padding:1em;background:#f9fafb;border-radius:8px;">
     <h2 style="margin-top:0;">🏆 Daily Leaderboard</h2>
-    <div style="margin-bottom:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <label for="leaderboardDatePicker" style="font-weight:600;">Date:</label>
         <input type="date" id="leaderboardDatePicker" style="padding:8px;border:1px solid #d1d5db;border-radius:4px;">
         <button id="loadLeaderboardBtn" onclick="loadSelectedDate()" style="padding:8px 16px;cursor:pointer;">Load</button>
         <button id="todayLeaderboardBtn" onclick="loadTodayScores()" style="padding:8px 16px;cursor:pointer;">Today</button>
     </div>
-    <div id="leaderboardDate" style="text-align:center;margin-bottom:16px;font-size:1.1rem;color:#6b7280;font-weight:600;"></div>
-    <div id="leaderboardContent" style="background:white;padding:20px;border-radius:8px;min-height:200px;max-height:600px;overflow-y:auto;">
+    <div id="leaderboardDate" style="text-align:center;font-size:1.1rem;color:#6b7280;font-weight:600;"></div>
+    <div id="leaderboardContent" style="border-radius:8px;min-height:200px;max-height:600px;overflow-y:auto;">
         <p style="text-align:center;color:#6b7280;">Click a button above to view scores</p>
     </div>
     
