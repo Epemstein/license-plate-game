@@ -22,7 +22,7 @@
         <button id="signInBtn" onclick="signInWithGoogle()" style="display:none;padding:8px 16px;cursor:pointer;background:#4285f4;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Google</button>
         <div id="userInfo" style="display:none;">
             Signed in: <strong id="userName"></strong>
-            <button id="signOutBtn" onclick="firebase.auth().signOut()" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
+            <button id="signOutBtn" onclick="logout()" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
         </div>
     </div>
 </div>
@@ -30,7 +30,10 @@
 <div style="margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;">
     <button id="dailyChallengeBtn" class="gameModeButton" style="padding:10px 20px;background:#fbbf24;border:none;font-weight:bold;margin-right:10px;">Daily Challenge</button>
     <button id="practiceBtn" class="gameModeButton" style="padding:10px 20px;background:#e9d5ff;border:none;margin-right:10px;font-weight:bold;">Practice Mode</button>
-    <button id="h2hBtn" class="gameModeButton" style="padding:10px 20px;background:#a60000ff;color:white;border:none;margin-right:10px;font-weight:bold;">Head-to-head</button>
+    <button id="h2hBtn" class="gameModeButton" style="padding:10px 20px;background:#a60000ff;color:white;border:none;margin-right:10px;font-weight:bold;">
+        <span>Head-to-head</span>
+        <span id="h2hNotificationBadge" style="display:none;position:absolute;top:8px;right:8px;background:#ef4444;color:white;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;text-align:center;font-weight:600;"></span>
+    </button>
     <button id="endlessBtn" class="gameModeButton" style="padding:10px 20px;background:#cae4ffff;border:none;margin-right:10px;font-weight:bold;">Endless Mode</button>
     <button id="rulesBtn" style="padding:10px 20px;background:#e5e7eb;border:none;font-weight:bold;">How to Play</button>
 </div>
@@ -69,9 +72,9 @@
 
     <!-- RIGHT PANEL -->
     <div id="game-status-panel" class="right-panel">
-        <div id="challenging-player-indicator" style="align-items:center;justify-content:space-between;display:none;">
+        <div id="challenging-player-indicator" style="align-items:center;justify-content:space-between;display:none;margin-bottom:.5em;">
             <span id="challenging-player-text" style="font-weight:bold;"></span>
-            <button id="challenging-player-text" onclick="cancelPendingChallenge(true)" style="padding:.25em .5em;">Cancel</button>
+            <button id="challenging-player-cancel-button" onclick="cancelPendingChallenge(true)" style="padding:.25em .5em;">Cancel</button>
         </div>
         <div id="timerRow">
             <span id="timerDisplay">Time: 0.0 s</span>
@@ -106,27 +109,29 @@
             </button>
         </div>
         
-        <!-- Incoming Challenges -->
-        <div style="margin-bottom:30px;">
-            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">📥 Incoming Challenges</h3>
-            <div id="incomingChallenges" style="background:white;border-radius:8px;padding:16px;min-height:100px;">
-                <p style="color:#9ca3af;text-align:center;">No incoming challenges</p>
+        <div style="max-height:800px;overflow-y:scroll">
+            <!-- Incoming Challenges -->
+            <div style="margin-bottom:30px;">
+                <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">📥 Incoming Challenges</h3>
+                <div id="incomingChallenges" style="background:white;border-radius:8px;padding:16px;">
+                    <p style="color:#9ca3af;text-align:center;">No incoming challenges</p>
+                </div>
             </div>
-        </div>
-        
-        <!-- Outgoing Challenges -->
-        <div style="margin-bottom:30px;">
-            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">📤 Outgoing Challenges</h3>
-            <div id="outgoingChallenges" style="background:white;border-radius:8px;padding:16px;min-height:100px;">
-                <p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>
+            
+            <!-- Outgoing Challenges -->
+            <div style="margin-bottom:30px;">
+                <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">📤 Outgoing Challenges</h3>
+                <div id="outgoingChallenges" style="background:white;border-radius:8px;padding:16px;">
+                    <p style="color:#9ca3af;text-align:center;">No outgoing challenges</p>
+                </div>
             </div>
-        </div>
-        
-        <!-- Completed Challenges / Results -->
-        <div style="margin-bottom:30px;">
-            <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">🏆 Challenge Results</h3>
-            <div id="h2hResults" style="background:white;border-radius:8px;padding:16px;min-height:100px;overflow-x:auto;">
-                <p style="color:#9ca3af;text-align:center;">No completed challenges</p>
+            
+            <!-- Completed Challenges / Results -->
+            <div style="margin-bottom:30px;">
+                <h3 style="margin:0 0 12px 0;color:#1f2937;font-size:1.1rem;">🏆 Challenge Results</h3>
+                <div id="h2hResults" style="background:white;border-radius:8px;padding:16px;min-height:100px;overflow-x:auto;">
+                    <p style="color:#9ca3af;text-align:center;">No completed challenges</p>
+                </div>
             </div>
         </div>
     </div>
