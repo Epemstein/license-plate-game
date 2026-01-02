@@ -3939,9 +3939,16 @@ window.addEventListener('load', function() {
             
             console.log('Calculated myTotalTime:', myTotalTime);
             console.log('Calculated theirTotalTime:', theirTotalTime);
+            console.log('Stored myResult.time:', myResult.time);
+            console.log('Stored theirResult.time:', theirResult.time);
+            
+            // Use stored time (more accurate) instead of calculated sum
+            // The calculated sum has rounding errors from individual plate times
+            const myFinalTime = myResult.time || myTotalTime;
+            const theirFinalTime = theirResult.time || theirTotalTime;
             
             // Determine win/loss/tie
-            const finalDiff = myTotalTime - theirTotalTime;
+            const finalDiff = myFinalTime - theirFinalTime;
             let resultText = '';
             let headerBg = '#e5e7eb';
             let finalDiffText = '';
@@ -3980,8 +3987,8 @@ window.addEventListener('load', function() {
                 year: 'numeric'
             }) : 'Unknown';
             
-            const myStatus = myResult.status === 'DNF' ? 'Abandoned' : `${myTotalTime.toFixed(1)}s`;
-            const theirStatus = theirResult.status === 'DNF' ? 'Abandoned' : `${theirTotalTime.toFixed(1)}s`;
+            const myStatus = myResult.status === 'DNF' ? 'Abandoned' : `${myFinalTime.toFixed(1)}s`;
+            const theirStatus = theirResult.status === 'DNF' ? 'Abandoned' : `${theirFinalTime.toFixed(1)}s`;
             
             // Update modal title with stats
             document.getElementById('h2hComparisonTitle').innerHTML = `
