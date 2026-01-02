@@ -12,7 +12,6 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const database = firebase.database();
 let gameMode = "practice";
-let challengeMode = null;
 let currentUser = null;
 let currentViewingDate = null; // Track which date we're viewing
 
@@ -829,7 +828,7 @@ function getPlateDifficultyScore(plate) {
   return d;
 }
 
-// --------- TIMER / GAME STATE ---------
+// --------- GAMEPLAY ---------
 function getPromiseFromEvent(item, event, callback) {
   return new Promise((resolve) => {
     const listener = (e) => {
@@ -859,7 +858,7 @@ function resetRunUI() {
   wordInputEl.value = "";
 }
 
-async function beginNewRun() {
+async function beginNewRun(token) {
   const ready = dictionaryReady && difficultyReady && platesReady;
   if (!ready) {
     resultEl.textContent = "Still loading…";
@@ -901,19 +900,19 @@ async function beginNewRun() {
 
   switch (gameMode) {
     case "daily":
-      await playDaily();
+      await playDaily(token);
       break;
 
     case "practice":
-      await playPractice();
+      await playPractice(token);
       break;
 
     case "endless":
       await playEndless();
       break;
 
-    case "challenge":
-      await playChallenge(challengeMode);
+    case "h2h":
+      await playHeadToHead(token);
       break;
   }
 
@@ -944,7 +943,7 @@ async function beginNewRun() {
   }
 }
 
-async function playTimed(plates, genMorePlates) {
+async function playTimed(plates, genMorePlates, token) {
   let idx = 0;
   let solved = 0;
   let skipped = 0;
@@ -991,6 +990,7 @@ async function playTimed(plates, genMorePlates) {
     let skip = false;
     let penalty = 0;
     let penaltyLabel = "";
+    let endGame = false;
     while (!exit) {
       await getPromiseFromEvent(window, "action", (e) => {
         switch (e.detail.action) {
@@ -1019,8 +1019,19 @@ async function playTimed(plates, genMorePlates) {
             nextPenalty += 5;
             skipButtonEl.textContent = `Skip +${nextPenalty}s`;
             break;
+
+          case "endGame":
+            if (!e.detail.token || token === e.detail.token) {
+              exit = true;
+              endGame = true;
+            }
+            break;
         }
       });
+    }
+
+    if (endGame) {
+      return;
     }
 
     let thinkingSeconds = (performance.now() - plateStartTime) / 1000;
@@ -1057,7 +1068,7 @@ async function playTimed(plates, genMorePlates) {
   return [totalSec, solved, skipped, gameHistory];
 }
 
-async function playDaily() {
+async function playDaily(token) {
   if (!currentUser) {
     return;
   }
@@ -1092,24 +1103,25 @@ async function playDaily() {
 
   let [totalSec, solved, skipped, history] = await playTimed(
     plates,
-    genMorePlates
+    genMorePlates,
+    token
   );
 
   // if (currentUser) saveScore(totalSec, solved, skipped, history);
   window.onbeforeunload = null;
 }
 
-async function playPractice() {
+async function playPractice(token) {
   let plates = generatePlates(Math.random, 200);
   let genMorePlates = () => {
     return generatePlates(Math.random, 200);
   };
   startButtonEl.textContent = "Restart game";
 
-  await playTimed(plates, genMorePlates);
+  await playTimed(plates, genMorePlates, token);
 }
 
-async function playChallenge() {
+async function playHeadToHead(token) {
   startButtonEl.style.display = "none";
 
   if (!currentChallengeId) {
@@ -1123,7 +1135,8 @@ async function playChallenge() {
 
   let [totalSec, solved, skipped, history] = await playTimed(
     challenge.plateSequence,
-    () => alert("BUG! Not enough plates")
+    () => alert("BUG! Not enough plates"),
+    token
   );
 
   let completed = await saveChallengeResult(
@@ -1157,7 +1170,7 @@ async function playEndless() {
   startButtonEl.textContent = "Restart game";
   skipButtonEl.textContent = `Skip`;
   progressDisplayEl.textContent = `Solved: ${solved}`;
-  timerDisplayEl.textContent = '';
+  timerDisplayEl.textContent = "";
 
   while (true) {
     const chosen = plates[idx];
@@ -1675,7 +1688,31 @@ startButtonEl.disabled = true;
 endButtonEl.style.display = "none";
 chartButtonEl.style.display = "none";
 
-startButtonEl.addEventListener("click", beginNewRun);
+let currentRun = null;
+
+startButtonEl.addEventListener("click", async () => {
+  startButtonEl.disabled = true;
+
+  // stop the current run first and wait for it to complete
+  if (currentRun) {
+    window.dispatchEvent(
+      new CustomEvent("action", {
+        detail: {
+          action: "endGame",
+          token: currentRun[0],
+        },
+      })
+    );
+
+    await Promise.all([currentRun[1]]);
+  }
+
+  let token = makeid(10);
+  currentRun = [token, beginNewRun(token)];
+
+  startButtonEl.disabled = false;
+});
+
 checkButtonEl.addEventListener("click", () => {
   window.dispatchEvent(
     new CustomEvent("action", {
@@ -1959,7 +1996,7 @@ window.addEventListener("DOMContentLoaded", function () {
     }
     document.getElementById("h2hBtn").disabled = true;
 
-    gameMode = "challenge";
+    gameMode = "h2h";
 
     loadH2HChallenges();
 
@@ -2266,7 +2303,6 @@ if (currentUser) {
 // Prepare challenge (don't create yet - wait for Start button)
 function prepareChallenge(opponent) {
   pendingOpponent = opponent;
-  challengeMode = opponent ? "h2h" : "open";
 
   // Update banner with back button embedded
   document.getElementById("challenging-player-indicator").style.display =
@@ -2420,8 +2456,6 @@ async function acceptChallenge(challengeId) {
     .ref(`challenges/${challengeId}`)
     .once("value");
   const challenge = challengeSnapshot.val() || {};
-
-  challengeMode = "h2h";
 
   // Update banner with back button embedded
   document.getElementById("challenging-player-indicator").style.display =
@@ -3293,3 +3327,14 @@ async function checkAbandonedChallenges(userId) {
   }
 }
 // ========== END HEAD-TO-HEAD FEATURE ==========
+
+function makeid(length) {
+  var result = "";
+  var characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  var charactersLength = characters.length;
+  for (var i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+}
