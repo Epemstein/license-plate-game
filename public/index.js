@@ -445,6 +445,7 @@ async function logout() {
   // TODO: hide leaderboard
 
   firebase.auth().signOut();
+  currentUser = null;
 }
 // === END FIREBASE ===
 
@@ -473,8 +474,6 @@ let currentPlate = null;
 let gameStarted = false;
 let gameOver = false;
 let solvedCount = 0;
-let startTime = null;
-let penaltySeconds = 0;
 let timerIntervalId = null;
 
 let plateLocked = false;
@@ -899,8 +898,6 @@ async function beginNewRun() {
   for (let e of document.getElementsByClassName("gameModeButton")) {
     e.disabled = true;
   }
-  startTime = performance.now();
-  timerIntervalId = setInterval(updateTimer, 100);
 
   switch (gameMode) {
     case "daily":
@@ -952,6 +949,15 @@ async function playTimed(plates, genMorePlates) {
   let solved = 0;
   let skipped = 0;
   let nextPenalty = 5;
+  let totalPenalty = 0;
+
+  let startTime = performance.now();
+
+  timerIntervalId = setInterval(() => {
+    let elapsed = (performance.now() - startTime) / 1000;
+    timerDisplayEl.textContent =
+      "Time: " + (elapsed + totalPenalty).toFixed(1) + " s";
+  }, 100);
 
   // Update buttons
   skipButtonEl.textContent = `Skip +${nextPenalty}s`;
@@ -1018,6 +1024,7 @@ async function playTimed(plates, genMorePlates) {
     }
 
     let thinkingSeconds = (performance.now() - plateStartTime) / 1000;
+    totalPenalty += penalty;
 
     gameHistory.push({
       plate: currentPlate,
@@ -1038,10 +1045,10 @@ async function playTimed(plates, genMorePlates) {
     idx++;
   }
 
-  console.log("Ending game - solved 10!");
-
-  const baseElapsedSec = (performance.now() - startTime) / 1000;
-  const totalSec = baseElapsedSec + penaltySeconds;
+  const totalSec = gameHistory.reduce((prev, cur) => {
+    return prev + cur.thinkingSeconds + cur.penaltySeconds;
+  }, 0);
+  timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
 
   resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
   resultEl.style.color = "green";
@@ -1150,6 +1157,7 @@ async function playEndless() {
   startButtonEl.textContent = "Restart game";
   skipButtonEl.textContent = `Skip`;
   progressDisplayEl.textContent = `Solved: ${solved}`;
+  timerDisplayEl.textContent = '';
 
   while (true) {
     const chosen = plates[idx];
@@ -1231,13 +1239,6 @@ async function playEndless() {
 
     idx++;
   }
-}
-
-function updateTimer() {
-  if (!gameStarted || !startTime) return;
-  const baseElapsedSec = (performance.now() - startTime) / 1000;
-  const totalSec = baseElapsedSec + penaltySeconds;
-  timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
 }
 
 // --------- FLOATING LABELS & HISTORY ---------
@@ -2369,9 +2370,7 @@ async function checkChallenge(challengeId) {
 
   // Check if this is an open challenge (handle both null and undefined)
   const isOpenChallenge =
-    challenge.isOpen === true &&
-    (challenge.challengedUser === null ||
-      challenge.challengedUser === undefined);
+    challenge.challengedUser === null || challenge.challengedUser === undefined;
 
   // Validate that current user can play this challenge
   const isCreator = challenge.createdBy === currentUser.uid;
@@ -2718,12 +2717,10 @@ function displayIncomingChallenges(allChallenges) {
                     </div>
                     <span style="flex:1;"><strong>${
                       challenge.creatorName
-                    }</strong> challenged you${
-      statusText ? " — " + statusText : ""
-    }</span>
+                    }</strong>${statusText ? " — " + statusText : ""}</span>
                     ${
                       canPlay
-                        ? `<button onclick="acceptChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>`
+                        ? `<button onclick="acceptChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play</button>`
                         : ""
                     }
                     ${
@@ -2757,8 +2754,6 @@ function displayOutgoingChallenges(allChallenges) {
   let html = "";
   outgoing.forEach(([id, challenge]) => {
     const myResult = challenge.results && challenge.results[currentUser.uid];
-    const theirResult =
-      challenge.results && challenge.results[challenge.challengedUser];
 
     // Format date
     const createdDate = challenge.createdAt
@@ -2772,10 +2767,12 @@ function displayOutgoingChallenges(allChallenges) {
       : "Unknown";
 
     // Check if open challenge
-    const isOpen = challenge.isOpen && challenge.challengedUser === null;
+    const isOpen =
+      challenge.challengedUser === null ||
+      challenge.challengedUser === undefined;
     const opponentDisplay = isOpen
-      ? '<strong>Open Challenge</strong> <span style="color:#10b981;font-size:0.85rem;">(unclaimed)</span>'
-      : `<strong>${challenge.opponentName}</strong>`;
+      ? "<strong>Open Challenge</strong>"
+      : `You vs. <strong>${challenge.opponentName}</strong>`;
 
     let statusText = "";
     if (myResult && myResult.status === "DNF") {
@@ -2787,32 +2784,15 @@ function displayOutgoingChallenges(allChallenges) {
     }
 
     const challengeUrl = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
-    const canPlay =
-      !myResult ||
-      (!myResult.time &&
-        myResult.status !== "DNF" &&
-        myResult.status !== "in_progress");
-    const canCancel = canPlay; // Can cancel if you haven't played yet
-
     html += `
                 <div style="display:flex;align-items:center;padding:12px;border-bottom:1px solid #f3f4f6;gap:15px;">
-                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;flex-shrink:0;">Copy Link</button>
                     <div style="min-width:140px;">
                         <div style="font-size:0.85rem;color:#6b7280;">${createdDate}</div>
                     </div>
-                    <span style="flex:1;">You vs. ${opponentDisplay}${
+                    <span style="flex:1;">${opponentDisplay}${
       statusText ? " — " + statusText : ""
     }</span>
-                    ${
-                      canPlay
-                        ? `<button onclick="playChallenge('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;">Play Now</button>`
-                        : ""
-                    }
-                    ${
-                      canCancel
-                        ? `<button onclick="cancelChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Cancel</button>`
-                        : ""
-                    }
+                    <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;flex-shrink:0;">Copy Link</button>
                 </div>
             `;
   });
@@ -2821,6 +2801,7 @@ function displayOutgoingChallenges(allChallenges) {
 }
 
 // View H2H Comparison
+// TODO: sometimes this says the wrong result in the header?
 async function viewH2HComparison(challengeId) {
   try {
     console.log("viewH2HComparison called with challengeId:", challengeId);
