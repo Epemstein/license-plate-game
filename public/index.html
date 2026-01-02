@@ -58,7 +58,7 @@
 
         <div class="controls">
             <button id="startButton">Play again</button>
-            <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
+            <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off" disabled>
             <button id="checkButton">Check</button>
             <button id="skipButton">Skip</button>
             <button id="endButton">End game</button>
@@ -71,7 +71,7 @@
     </div>
 
     <!-- RIGHT PANEL -->
-    <div id="game-status-panel" class="right-panel">
+    <div id="game-status-panel" class="right-panel" style="display:none;">
         <div id="challenging-player-indicator" style="align-items:center;justify-content:space-between;display:none;margin-bottom:.5em;">
             <span id="challenging-player-text" style="font-weight:bold;"></span>
             <button id="challenging-player-cancel-button" onclick="cancelPendingChallenge(true)" style="padding:.25em .5em;">Cancel</button>
