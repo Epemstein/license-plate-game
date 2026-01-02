@@ -1164,6 +1164,143 @@ async function playPractice() {
   resultEl.style.color = "green";
 }
 
+async function playH2H() {
+  if (!currentUser) {
+    return;
+  }
+
+  const date = new Date();
+  let seed = date.getDate() + date.getMonth() * 100 + date.getFullYear() * 1000;
+
+  let rng = seededRandom(seed);
+  let plates = generatePlates(rng, 2);
+
+  let idx = 0;
+  let solved = 0;
+  let nextPenalty = 5;
+
+  // Update buttons
+  startButtonEl.style.display = "none";
+  skipButtonEl.textContent = `Skip +${nextPenalty}s`;
+  progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
+
+  {
+    {
+      /* // Save started flag to Firebase
+        database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({
+            userName: currentUser.displayName || currentUser.email,
+            timestamp: Date.now(),
+            started: true
+        });
+        
+        window.onbeforeunload = e => {
+            if (gameStarted && !gameOver && gameMode==='daily') {
+                e.preventDefault();
+                return 'Leave? Daily attempt will be used!';
+            }
+        }; */
+    }
+  }
+
+  while (solved < TOTAL_PLATES) {
+    const chosen = plates[idx];
+    currentPlate = chosen;
+    plateEl.textContent = chosen;
+    resultEl.textContent = "";
+    plateLocked = false;
+    checkButtonEl.disabled = false;
+    skipButtonEl.disabled = false;
+    wordInputEl.disabled = false;
+    wordInputEl.readOnly = false;
+    let plateStartTime = performance.now();
+    updateDifficultyDisplay(chosen);
+    wordInputEl.value = "";
+    wordInputEl.focus();
+
+    // Check if we've run out of plates
+    if (idx >= plates.length) {
+      console.log("generating more plates...");
+      seed *= 10;
+      let rng = seededRandom(seed);
+      plates.push(...generatePlates(rng, 200));
+      continue;
+    }
+
+    let exit = false;
+    let word = "";
+    let matchIndices = null;
+    let skip = false;
+    let penalty = 0;
+    let penaltyLabel = "";
+    while (!exit) {
+      await getPromiseFromEvent(window, "action", (e) => {
+        switch (e.detail.action) {
+          case "submitWord":
+            word = wordInputEl.value.trim();
+            let [ok, indices, reason] = checkWord(currentPlate, word);
+            matchIndices = indices;
+
+            if (ok) {
+              solved++;
+              progressDisplayEl.textContent = `Solved: ${solved} / ${TOTAL_PLATES}`;
+              exit = true;
+            }
+
+            resultEl.innerHTML = `${ok ? "✅" : "❌"} ${reason}`;
+            resultEl.style.color = ok ? "green" : "red";
+            break;
+
+          case "skipWord":
+            exit = true;
+            skip = true;
+            penalty = nextPenalty;
+            penaltyLabel = `Skipped (+${penalty}s)`;
+
+            nextPenalty += 5;
+            skipButtonEl.textContent = `Skip +${nextPenalty}s`;
+            break;
+        }
+      });
+    }
+
+    let thinkingSeconds = (performance.now() - plateStartTime) / 1000;
+
+    gameHistory.push({
+      plate: currentPlate,
+      word,
+      skipped: skip,
+      thinkingSeconds,
+      penaltySeconds: penalty,
+    });
+
+    addToHistoryWithAnimation(
+      currentPlate,
+      skip ? penaltyLabel : word,
+      matchIndices,
+      PLATE_DIFFICULTY[currentPlate].difficulty,
+      `${thinkingSeconds.toFixed(1)}s`
+    );
+
+    idx++;
+  }
+
+  console.log("Ending game - solved 10!");
+
+  const baseElapsedSec = (performance.now() - startTime) / 1000;
+  const totalSec = baseElapsedSec + penaltySeconds;
+
+  {
+    {
+      /* if (currentUser) saveScore(totalSec,solvedCount,skipCount); */
+    }
+  }
+  window.onbeforeunload = null;
+
+  resultEl.textContent = `🏁 Finished! Time: ${totalSec.toFixed(1)} s`;
+  resultEl.style.color = "green";
+  startButtonEl.textContent = "Play again";
+}
+
 async function playEndless() {
   let plates = generatePlates(Math.random, 1);
   let idx = 0;
