@@ -8,29 +8,67 @@ const firebaseConfig = {
   messagingSenderId: "247985429580",
   appId: "1:247985429580:web:4927cee2ca3581b569a8e9",
 };
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const database = firebase.database();
+
+let auth = null;
+let database = null;
 let gameMode = "practice";
 let currentUser = null;
 let currentViewingDate = null; // Track which date we're viewing
 
-auth.onAuthStateChanged((user) => {
-  currentUser = user;
-  const signInBtn = document.getElementById("signInBtn");
-  const userInfo = document.getElementById("userInfo");
-  if (user) {
-    signInBtn.style.display = "none";
-    document.getElementById("authPlaceholder").style.display = "none";
-    userInfo.style.display = "block";
-    document.getElementById("userName").textContent =
-      user.displayName || user.email;
+window.addEventListener("load", async function () {
+  await firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  database = firebase.database();
 
-    loadH2HChallenges();
-  } else {
-    document.getElementById("authPlaceholder").style.display = "none";
-    signInBtn.style.display = "inline-block";
-    userInfo.style.display = "none";
+  auth.onAuthStateChanged(async (user) => {
+    currentUser = user;
+    const signInBtn = document.getElementById("signInBtn");
+    const userInfo = document.getElementById("userInfo");
+    if (user) {
+      signInBtn.style.display = "none";
+      document.getElementById("authPlaceholder").style.display = "none";
+      userInfo.style.display = "block";
+      document.getElementById("userName").textContent =
+        user.displayName || user.email;
+
+      try {
+        await database.ref(`users/${user.uid}`).set({
+          displayName: user.displayName || user.email,
+          email: user.email,
+          lastSeen: Date.now(),
+        });
+      } catch (error) {
+        console.log(
+          "Could not register user (may need Firebase permissions)",
+          error
+        );
+      }
+      // Check for abandoned challenges
+      checkAbandonedChallenges(user.uid);
+      loadH2HChallenges();
+    } else {
+      document.getElementById("authPlaceholder").style.display = "none";
+      signInBtn.style.display = "inline-block";
+      userInfo.style.display = "none";
+    }
+  });
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const challengeId = urlParams.get("challenge");
+
+  if (challengeId) {
+    // we need to wait some time before checking currentUser, since firebase doesn't
+    // actually let us await the result of initialization:
+    // https://stackoverflow.com/questions/37873608/how-do-i-detect-if-a-user-is-already-logged-in-firebase
+    setTimeout(async () => {
+      if (!currentUser) {
+        await signInWithGoogle();
+      }
+
+      // User has a challenge link - load the challenge
+      document.getElementById("h2hBtn").click();
+      acceptChallenge(challengeId);
+    }, 500);
   }
 });
 
@@ -2302,6 +2340,7 @@ if (currentUser) {
 
 // Prepare challenge (don't create yet - wait for Start button)
 function prepareChallenge(opponent) {
+  currentChallengeId = null;
   pendingOpponent = opponent;
 
   // Update banner with back button embedded
@@ -2331,11 +2370,13 @@ function prepareChallenge(opponent) {
 
 // Cancel pending challenge
 function cancelPendingChallenge(showChallengePanel) {
-  if (gameStarted) {
-    return;
+  console.log(currentChallengeId, gameStarted, gameOver);
+  if (currentChallengeId && gameStarted && !gameOver) {
+    cancelChallenge(currentChallengeId);
   }
 
   pendingOpponent = null;
+  currentChallengeId = null;
 
   document.getElementById("challenging-player-indicator").style.display =
     "none";
@@ -2450,6 +2491,10 @@ async function checkChallenge(challengeId) {
 }
 
 async function acceptChallenge(challengeId) {
+  if (!currentUser) {
+    return;
+  }
+
   currentChallengeId = challengeId;
 
   const challengeSnapshot = await database
@@ -2457,12 +2502,22 @@ async function acceptChallenge(challengeId) {
     .once("value");
   const challenge = challengeSnapshot.val() || {};
 
+  if (challenge.createdBy == currentUser.uid) {
+    alert("You cannot accept a challenge from yourself");
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.delete("challenge");
+    window.location.search = urlParams.toString();
+    return;
+  }
+
+  console.log(challenge);
+
   // Update banner with back button embedded
   document.getElementById("challenging-player-indicator").style.display =
     "flex";
   document.getElementById(
     "challenging-player-text"
-  ).textContent = `⚔️ Accepting challenge from ${challenge.opponentName}`;
+  ).textContent = `⚔️ Accepting challenge from ${challenge.creatorName}`;
   document.getElementById("challenging-player-text").style.color = "default";
   document.getElementById("challenging-player-cancel-button").textContent =
     "Back";
@@ -2517,26 +2572,6 @@ async function declineChallenge(challengeId) {
 window.declineChallenge = declineChallenge;
 
 async function cancelChallenge(challengeId) {
-  // Check if challenge is active (you're currently playing it)
-  if (currentChallengeId === challengeId && gameStarted && !gameOver) {
-    alert("Cannot cancel a challenge while playing it!");
-    return;
-  }
-
-  // Check if you've already started this challenge
-  try {
-    const snapshot = await database
-      .ref(`challenges/${challengeId}/results/${currentUser.uid}`)
-      .once("value");
-    const myResult = snapshot.val();
-    if (myResult) {
-      alert("Cannot cancel a challenge you have already started!");
-      return;
-    }
-  } catch (error) {
-    console.error("Error checking challenge status:", error);
-  }
-
   if (!confirm("Are you sure you want to cancel this challenge?")) return;
 
   try {
@@ -2560,7 +2595,7 @@ async function saveChallengeResult(
   skipped,
   history
 ) {
-  if (!currentUser || !challengeId || gameMode !== "challenge") return;
+  if (!currentUser || !challengeId || gameMode !== "h2h") return;
 
   const historyData = history.map((entry) => ({
     plate: entry.plate,
@@ -2585,6 +2620,8 @@ async function saveChallengeResult(
     .ref(`challenges/${challengeId}`)
     .once("value");
   let challenge = challengeSnapshot.val();
+
+  console.log(challenge);
 
   if (challenge && challenge.results) {
     let creatorResult = challenge.results[challenge.createdBy];
@@ -2826,6 +2863,7 @@ function displayOutgoingChallenges(allChallenges) {
                     <span style="flex:1;">${opponentDisplay}${
       statusText ? " — " + statusText : ""
     }</span>
+                    <button onclick="cancelChallenge('${id}')" style="padding:6px 16px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Cancel</button>
                     <button onclick="copyToClipboard('${challengeUrl}')" style="padding:6px 16px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;flex-shrink:0;">Copy Link</button>
                 </div>
             `;
@@ -3326,6 +3364,7 @@ async function checkAbandonedChallenges(userId) {
     console.error("Error checking abandoned challenges:", error);
   }
 }
+
 // ========== END HEAD-TO-HEAD FEATURE ==========
 
 function makeid(length) {
