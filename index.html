@@ -5,6 +5,15 @@
     <title>Plate Speller</title>
     <style>
 
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+            }
+        }
+
         @font-face {
             font-family: "RoadgeekUS";
             src: url("fonts/Roadgeek.woff2") format("woff2");
@@ -3014,10 +3023,20 @@
                 return creatorResult && (creatorResult.time || creatorResult.status === 'DNF');
             });
         
-        // Update notification badge
+        // Count new completed challenges (unviewed and within 7 days)
+        const viewedChallenges = JSON.parse(localStorage.getItem('viewedChallenges') || '[]');
+        const completed = Object.entries(allChallenges).filter(([id, c]) => c.status === 'completed');
+        const newCompletedCount = completed.filter(([id, challenge]) => {
+            const isViewed = viewedChallenges.includes(id);
+            const daysSinceCompleted = (Date.now() - challenge.completedAt) / (1000 * 60 * 60 * 24);
+            return !isViewed && daysSinceCompleted < 7;
+        }).length;
+        
+        // Update notification badge (incoming + new completed)
         const badge = document.getElementById('h2hNotificationBadge');
-        if (incoming.length > 0) {
-            badge.textContent = incoming.length;
+        const totalNotifications = incoming.length + newCompletedCount;
+        if (totalNotifications > 0) {
+            badge.textContent = totalNotifications;
             badge.style.display = 'block';
         } else {
             badge.style.display = 'none';
@@ -3180,6 +3199,12 @@
             const opponentId = isCreator ? challenge.challengedUser : challenge.createdBy;
             const opponentName = isCreator ? challenge.opponentName : challenge.creatorName;
             
+            // Check if challenge is "new" (unviewed and completed within 7 days)
+            const viewedChallenges = JSON.parse(localStorage.getItem('viewedChallenges') || '[]');
+            const isViewed = viewedChallenges.includes(id);
+            const daysSinceCompleted = (Date.now() - challenge.completedAt) / (1000 * 60 * 60 * 24);
+            const isNew = !isViewed && daysSinceCompleted < 7;
+            
             // Format completion date
             const completedDate = challenge.completedAt ? new Date(challenge.completedAt).toLocaleDateString('en-US', {
                 month: 'short',
@@ -3196,13 +3221,14 @@
             let theirTimeText = '—';
             let resultText = '';
             let resultColor = '';
+            let rowBgColor = ''; // For win/loss row coloring
             
             if (myResult) {
-                myTimeText = myResult.status === 'DNF' ? '<span style="color:#ef4444;">Abandoned</span>' : (myResult.time ? myResult.time.toFixed(1) + 's' : '—');
+                myTimeText = myResult.status === 'DNF' ? '<span style="color:#000000;">Abandoned</span>' : (myResult.time ? myResult.time.toFixed(1) + 's' : '—');
             }
             
             if (theirResult) {
-                theirTimeText = theirResult.status === 'DNF' ? '<span style="color:#ef4444;">Abandoned</span>' : (theirResult.time ? theirResult.time.toFixed(1) + 's' : '—');
+                theirTimeText = theirResult.status === 'DNF' ? '<span style="color:#000000;">Abandoned</span>' : (theirResult.time ? theirResult.time.toFixed(1) + 's' : '—');
             }
             
             if (myResult && theirResult) {
@@ -3212,36 +3238,49 @@
                 if (myDNF && theirDNF) {
                     resultText = 'Both Abandoned';
                     resultColor = '#6b7280';
+                    rowBgColor = '';
                 } else if (myDNF) {
                     resultText = '❌ Loss';
                     resultColor = '#ef4444';
+                    rowBgColor = 'background:#fee2e2;'; // Light red
                 } else if (theirDNF) {
                     resultText = '🏆 Win';
                     resultColor = '#10b981';
+                    rowBgColor = 'background:#d1fae5;'; // Light green
                 } else if (myResult.time && theirResult.time) {
                     const diff = myResult.time - theirResult.time;
                     if (diff < -0.05) {
                         resultText = `🏆 Win (+${Math.abs(diff).toFixed(1)}s)`;
                         resultColor = '#10b981';
+                        rowBgColor = 'background:#d1fae5;'; // Light green
                     } else if (diff > 0.05) {
                         resultText = `❌ Loss (-${diff.toFixed(1)}s)`;
                         resultColor = '#ef4444';
+                        rowBgColor = 'background:#fee2e2;'; // Light red
                     } else {
                         resultText = '🤝 Tie';
                         resultColor = '#6b7280';
+                        rowBgColor = '';
                     }
                 }
             }
             
+            // Determine row background - prioritize new indicator over win/loss colors
+            const rowBg = isNew ? 'background:#fef3c7 !important;' : (rowBgColor ? rowBgColor.replace(';', ' !important;') : ''); // Gold for new, otherwise win/loss color
+            const buttonStyle = isNew ? 
+                'padding:6px 16px;background:#f59e0b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;font-weight:600;animation:pulse 2s infinite;' :
+                'padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;';
+            const newBadge = isNew ? '<span style="background:#f59e0b;color:white;font-size:0.7rem;padding:2px 6px;border-radius:3px;margin-left:8px;font-weight:600;">NEW</span>' : '';
+            
             html += `
-                <tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:12px 8px;font-size:0.85rem;color:#6b7280;">${completedDate}</td>
-                    <td style="padding:12px 8px;font-weight:500;">${opponentName}</td>
-                    <td style="padding:12px 8px;text-align:center;">${myTimeText}</td>
-                    <td style="padding:12px 8px;text-align:center;">${theirTimeText}</td>
-                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;">${resultText}</td>
-                    <td style="padding:12px 8px;text-align:center;">
-                        <button onclick="viewH2HComparison('${id}')" style="padding:6px 16px;background:#9370db;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">View</button>
+                <tr style="${rowBg}border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:12px 8px;font-size:0.85rem;color:#6b7280;${rowBg}">${completedDate}</td>
+                    <td style="padding:12px 8px;font-weight:500;${rowBg}">${opponentName}${newBadge}</td>
+                    <td style="padding:12px 8px;text-align:center;${rowBg}">${myTimeText}</td>
+                    <td style="padding:12px 8px;text-align:center;${rowBg}">${theirTimeText}</td>
+                    <td style="padding:12px 8px;text-align:center;color:${resultColor};font-weight:600;${rowBg}">${resultText}</td>
+                    <td style="padding:12px 8px;text-align:center;${rowBg}">
+                        <button onclick="viewH2HComparison('${id}')" style="${buttonStyle}">View</button>
                     </td>
                 </tr>
             `;
@@ -3769,6 +3808,15 @@ window.addEventListener('load', function() {
             console.log('viewH2HComparison called with challengeId:', challengeId);
             console.log('currentUser:', currentUser);
             
+            // Mark this challenge as viewed in localStorage
+            const viewedChallenges = JSON.parse(localStorage.getItem('viewedChallenges') || '[]');
+            if (!viewedChallenges.includes(challengeId)) {
+                viewedChallenges.push(challengeId);
+                localStorage.setItem('viewedChallenges', JSON.stringify(viewedChallenges));
+                // Refresh badge count
+                loadH2HChallenges();
+            }
+            
             if (!currentUser) {
                 alert('Please sign in to view challenges');
                 return;
@@ -3820,6 +3868,7 @@ window.addEventListener('load', function() {
             let tableRows = '';
             let myTotalTime = 0;
             let theirTotalTime = 0;
+            let cumulativeDiff = 0;
             
             for (let i = 0; i < maxLength; i++) {
                 const myEntry = myHistory[i];
@@ -3898,21 +3947,38 @@ window.addEventListener('load', function() {
                     theirCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
                 }
                 
-                // Differential cell - always white background, colored text
-                const diff = myTime - theirTime;
+                // Differential cell - calculate for all cases
+                // Their time - my time (positive = you're faster/ahead)
+                const diff = theirTime - myTime;
                 let diffCell = '';
-                if (myEntry && theirEntry && myTime > 0 && theirTime > 0) {
+                let cumulativeDiffCell = '';
+                
+                // Update cumulative differential
+                cumulativeDiff += diff;
+                
+                // Format differential cell
+                if (myEntry || theirEntry) {
                     if (Math.abs(diff) < 0.05) {
                         diffCell = '<div style="font-size:0.95rem;font-weight:600;color:#6b7280;">0.0s</div>';
-                    } else if (diff < 0) {
-                        // Faster = green text
-                        diffCell = `<div style="font-size:0.95rem;font-weight:700;color:#16a34a;">${diff.toFixed(1)}s</div>`;
+                    } else if (diff > 0) {
+                        // You're faster (positive) = green text
+                        diffCell = `<div style="font-size:0.95rem;font-weight:700;color:#16a34a;">+${diff.toFixed(1)}s</div>`;
                     } else {
-                        // Slower = red text
-                        diffCell = `<div style="font-size:0.95rem;font-weight:700;color:#dc2626;">+${diff.toFixed(1)}s</div>`;
+                        // You're slower (negative) = red text
+                        diffCell = `<div style="font-size:0.95rem;font-weight:700;color:#dc2626;">${diff.toFixed(1)}s</div>`;
+                    }
+                    
+                    // Format cumulative differential cell
+                    if (Math.abs(cumulativeDiff) < 0.05) {
+                        cumulativeDiffCell = '<div style="font-size:0.95rem;font-weight:600;color:#6b7280;">0.0s</div>';
+                    } else if (cumulativeDiff > 0) {
+                        cumulativeDiffCell = `<div style="font-size:0.95rem;font-weight:700;color:#16a34a;">+${cumulativeDiff.toFixed(1)}s</div>`;
+                    } else {
+                        cumulativeDiffCell = `<div style="font-size:0.95rem;font-weight:700;color:#dc2626;">${cumulativeDiff.toFixed(1)}s</div>`;
                     }
                 } else {
                     diffCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
+                    cumulativeDiffCell = '<div style="font-size:1rem;color:#9ca3af;">—</div>';
                 }
                 
                 tableRows += `
@@ -3920,7 +3986,8 @@ window.addEventListener('load', function() {
                         <td style="padding:8px 6px;font-weight:700;font-size:0.9rem;background:#f9fafb;border-right:2px solid #e5e7eb;text-align:center;">${plate}</td>
                         <td style="padding:8px 6px;background:${myCellBg};border-right:2px solid #e5e7eb;text-align:center;">${myCell}</td>
                         <td style="padding:8px 6px;background:${theirCellBg};border-right:2px solid #e5e7eb;text-align:center;">${theirCell}</td>
-                        <td style="padding:8px 6px;background:#ffffff;text-align:center;">${diffCell}</td>
+                        <td style="padding:8px 6px;background:#ffffff;border-right:2px solid #e5e7eb;text-align:center;">${diffCell}</td>
+                        <td style="padding:8px 6px;background:#ffffff;text-align:center;">${cumulativeDiffCell}</td>
                     </tr>
                 `;
             }
@@ -3935,8 +4002,8 @@ window.addEventListener('load', function() {
             const myFinalTime = myResult.time || myTotalTime;
             const theirFinalTime = theirResult.time || theirTotalTime;
             
-            // Determine win/loss/tie
-            const finalDiff = myFinalTime - theirFinalTime;
+            // Determine win/loss/tie (their time - my time)
+            const finalDiff = theirFinalTime - myFinalTime;
             let resultText = '';
             let headerBg = '#e5e7eb';
             let finalDiffText = '';
@@ -3956,15 +4023,17 @@ window.addEventListener('load', function() {
             } else if (Math.abs(finalDiff) < 0.05) {
                 resultText = 'Tie';
                 finalDiffText = '0.0s';
-            } else if (finalDiff < 0) {
+            } else if (finalDiff > 0) {
+                // Positive = you won
                 resultText = 'Win';
                 headerBg = '#86efac';
-                finalDiffText = `${finalDiff.toFixed(1)}s`;
+                finalDiffText = `+${finalDiff.toFixed(1)}s`;
                 finalDiffColor = '#16a34a';
             } else {
+                // Negative = you lost
                 resultText = 'Loss';
                 headerBg = '#fca5a5';
-                finalDiffText = `+${finalDiff.toFixed(1)}s`;
+                finalDiffText = `${finalDiff.toFixed(1)}s`;
                 finalDiffColor = '#dc2626';
             }
             
@@ -3985,15 +4054,55 @@ window.addEventListener('load', function() {
             `;
             document.querySelector('#h2hComparisonModalBackdrop .modal-header').style.background = headerBg;
             
+            // Prepare cumulative time data and differential for chart
+            const myCumulative = [];
+            const theirCumulative = [];
+            const differential = []; // Their time - your time (positive = you're ahead)
+            let mySum = 0;
+            let theirSum = 0;
+            
+            for (let i = 0; i < maxLength; i++) {
+                const myEntry = myHistory[i];
+                const theirEntry = theirHistory[i];
+                
+                if (myEntry) {
+                    const thinkingTime = myEntry.thinkingSeconds || 0;
+                    const penaltyTime = myEntry.penaltySeconds || 0;
+                    mySum += thinkingTime + penaltyTime;
+                }
+                myCumulative.push(mySum);
+                
+                if (theirEntry) {
+                    const thinkingTime = theirEntry.thinkingSeconds || 0;
+                    const penaltyTime = theirEntry.penaltySeconds || 0;
+                    theirSum += thinkingTime + penaltyTime;
+                }
+                theirCumulative.push(theirSum);
+                
+                // Calculate differential (their time - your time)
+                // Positive = you're ahead, negative = you're behind
+                differential.push(theirSum - mySum);
+            }
+            
             content.innerHTML = `
-                <div style="overflow-x:auto;">
+                <div style="margin-bottom:12px;text-align:center;border-bottom:2px solid #e5e7eb;">
+                    <button id="tableViewTab" class="view-tab" style="padding:12px 24px;background:transparent;color:#9370db;border:none;border-bottom:3px solid #9370db;cursor:pointer;font-weight:600;font-size:0.95rem;">
+                        Table
+                    </button>
+                    <button id="chartViewTab" class="view-tab" style="padding:12px 24px;background:transparent;color:#6b7280;border:none;border-bottom:3px solid transparent;cursor:pointer;font-weight:400;font-size:0.95rem;">
+                        Chart
+                    </button>
+                </div>
+                
+                <div id="tableView">
                     <table style="width:100%;border-collapse:collapse;background:white;border:2px solid #e5e7eb;">
                         <thead>
                             <tr style="background:#e5e7eb;">
-                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:12%;">Plate</th>
-                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:32%;">${myName}</th>
-                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:32%;">${opponentName}</th>
-                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;width:24%;">Diff</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:10%;">Plate</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:30%;">${myName}</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:30%;">${opponentName}</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;border-right:2px solid #e5e7eb;width:15%;">Diff</th>
+                                <th style="padding:10px 8px;text-align:center;font-weight:700;font-size:0.9rem;width:15%;">Cumulative</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -4002,6 +4111,9 @@ window.addEventListener('load', function() {
                                 <td style="padding:12px 8px;font-weight:700;font-size:0.9rem;background:#f3f4f6;border-right:2px solid #e5e7eb;text-align:center;">TOTAL</td>
                                 <td style="padding:10px 8px;background:#e5e7eb;border-right:2px solid #e5e7eb;text-align:center;font-weight:600;font-size:0.95rem;">${myStatus}</td>
                                 <td style="padding:10px 8px;background:#e5e7eb;border-right:2px solid #e5e7eb;text-align:center;font-weight:600;font-size:0.95rem;">${theirStatus}</td>
+                                <td style="padding:10px 8px;background:#ffffff;border-right:2px solid #e5e7eb;text-align:center;">
+                                    <div style="font-size:1rem;font-weight:700;color:${finalDiffColor};">${finalDiffText}</div>
+                                </td>
                                 <td style="padding:10px 8px;background:#ffffff;text-align:center;">
                                     <div style="font-size:1rem;font-weight:700;color:${finalDiffColor};">${finalDiffText}</div>
                                 </td>
@@ -4009,8 +4121,232 @@ window.addEventListener('load', function() {
                         </tbody>
                     </table>
                 </div>
+                
+                <div id="chartView" style="display:none;position:relative;">
+                    <canvas id="comparisonChart" width="1600" height="800" style="max-width:100%;height:auto;"></canvas>
+                    <div id="chartTooltip" style="position:absolute;background:rgba(0,0,0,0.9);color:white;padding:12px 16px;border-radius:6px;font-size:14px;font-weight:500;pointer-events:none;display:none;z-index:1000;line-height:1.6;"></div>
+                </div>
             `;
 
+            // Tab switching functionality
+            document.getElementById('tableViewTab').addEventListener('click', function() {
+                document.getElementById('tableView').style.display = 'block';
+                document.getElementById('chartView').style.display = 'none';
+                this.style.borderBottom = '3px solid #9370db';
+                this.style.color = '#9370db';
+                this.style.fontWeight = '600';
+                document.getElementById('chartViewTab').style.borderBottom = '3px solid transparent';
+                document.getElementById('chartViewTab').style.color = '#6b7280';
+                document.getElementById('chartViewTab').style.fontWeight = '400';
+            });
+            
+            document.getElementById('chartViewTab').addEventListener('click', function() {
+                document.getElementById('tableView').style.display = 'none';
+                document.getElementById('chartView').style.display = 'block';
+                this.style.borderBottom = '3px solid #9370db';
+                this.style.color = '#9370db';
+                this.style.fontWeight = '600';
+                document.getElementById('tableViewTab').style.borderBottom = '3px solid transparent';
+                document.getElementById('tableViewTab').style.color = '#6b7280';
+                document.getElementById('tableViewTab').style.fontWeight = '400';
+                drawChart();
+            });
+            
+            // Determine winner colors
+            const iWon = finalDiff < 0;
+            const myColor = iWon ? '#10b981' : '#ef4444'; // Green if won, red if lost
+            const theirColor = iWon ? '#ef4444' : '#10b981'; // Opposite
+            
+            // Draw chart function
+            function drawChart() {
+                const canvas = document.getElementById('comparisonChart');
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+                
+                // Padding
+                const padding = { top: 60, right: 40, bottom: 50, left: 80 };
+                const chartWidth = width - padding.left - padding.right;
+                const chartHeight = height - padding.top - padding.bottom;
+                
+                // Find max/min differential for Y axis
+                const maxDiff = Math.max(...differential.map(Math.abs));
+                const yMax = Math.ceil(maxDiff / 10) * 10; // Round up to nearest 10
+                const yMin = -yMax; // Symmetric around zero
+                
+                // Draw background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw zero line (thicker, darker)
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                const zeroY = padding.top + chartHeight / 2;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, zeroY);
+                ctx.lineTo(width - padding.right, zeroY);
+                ctx.stroke();
+                
+                // Draw grid lines
+                ctx.strokeStyle = '#e5e7eb';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 6; i++) {
+                    if (i === 3) continue; // Skip zero line (already drawn)
+                    const y = padding.top + (chartHeight * i / 6);
+                    ctx.beginPath();
+                    ctx.moveTo(padding.left, y);
+                    ctx.lineTo(width - padding.right, y);
+                    ctx.stroke();
+                }
+                
+                // Draw Y axis labels
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 20px sans-serif';
+                ctx.textAlign = 'right';
+                for (let i = 0; i <= 6; i++) {
+                    const value = yMax - ((yMax - yMin) * i / 6);
+                    const y = padding.top + (chartHeight * i / 6);
+                    const label = value > 0 ? '+' + value.toFixed(0) + 's' : value.toFixed(0) + 's';
+                    ctx.fillText(label, padding.left - 15, y + 7);
+                }
+                
+                // Draw X axis labels
+                ctx.font = 'bold 20px sans-serif';
+                ctx.textAlign = 'center';
+                const actualLength = Math.max(myHistory.length, theirHistory.length);
+                const xStep = actualLength <= 15 ? 1 : 5;
+                for (let i = 0; i < actualLength; i += xStep) {
+                    const x = padding.left + (chartWidth * i / (actualLength - 1));
+                    ctx.fillText((i + 1).toString(), x, height - padding.bottom + 30);
+                }
+                
+                // Draw axis labels
+                ctx.font = 'bold 24px sans-serif';
+                ctx.fillText('Plate Number', width / 2, height - 10);
+                ctx.save();
+                ctx.translate(20, height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText('Time Differential (s)', 0, 0);
+                ctx.restore();
+                
+                // Add "Ahead/Behind" labels
+                ctx.font = 'bold 18px sans-serif';
+                ctx.fillStyle = '#10b981';
+                ctx.textAlign = 'left';
+                ctx.fillText('Ahead', padding.left + 10, padding.top + 25);
+                ctx.fillStyle = '#ef4444';
+                ctx.fillText('Behind', padding.left + 10, height - padding.bottom - 10);
+                
+                // Draw differential line
+                ctx.strokeStyle = '#9370db';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                
+                for (let i = 0; i < actualLength; i++) {
+                    const x = padding.left + (chartWidth * i / (actualLength - 1));
+                    const diffValue = differential[i] || 0;
+                    // Map differential to Y coordinate (positive = ahead = top)
+                    const y = padding.top + chartHeight / 2 - (chartHeight / 2 * diffValue / yMax);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+                
+                // Draw shaded area between line and zero
+                ctx.globalAlpha = 0.2;
+                for (let i = 0; i < actualLength - 1; i++) {
+                    const x1 = padding.left + (chartWidth * i / (actualLength - 1));
+                    const x2 = padding.left + (chartWidth * (i + 1) / (actualLength - 1));
+                    const diff1 = differential[i] || 0;
+                    const diff2 = differential[i + 1] || 0;
+                    const y1 = padding.top + chartHeight / 2 - (chartHeight / 2 * diff1 / yMax);
+                    const y2 = padding.top + chartHeight / 2 - (chartHeight / 2 * diff2 / yMax);
+                    
+                    // Green if ahead (positive), red if behind (negative)
+                    ctx.fillStyle = diff1 > 0 ? '#10b981' : '#ef4444';
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.lineTo(x2, zeroY);
+                    ctx.lineTo(x1, zeroY);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1.0;
+                
+                // Draw data points
+                ctx.fillStyle = '#9370db';
+                for (let i = 0; i < actualLength; i++) {
+                    const x = padding.left + (chartWidth * i / (actualLength - 1));
+                    const diffValue = differential[i] || 0;
+                    const y = padding.top + chartHeight / 2 - (chartHeight / 2 * diffValue / yMax);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                
+                // Draw legend
+                ctx.font = 'bold 22px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#9370db';
+                ctx.fillRect(padding.left, 15, 40, 5);
+                ctx.fillText('Your Lead/Deficit', padding.left + 50, 25);
+                
+                // Add tooltip on hover
+                const tooltip = document.getElementById('chartTooltip');
+                canvas.onmousemove = function(e) {
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    const mouseX = (e.clientX - rect.left) * scaleX;
+                    const mouseY = (e.clientY - rect.top) * scaleY;
+                    
+                    // Check for point hover
+                    let found = false;
+                    for (let i = 0; i < actualLength; i++) {
+                        const x = padding.left + (chartWidth * i / (actualLength - 1));
+                        const diffValue = differential[i] || 0;
+                        const y = padding.top + chartHeight / 2 - (chartHeight / 2 * diffValue / yMax);
+                        const dist = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+                        
+                        if (dist < 25) {
+                            const plate = myHistory[i]?.plate || theirHistory[i]?.plate || '?';
+                            const myWord = myHistory[i] ? (myHistory[i].word || 'Skipped') : '—';
+                            const theirWord = theirHistory[i] ? (theirHistory[i].word || 'Skipped') : '—';
+                            const myTime = myCumulative[i].toFixed(1);
+                            const theirTime = theirCumulative[i].toFixed(1);
+                            const diffText = diffValue > 0 ? '+' + diffValue.toFixed(1) + 's ahead' : diffValue.toFixed(1) + 's behind';
+                            
+                            tooltip.innerHTML = 'Plate ' + (i + 1) + ': ' + plate + '<br>' + 
+                                               myName + ': ' + myWord + ' (' + myTime + 's)<br>' +
+                                               opponentName + ': ' + theirWord + ' (' + theirTime + 's)<br>' +
+                                               '<strong>' + diffText + '</strong>';
+                            tooltip.style.display = 'block';
+                            tooltip.style.left = (e.clientX - rect.left + 15) + 'px';
+                            tooltip.style.top = (e.clientY - rect.top - 60) + 'px';
+                            canvas.style.cursor = 'pointer';
+                            found = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!found) {
+                        canvas.style.cursor = 'default';
+                        tooltip.style.display = 'none';
+                    }
+                };
+                
+                canvas.onmouseleave = function() {
+                    tooltip.style.display = 'none';
+                };
+            }
             
             // Show modal
             document.getElementById('h2hComparisonModalBackdrop').classList.add('show');
@@ -4165,7 +4501,7 @@ window.addEventListener('load', function() {
 
 <!-- MODAL: H2H Challenge Comparison -->
 <div id="h2hComparisonModalBackdrop" class="modal-backdrop">
-    <div class="modal" style="max-width:650px;">
+    <div class="modal" style="max-width:900px;">
         <div class="modal-header" style="background:#9370db;">
             <div class="modal-title" id="h2hComparisonTitle">H2H Challenge</div>
             <button class="modal-close-btn" id="h2hComparisonCloseBtn" aria-label="Close">&times;</button>
