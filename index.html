@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plate Speller</title>
     <style>
 
@@ -62,13 +63,13 @@
         .plate-text {
             position: absolute;
             left: 52%;
-            bottom: 26%;
+            bottom: 8.5%; /* Moved down from 26% */
             transform: translateX(-50%);
             font-family: "RoadgeekUS", sans-serif;
-            font-size: 3rem;
+            font-size: 3.5rem;
             letter-spacing: 0.33em;
             color: #222;
-            font-weight: 400;
+            font-weight: 600;
             text-transform: uppercase;
             text-shadow: 0 1px 2px rgba(0,0,0,0.35);
             pointer-events: none;
@@ -87,16 +88,34 @@
         .controls {
             margin: 24px 0 12px;
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
+            flex-direction: column; /* Buttons always under input */
+            gap: 10px;
         }
 
         .controls input[type="text"] {
-            flex: 1;
-            min-width: 180px;
+            width: 100%; /* Full width input */
             padding: 8px;
-            font-size: 1rem;
+            font-size: 16px; /* 16px prevents iOS zoom */
+        }
+        
+        .controls .button-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        /* Mobile only styles */
+        @media (max-width: 768px) {
+            /* Hide the debug/loaded text on mobile */
+            #debug {
+                display: none;
+            }
+            
+            /* Make buttons bigger on mobile */
+            .controls .button-row button {
+                padding: 14px 20px;
+                font-size: 16px;
+            }
         }
 
         button {
@@ -111,7 +130,7 @@
         }
 
         #startButton {
-            display: none;
+            /* Always visible now */
         }
 
         #chartButton {
@@ -411,20 +430,24 @@
 <body>
 
 <h1>Plate Speller</h1>
-<div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
-    <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;margin-right:10px;">Daily Challenge</button>
-    <button id="practiceBtn" style="padding:10px 20px;background:#e9d5ff;border:2px solid #9370db;cursor:pointer;margin-right:10px;font-weight:bold;">Practice Mode</button>
-    <button id="rulesBtn" style="padding:10px 20px;background:#e5e7eb;border:2px solid #9ca3af;cursor:pointer;font-weight:bold;">How to Play</button>
 
-    <div id="authSection" style="margin-left:auto;">
-        <div id="authPlaceholder" style="padding:10px;background:#f3f4f6;border-radius:4px;color:#9ca3af;">
-            Loading...
-        </div>
-        <button id="signInBtn" onclick="signInWithGoogle()" style="display:none;padding:8px 16px;cursor:pointer;background:#4285f4;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Google</button>
-        <div id="userInfo" style="display:none;padding:10px;background:#f3f4f6;border-radius:4px;">
-            Signed in: <strong id="userName"></strong>
-            <button id="signOutBtn" onclick="firebase.auth().signOut()" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
-        </div>
+<!-- Row 1: Game mode buttons -->
+<div style="margin-bottom:10px;display:flex;gap:10px;">
+    <button id="dailyChallengeBtn" style="padding:10px 20px;background:#fbbf24;border:2px solid #f59e0b;font-weight:bold;cursor:pointer;">Daily Challenge</button>
+    <button id="practiceBtn" style="padding:10px 20px;background:#e9d5ff;border:2px solid #9370db;cursor:pointer;font-weight:bold;">Practice Mode</button>
+    <button id="rulesBtn" style="padding:10px 20px;background:#e5e7eb;border:2px solid #9ca3af;cursor:pointer;font-weight:bold;">How to Play</button>
+</div>
+
+<!-- Row 2: Auth section -->
+<div id="authSection" style="margin-bottom:20px;">
+    <div id="authPlaceholder" style="padding:10px;background:#f3f4f6;border-radius:4px;color:#9ca3af;display:inline-block;">
+        Loading...
+    </div>
+    <button id="signInBtn" onclick="signInWithGoogle()" style="display:none;padding:8px 16px;cursor:pointer;background:#4285f4;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Google</button>
+    <div id="userInfo" style="display:none;padding:10px;background:#f3f4f6;border-radius:4px;display:inline-block;">
+        Signed in: <strong id="userName"></strong>
+        <button id="signOutBtn" onclick="firebase.auth().signOut()" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
+    </div>
     </div>
 </div>
 <div id="modeIndicator" style="padding:8px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:4px;margin-bottom:10px;font-weight:600;text-align:left;color:#000000;">Select a game mode above to begin</div>
@@ -447,10 +470,12 @@
         </div>
 
         <div class="controls">
-            <button id="startButton">Play again</button>
             <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
-            <button id="checkButton">Check</button>
-            <button id="skipButton">Skip +5s</button>
+            <div class="button-row">
+                <button id="startButton">Start Game</button>
+                <button id="checkButton">Check</button>
+                <button id="skipButton">Skip +5s</button>
+            </div>
         </div>
 
         <div id="result"></div>
@@ -1467,20 +1492,25 @@
     }
 
     function showStartGameButton() {
-        startButtonEl.style.display = "inline-block";
         startButtonEl.textContent = "Start Game";
         const ready = dictionaryReady && difficultyReady && platesReady;
         startButtonEl.disabled = !ready;
+        startButtonEl.style.opacity = ready ? '1' : '0.5';
+        startButtonEl.style.cursor = ready ? 'pointer' : 'not-allowed';
     }
 
     function showRestartGameButton() {
-        startButtonEl.style.display = "inline-block";
         startButtonEl.textContent = "Restart game";
         startButtonEl.disabled = false;
+        startButtonEl.style.opacity = '1';
+        startButtonEl.style.cursor = 'pointer';
     }
 
     function hideMainStartButton() {
-        startButtonEl.style.display = "none";
+        // Don't hide, just disable
+        startButtonEl.disabled = true;
+        startButtonEl.style.opacity = '0.5';
+        startButtonEl.style.cursor = 'not-allowed';
     }
 
     function showChartButton() {
@@ -1547,6 +1577,14 @@
         // Show difficulty bar when game starts
         document.getElementById('difficultyLabel').style.display = 'block';
         
+        // Scroll to plate on mobile
+        if (window.innerWidth <= 768) {
+            const carWrapper = document.querySelector('.car-wrapper');
+            if (carWrapper) {
+                carWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        
         startTime = performance.now();
         timerIntervalId = setInterval(updateTimer, 100);
         updateProgressDisplay();
@@ -1557,9 +1595,11 @@
             document.getElementById('practiceBtn').disabled = true;
         }
         
-        // Hide restart button during daily challenge or H2H
+        // Disable restart button during daily challenge or H2H
         if (gameMode === 'daily' || gameMode === 'h2h_challenge') {
-            startButtonEl.style.display = 'none';
+            startButtonEl.disabled = true;
+            startButtonEl.style.opacity = '0.5';
+            startButtonEl.style.cursor = 'not-allowed';
         }
         
         if (gameMode==='daily' && currentUser) {
@@ -2652,6 +2692,26 @@
     // === FIREBASE EVENT HANDLERS ===
     // Wait for page to fully load before attaching event listeners
     window.addEventListener('DOMContentLoaded', function() {
+    // Initialize to practice mode on page load
+    gameMode = 'practice';
+    const mi = document.getElementById('modeIndicator');
+    mi.textContent = 'Practice Mode - Unlimited attempts';
+    mi.style.background = '#f3e8ff';
+    mi.style.color = '#6b21a8';
+    
+    // Set practice button as selected
+    document.getElementById('practiceBtn').style.background = '#e9d5ff';
+    document.getElementById('practiceBtn').style.border = '2px solid #9370db';
+    document.getElementById('dailyChallengeBtn').style.background = '#e5e7eb';
+    document.getElementById('dailyChallengeBtn').style.border = '2px solid #9ca3af';
+    
+    // Show start button - enabled and clickable immediately
+    const startBtn = document.getElementById('startButton');
+    startBtn.textContent = 'Start Game';
+    startBtn.disabled = false;
+    startBtn.style.opacity = '1';
+    startBtn.style.cursor = 'pointer';
+    
     document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
         console.log('Daily Challenge clicked!');
         
@@ -3023,9 +3083,12 @@
                 return creatorResult && (creatorResult.time || creatorResult.status === 'DNF');
             });
         
-        // Count new completed challenges (unviewed and within 7 days)
+        // Count new completed challenges (unviewed and within 7 days) - only for current user
         const viewedChallenges = JSON.parse(localStorage.getItem('viewedChallenges') || '[]');
-        const completed = Object.entries(allChallenges).filter(([id, c]) => c.status === 'completed');
+        const completed = Object.entries(allChallenges).filter(([id, c]) => {
+            // Only count if completed AND user is involved
+            return c.status === 'completed' && (c.createdBy === currentUser.uid || c.challengedUser === currentUser.uid);
+        });
         const newCompletedCount = completed.filter(([id, challenge]) => {
             const isViewed = viewedChallenges.includes(id);
             const daysSinceCompleted = (Date.now() - challenge.completedAt) / (1000 * 60 * 60 * 24);
@@ -4404,7 +4467,7 @@ window.addEventListener('load', function() {
     </div>
 </div>
 
-<div style="margin-top:40px;padding:20px;background:#f9fafb;border-radius:8px;">
+<div id="leaderboardSection" style="margin-top:40px;padding:20px;background:#f9fafb;border-radius:8px;">
     <!-- Tab Headers -->
     <div style="display:flex;gap:10px;border-bottom:2px solid #e5e7eb;margin-bottom:20px;">
         <h2 id="dailyLeaderboardTab" style="margin:0;padding:10px 20px;cursor:pointer;border-bottom:3px solid #9370db;color:#9370db;font-weight:600;">🏆 Daily Leaderboard</h2>
