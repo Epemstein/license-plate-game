@@ -3023,9 +3023,12 @@
                 return creatorResult && (creatorResult.time || creatorResult.status === 'DNF');
             });
         
-        // Count new completed challenges (unviewed and within 7 days)
+        // Count new completed challenges (unviewed and within 7 days) - only for current user
         const viewedChallenges = JSON.parse(localStorage.getItem('viewedChallenges') || '[]');
-        const completed = Object.entries(allChallenges).filter(([id, c]) => c.status === 'completed');
+        const completed = Object.entries(allChallenges).filter(([id, c]) => {
+            // Only count if completed AND user is involved
+            return c.status === 'completed' && (c.createdBy === currentUser.uid || c.challengedUser === currentUser.uid);
+        });
         const newCompletedCount = completed.filter(([id, challenge]) => {
             const isViewed = viewedChallenges.includes(id);
             const daysSinceCompleted = (Date.now() - challenge.completedAt) / (1000 * 60 * 60 * 24);
