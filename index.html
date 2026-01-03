@@ -3159,6 +3159,10 @@
             .filter(([id, c]) => {
                 if (c.status !== 'completed') return false;
                 
+                // Only show challenges where current user is involved
+                const isInvolved = c.createdBy === currentUser.uid || c.challengedUser === currentUser.uid;
+                if (!isInvolved) return false;
+                
                 // Filter out challenges where both players abandoned (already deleted by loadH2HChallenges)
                 const creatorResult = c.results && c.results[c.createdBy];
                 const challengedResult = c.results && c.results[c.challengedUser];
