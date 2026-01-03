@@ -1,0 +1,13 @@
+# Profanity List
+# Add offensive words here (one per line)
+# Lines starting with # are ignored
+# This is a starter list - add more as needed
+
+fuck
+shit
+damn
+hell
+ass
+bitch
+bastard
+crap
