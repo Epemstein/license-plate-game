@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Speller v3</title>
+    <title>Plate Speller v4</title>
     <style>
 
         @keyframes pulse {
@@ -2835,7 +2835,7 @@
         startBtn.textContent = 'Start Game';
         startBtn.style.display = 'inline-block';
     });
-    document.getElementById('leaderboardBtn').addEventListener('click', () => {
+    document.getElementById('leaderboardBtn')?.addEventListener('click', () => {
         console.log('Leaderboard clicked!');
         const t = getTodayString();
         document.getElementById('leaderboardDatePicker').value = t;
