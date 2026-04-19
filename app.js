@@ -1950,8 +1950,10 @@
                 const bgColor = entry.skipped ? '#1f2937' : getTimeColor(time);
                 const textColor = entry.skipped ? '#ef4444' : '#000';
                 const plateColor = entry.skipped ? '#ef4444' : '#000';
+                const wordPlayed = entry.skipped ? '' : (entry.word || '');
+                const timePlayed = time.toFixed(1);
 
-                html += `<div onclick="showViableWordsForPlate('${entry.plate}')" style="display:flex;align-items:center;padding:12px;margin-bottom:2px;border-radius:8px;background:${bgColor};cursor:pointer;">`;
+                html += `<div onclick="showViableWordsForPlate('${entry.plate}','${wordPlayed.replace(/'/g,"\\'")}',${timePlayed})" style="display:flex;align-items:center;padding:12px;margin-bottom:2px;border-radius:8px;background:${bgColor};cursor:pointer;">`;
                 html += `<span style="font-weight:700;min-width:50px;color:${plateColor};">${entry.plate}</span>`;
                 html += `<span style="color:#6b7280;margin:0 8px;">|</span>`;
 
@@ -2002,23 +2004,32 @@
 
     function getViableWordsForPlate(plate) {
         const viable = [];
-        const upperPlate = plate.toUpperCase();
-        if (typeof WORDS !== 'undefined') {
+        if (WORDS && WORDS.length > 0) {
             for (const word of WORDS) {
                 if (wordMatchesPlate(plate, word)) viable.push(word);
             }
         }
+        console.log('getViableWordsForPlate:', plate, 'WORDS.length:', WORDS?.length, 'viable:', viable.length, 'COMMON_WORDS.size:', COMMON_WORDS.size);
         return viable;
     }
 
-    function showViableWordsForPlate(plate) {
+    let wordsModalPlayerWord = '';
+    let wordsModalPlayerTime = 0;
+    let wordsModalSkipPct = 0;
+    let wordsModalAvgTime = 0;
+
+    function showViableWordsForPlate(plate, playerWord, playerTime) {
         if (!plate || plate === '\u2014') return;
 
         wordsModalPlate = plate.toUpperCase();
         wordsModalDate = currentViewingDate || getTodayString();
+        wordsModalPlayerWord = playerWord || '';
+        wordsModalPlayerTime = playerTime || 0;
         wordsModalViable = getViableWordsForPlate(plate);
         wordsModalCommon = wordsModalViable.filter(w => COMMON_WORDS.has(w.toLowerCase()));
         wordsModalUsed = [];
+        wordsModalSkipPct = 0;
+        wordsModalAvgTime = 0;
         wordsModalActiveTab = 'common';
 
         document.getElementById('wordsModalTitle').textContent = `Plate: ${wordsModalPlate}`;
@@ -2031,30 +2042,53 @@
 
         renderWordsTab('common');
 
-        // Load used words from Supabase (non-blocking)
+        // Load used words and stats from Supabase (non-blocking)
         sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate })
             .then(({ data }) => {
                 if (!data) return;
-                // Group by word, count uses
+                // Group by word, count uses, compute stats
                 const wordCounts = {};
                 let totalPlays = 0;
+                let skipCount = 0;
+                let totalTime = 0;
                 data.forEach(row => {
                     totalPlays++;
+                    const t = (row.thinking_seconds || 0) + (row.penalty_seconds || 0);
+                    totalTime += t;
                     if (row.skipped) {
+                        skipCount++;
                         wordCounts['__skipped__'] = (wordCounts['__skipped__'] || 0) + 1;
                     } else if (row.word) {
                         const w = row.word.toLowerCase();
                         wordCounts[w] = (wordCounts[w] || 0) + 1;
                     }
                 });
+                wordsModalSkipPct = totalPlays > 0 ? Math.round(skipCount / totalPlays * 100) : 0;
+                wordsModalAvgTime = totalPlays > 0 ? totalTime / totalPlays : 0;
                 wordsModalUsed = Object.entries(wordCounts)
                     .filter(([w]) => w !== '__skipped__')
                     .map(([word, count]) => ({ word, count, pct: Math.round(count / totalPlays * 100) }))
                     .sort((a, b) => b.count - a.count);
                 document.getElementById('wordsTabUsed').textContent = `Used`;
+                // Update header with stats
+                updateWordsModalHeader();
                 if (wordsModalActiveTab === 'used') renderWordsTab('used');
             })
             .catch(e => console.error('Failed to load used words:', e));
+    }
+
+    function updateWordsModalHeader() {
+        const statusEl = document.getElementById('wordsModalStatus');
+        let headerHtml = '';
+        if (wordsModalPlayerWord) {
+            headerHtml += `<span style="color:#6b7280;">You played: </span><strong>${wordsModalPlayerWord}</strong> <span style="color:#6b7280;">(${wordsModalPlayerTime}s)</span>`;
+        }
+        if (wordsModalAvgTime > 0) {
+            if (headerHtml) headerHtml += '<br>';
+            headerHtml += `<span style="color:#6b7280;">Skip: ${wordsModalSkipPct}%</span>`;
+            headerHtml += `<span style="color:#6b7280;margin-left:16px;">Avg: ${wordsModalAvgTime.toFixed(1)}s</span>`;
+        }
+        statusEl.innerHTML = headerHtml;
     }
 
     function switchWordsTab(tab) {
