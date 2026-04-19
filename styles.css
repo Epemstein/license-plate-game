@@ -374,6 +374,10 @@
             font-size: 0.95rem;
         }
 
+        #wordsModalBackdrop .modal-body {
+            min-height: 50vh;
+        }
+
         .modal-footer {
             padding: 8px 14px;
             border-top: 1px solid #e5e7eb;

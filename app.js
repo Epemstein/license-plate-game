@@ -2049,8 +2049,8 @@
         sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate })
             .then(({ data }) => {
                 if (!data) return;
-                // Group by word, count uses, compute stats
-                const wordCounts = {};
+                // Group by word (or "skipped"), keep per-user details
+                const wordGroups = {};
                 let totalPlays = 0;
                 let skipCount = 0;
                 let totalTime = 0;
@@ -2058,22 +2058,22 @@
                     totalPlays++;
                     const t = (row.thinking_seconds || 0) + (row.penalty_seconds || 0);
                     totalTime += t;
-                    if (row.skipped) {
-                        skipCount++;
-                        wordCounts['__skipped__'] = (wordCounts['__skipped__'] || 0) + 1;
-                    } else if (row.word) {
-                        const w = row.word.toLowerCase();
-                        wordCounts[w] = (wordCounts[w] || 0) + 1;
-                    }
+                    const key = row.skipped ? '__skipped__' : (row.word || '').toLowerCase();
+                    if (row.skipped) skipCount++;
+                    if (!wordGroups[key]) wordGroups[key] = { word: key, count: 0, users: [] };
+                    wordGroups[key].count++;
+                    wordGroups[key].users.push({
+                        name: row.display_name || (row.handle ? '@' + row.handle : 'Anonymous'),
+                        time: t,
+                        userId: row.user_id
+                    });
                 });
                 wordsModalSkipPct = totalPlays > 0 ? Math.round(skipCount / totalPlays * 100) : 0;
                 wordsModalAvgTime = totalPlays > 0 ? totalTime / totalPlays : 0;
-                wordsModalUsed = Object.entries(wordCounts)
-                    .filter(([w]) => w !== '__skipped__')
-                    .map(([word, count]) => ({ word, count, pct: Math.round(count / totalPlays * 100) }))
+                wordsModalUsed = Object.values(wordGroups)
+                    .map(g => ({ ...g, pct: Math.round(g.count / totalPlays * 100), isSkip: g.word === '__skipped__' }))
                     .sort((a, b) => b.count - a.count);
                 document.getElementById('wordsTabUsed').textContent = `Used`;
-                // Update header with stats
                 updateWordsModalHeader();
                 if (wordsModalActiveTab === 'used') renderWordsTab('used');
             })
@@ -2121,41 +2121,71 @@
 
     function renderWordsTab(tab) {
         const listEl = document.getElementById('wordsModalList');
-        const statusEl = document.getElementById('wordsModalStatus');
+        // Don't clear the status — keep the header stats visible
+        updateWordsModalHeader();
         let html = '';
 
         if (tab === 'common') {
             const sorted = [...wordsModalCommon].sort((a, b) => a.localeCompare(b));
-            statusEl.textContent = '';
             sorted.forEach(word => {
                 html += `<div class="word-item">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
             });
         } else if (tab === 'viable') {
             const sorted = [...wordsModalViable].sort((a, b) => a.localeCompare(b));
-            statusEl.textContent = '';
             sorted.forEach(word => {
                 html += `<div class="word-item">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
             });
         } else if (tab === 'used') {
-            statusEl.textContent = '';
             if (wordsModalUsed.length === 0) {
                 html = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
             } else {
-                wordsModalUsed.forEach(entry => {
-                    const isMe = currentUser && entry.word === (document.getElementById('userName').textContent || '').toLowerCase();
-                    const badge = isMe ? ' <span class="lb-badge lb-badge-you" style="font-size:0.7rem;">YOU</span>' : '';
-                    html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
-                    html += `<div style="flex:1;">${highlightWordWithPlate(entry.word, wordsModalPlate)}${badge}</div>`;
+                wordsModalUsed.forEach((entry, idx) => {
+                    // Check if this is the word the current user played
+                    const isMyWord = wordsModalPlayerWord && entry.word === wordsModalPlayerWord.toLowerCase();
+                    const badge = isMyWord ? ' <span class="lb-badge lb-badge-you" style="font-size:0.7rem;">YOU</span>' : '';
+
+                    const wordDisplay = entry.isSkip
+                        ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
+                        : highlightWordWithPlate(entry.word, wordsModalPlate);
+
+                    html += `<div>`;
+                    html += `<div onclick="toggleUsedDetail(${idx})" style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6;cursor:pointer;">`;
+                    html += `<div style="flex:1;">${wordDisplay}${badge}</div>`;
                     html += `<div style="min-width:30px;text-align:right;font-weight:600;color:#374151;">${entry.count}</div>`;
                     html += `<div style="min-width:40px;text-align:right;color:#6b7280;">${entry.pct}%</div>`;
-                    html += `<div style="color:#9ca3af;margin-left:8px;">&#8250;</div>`;
+                    html += `<div id="usedChevron${idx}" style="color:#9ca3af;margin-left:8px;transition:transform 0.2s;">&#8250;</div>`;
                     html += `</div>`;
+                    // Expandable detail (hidden by default)
+                    html += `<div id="usedDetail${idx}" style="display:none;padding:4px 0 8px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;">`;
+                    entry.users.sort((a, b) => a.time - b.time).forEach(u => {
+                        const isMe = currentUser && u.userId === currentUser.id;
+                        const nameStyle = isMe ? 'color:#9370db;font-weight:600;' : 'color:#374151;';
+                        html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.9rem;">`;
+                        html += `<span style="${nameStyle}">${u.name}</span>`;
+                        html += `<span style="color:#6b7280;">${u.time.toFixed(1)}s</span>`;
+                        html += `</div>`;
+                    });
+                    html += `</div></div>`;
                 });
             }
         }
 
         listEl.innerHTML = html;
     }
+
+    function toggleUsedDetail(idx) {
+        const detail = document.getElementById('usedDetail' + idx);
+        const chevron = document.getElementById('usedChevron' + idx);
+        if (!detail) return;
+        if (detail.style.display === 'none') {
+            detail.style.display = 'block';
+            if (chevron) chevron.style.transform = 'rotate(90deg)';
+        } else {
+            detail.style.display = 'none';
+            if (chevron) chevron.style.transform = '';
+        }
+    }
+    window.toggleUsedDetail = toggleUsedDetail;
 
     // Legacy compat
     function displayViableWords(sortType) {
