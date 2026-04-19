@@ -572,7 +572,7 @@
     // === SUPABASE ===
     const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTkwNTUsImV4cCI6MjA5MTQ5NTA1NX0.RRQA0fW02H6XKj7xKUTSnR9zrGbWuE2kSmspCeHCfyQ';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Stub for removed Firebase — prevents H2H code from crashing.
     // H2H challenges are not yet ported to Supabase.
@@ -584,7 +584,7 @@
     let currentDailyRunId = null;
 
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    sb.auth.getSession().then(({ data: { session } }) => {
         if (!session) {
             document.getElementById('authPlaceholder').style.display = 'none';
             document.getElementById('signInBtn').style.display = 'inline-block';
@@ -592,7 +592,7 @@
     });
 
     // Auth state listener
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    sb.auth.onAuthStateChange(async (event, session) => {
         const signInBtn = document.getElementById('signInBtn');
         const userInfo = document.getElementById('userInfo');
         if (session?.user) {
@@ -601,7 +601,7 @@
             document.getElementById('authPlaceholder').style.display = 'none';
             userInfo.style.display = 'inline-block';
             // Load profile name
-            const { data: profile } = await supabase
+            const { data: profile } = await sb
                 .from('profiles')
                 .select('display_name, handle')
                 .eq('id', session.user.id)
@@ -690,7 +690,7 @@
 
     async function signInWithApple() {
         try {
-            const { error } = await supabase.auth.signInWithOAuth({
+            const { error } = await sb.auth.signInWithOAuth({
                 provider: 'apple',
                 options: { redirectTo: window.location.origin + window.location.pathname }
             });
@@ -703,14 +703,14 @@
     }
 
     async function signOut() {
-        await supabase.auth.signOut();
+        await sb.auth.signOut();
         currentUser = null;
     }
 
     async function checkIfPlayedToday() {
         if (!currentUser) return false;
         const t = getTodayString();
-        const { data } = await supabase
+        const { data } = await sb
             .from('daily_runs')
             .select('id')
             .eq('user_id', currentUser.id)
@@ -725,7 +725,7 @@
         const totalSeconds = Math.floor(time * 10) / 10;
 
         // Submit total time
-        await supabase
+        await sb
             .from('daily_runs')
             .update({ total_seconds: totalSeconds, completed_at: new Date().toISOString() })
             .eq('id', currentDailyRunId);
@@ -742,7 +742,7 @@
             user_id: currentUser.id
         }));
 
-        await supabase.from('daily_run_entries').insert(entries);
+        await sb.from('daily_run_entries').insert(entries);
 
         // Refresh leaderboard
         setTimeout(() => {
@@ -753,7 +753,7 @@
 
     // Load a specific player's run entries
     async function loadPlayerHistory(userId, dateStr) {
-        const { data: runs } = await supabase
+        const { data: runs } = await sb
             .from('daily_runs')
             .select('id, total_seconds')
             .eq('user_id', userId)
@@ -761,7 +761,7 @@
             .limit(1);
         if (!runs || !runs.length) return null;
         const run = runs[0];
-        const { data: entries } = await supabase
+        const { data: entries } = await sb
             .from('daily_run_entries')
             .select('*')
             .eq('run_id', run.id)
@@ -780,7 +780,7 @@
 
     async function loadLeaderboard(dateStr) {
         if (!currentUser) return [];
-        const { data } = await supabase.rpc('leaderboard_for_date', {
+        const { data } = await sb.rpc('leaderboard_for_date', {
             p_date: dateStr,
             p_user_id: currentUser.id
         });
@@ -1623,7 +1623,7 @@
         if (gameMode==='daily' && currentUser) {
             // Start daily run on server
             try {
-                const { data } = await supabase.rpc('start_daily_run', {
+                const { data } = await sb.rpc('start_daily_run', {
                     p_date: getTodayString()
                 });
                 if (data && data.length > 0) {
@@ -1640,7 +1640,7 @@
             }
 
             // Fetch daily plates from server
-            const { data: plateRow } = await supabase
+            const { data: plateRow } = await sb
                 .from('daily_plates')
                 .select('plates')
                 .eq('date', getTodayString())
