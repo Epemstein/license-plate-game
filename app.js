@@ -70,9 +70,73 @@
             <div class="profile-avatar">${initials}</div>
             <div class="profile-name">${displayName}</div>
             ${handle ? `<div class="profile-handle">@${handle}</div>` : ''}
-            <button class="profile-signout-btn" onclick="signOut()">Sign Out</button>
+            <div id="profileStats" style="display:flex;justify-content:center;gap:0;margin:20px 0;background:#f9fafb;border-radius:12px;padding:12px 0;">
+                <div style="flex:1;text-align:center;border-right:1px solid #e5e7eb;">
+                    <div style="font-weight:700;font-size:1.1rem;" id="statDailies">--</div>
+                    <div style="font-size:0.75rem;color:#6b7280;">dailies</div>
+                </div>
+                <div style="flex:1;text-align:center;border-right:1px solid #e5e7eb;">
+                    <div style="font-weight:700;font-size:1.1rem;" id="statAvgTime">--</div>
+                    <div style="font-size:0.75rem;color:#6b7280;">avg time</div>
+                </div>
+                <div style="flex:1;text-align:center;border-right:1px solid #e5e7eb;">
+                    <div style="font-weight:700;font-size:1.1rem;" id="statBeat">--</div>
+                    <div style="font-size:0.75rem;color:#6b7280;">beat</div>
+                </div>
+                <div style="flex:1;text-align:center;">
+                    <div style="font-weight:700;font-size:1.1rem;" id="statOverall">--</div>
+                    <div style="font-size:0.75rem;color:#6b7280;">overall</div>
+                </div>
+            </div>
+            <button onclick="showHistoricalScores()" style="width:100%;padding:14px;background:#fbbf24;color:#92400e;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+                <span>Historical Scores</span><span>&#8250;</span>
+            </button>
+            <button class="profile-signout-btn" onclick="signOut()" style="margin-top:24px;">Sign Out</button>
         `;
+        // Load stats asynchronously
+        if (currentUser) loadProfileStats();
     }
+
+    async function loadProfileStats() {
+        if (!currentUser) return;
+        // Dailies count + avg time
+        sb.from('daily_runs')
+            .select('total_seconds')
+            .eq('user_id', currentUser.id)
+            .not('total_seconds', 'is', null)
+            .then(({ data }) => {
+                if (!data) return;
+                const el = document.getElementById('statDailies');
+                const avgEl = document.getElementById('statAvgTime');
+                if (el) el.textContent = data.length;
+                if (avgEl && data.length > 0) {
+                    const avg = data.reduce((s, r) => s + r.total_seconds, 0) / data.length;
+                    avgEl.textContent = avg.toFixed(1) + 's';
+                }
+            });
+
+        // Overall stats
+        sb.rpc('user_overall_stats', { p_user_id: currentUser.id })
+            .then(({ data }) => {
+                if (!data || !data.length) return;
+                const row = data[0];
+                const beatEl = document.getElementById('statBeat');
+                const overallEl = document.getElementById('statOverall');
+                if (beatEl && row.ratio != null) {
+                    beatEl.textContent = Math.round(row.ratio * 100) + '%';
+                }
+                if (overallEl && row.percentile_rank != null) {
+                    overallEl.textContent = 'Top ' + Math.round(100 - row.percentile_rank) + '%';
+                }
+            });
+    }
+
+    function showHistoricalScores() {
+        // Switch to leaderboard tab as a simple fallback for now
+        // TODO: build full calendar view
+        switchTab('leaderboard');
+    }
+    window.showHistoricalScores = showHistoricalScores;
 
     function updateProfileTab() {
         console.log('updateProfileTab called, currentUser:', !!currentUser);
