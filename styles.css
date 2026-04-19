@@ -374,8 +374,15 @@
             font-size: 0.95rem;
         }
 
-        #wordsModalBackdrop .modal-body {
-            min-height: 50vh;
+        #wordsModalBackdrop .modal,
+        #runDetailsModalBackdrop .modal {
+            max-width: 500px;
+            height: 80vh;
+        }
+        #wordsModalBackdrop .modal-body,
+        #runDetailsModalBackdrop .modal-body {
+            flex: 1;
+            overflow-y: auto;
         }
 
         .modal-footer {

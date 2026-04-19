@@ -2017,10 +2017,7 @@
                 const bgColor = entry.skipped ? '#1f2937' : getTimeColor(time);
                 const textColor = entry.skipped ? '#ef4444' : '#000';
                 const plateColor = entry.skipped ? '#ef4444' : '#000';
-                const wordPlayed = entry.skipped ? '' : (entry.word || '');
-                const timePlayed = time.toFixed(1);
-
-                html += `<div onclick="showViableWordsForPlate('${entry.plate}','${wordPlayed.replace(/'/g,"\\'")}',${timePlayed})" style="display:flex;align-items:center;padding:12px;margin-bottom:2px;border-radius:8px;background:${bgColor};cursor:pointer;">`;
+                html += `<div onclick="showViableWordsForPlate('${entry.plate}')" style="display:flex;align-items:center;padding:12px;margin-bottom:2px;border-radius:8px;background:${bgColor};cursor:pointer;">`;
                 html += `<span style="font-weight:700;min-width:50px;color:${plateColor};">${entry.plate}</span>`;
                 html += `<span style="color:#6b7280;margin:0 8px;">|</span>`;
 
@@ -2080,18 +2077,22 @@
         return viable;
     }
 
-    let wordsModalPlayerWord = '';
-    let wordsModalPlayerTime = 0;
+    let wordsModalMyWord = '';  // current user's word for this plate
+    let wordsModalMyTime = 0;
+    let wordsModalMySkipped = false;
+    let wordsModalMyPenalty = 0;
     let wordsModalSkipPct = 0;
     let wordsModalAvgTime = 0;
 
-    function showViableWordsForPlate(plate, playerWord, playerTime) {
+    function showViableWordsForPlate(plate) {
         if (!plate || plate === '\u2014') return;
 
         wordsModalPlate = plate.toUpperCase();
         wordsModalDate = currentViewingDate || getTodayString();
-        wordsModalPlayerWord = playerWord || '';
-        wordsModalPlayerTime = playerTime || 0;
+        wordsModalMyWord = '';
+        wordsModalMyTime = 0;
+        wordsModalMySkipped = false;
+        wordsModalMyPenalty = 0;
         wordsModalViable = getViableWordsForPlate(plate);
         wordsModalCommon = wordsModalViable.filter(w => COMMON_WORDS.has(w.toLowerCase()));
         wordsModalUsed = [];
@@ -2102,7 +2103,6 @@
         document.getElementById('wordsModalTitle').textContent = `Plate: ${wordsModalPlate}`;
         document.getElementById('wordsModalBackdrop').classList.add('show');
 
-        // Update tab labels with counts
         document.getElementById('wordsTabCommon').textContent = `Common (${wordsModalCommon.length})`;
         document.getElementById('wordsTabViable').textContent = `Viable (${wordsModalViable.length.toLocaleString()})`;
         document.getElementById('wordsTabUsed').textContent = 'Used';
@@ -2113,14 +2113,16 @@
         sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate })
             .then(({ data }) => {
                 if (!data) return;
-                // Group by word (or "skipped"), keep per-user details
                 const wordGroups = {};
                 let totalPlays = 0;
                 let skipCount = 0;
                 let totalTime = 0;
+                let foundMyEntry = false;
                 data.forEach(row => {
                     totalPlays++;
-                    const t = (row.thinking_seconds || 0) + (row.penalty_seconds || 0);
+                    const thinkTime = row.thinking_seconds || 0;
+                    const penTime = row.penalty_seconds || 0;
+                    const t = thinkTime + penTime;
                     totalTime += t;
                     const key = row.skipped ? '__skipped__' : (row.word || '').toLowerCase();
                     if (row.skipped) skipCount++;
@@ -2128,10 +2130,23 @@
                     wordGroups[key].count++;
                     wordGroups[key].users.push({
                         name: row.display_name || (row.handle ? '@' + row.handle : 'Anonymous'),
-                        time: t,
-                        userId: row.user_id
+                        time: thinkTime,
+                        penalty: penTime,
+                        userId: row.user_id,
+                        skipped: row.skipped
                     });
+                    // Find current user's entry
+                    if (currentUser && row.user_id === currentUser.id) {
+                        foundMyEntry = true;
+                        wordsModalMySkipped = row.skipped;
+                        wordsModalMyWord = row.skipped ? '' : (row.word || '').toLowerCase();
+                        wordsModalMyTime = thinkTime;
+                        wordsModalMyPenalty = penTime;
+                    }
                 });
+                if (!foundMyEntry && currentUser) {
+                    wordsModalMyWord = '__not_played__';
+                }
                 wordsModalSkipPct = totalPlays > 0 ? Math.round(skipCount / totalPlays * 100) : 0;
                 wordsModalAvgTime = totalPlays > 0 ? totalTime / totalPlays : 0;
                 wordsModalUsed = Object.values(wordGroups)
@@ -2147,8 +2162,13 @@
     function updateWordsModalHeader() {
         const statusEl = document.getElementById('wordsModalStatus');
         let headerHtml = '';
-        if (wordsModalPlayerWord) {
-            headerHtml += `<span style="color:#6b7280;">You played: </span><strong>${wordsModalPlayerWord}</strong> <span style="color:#6b7280;">(${wordsModalPlayerTime}s)</span>`;
+        // Show what the current user played
+        if (wordsModalMySkipped) {
+            headerHtml += `<span style="color:#6b7280;">You skipped: </span><strong style="color:#ef4444;">${wordsModalMyTime.toFixed(1)}s (+${wordsModalMyPenalty}s)</strong>`;
+        } else if (wordsModalMyWord === '__not_played__') {
+            headerHtml += `<span style="color:#6b7280;">You finished before this plate</span>`;
+        } else if (wordsModalMyWord) {
+            headerHtml += `<span style="color:#6b7280;">You played: </span><strong>${wordsModalMyWord}</strong> <span style="color:#6b7280;">(${wordsModalMyTime.toFixed(1)}s)</span>`;
         }
         if (wordsModalAvgTime > 0) {
             if (headerHtml) headerHtml += '<br>';
@@ -2190,12 +2210,12 @@
         let html = '';
 
         if (tab === 'common') {
-            const sorted = [...wordsModalCommon].sort((a, b) => a.localeCompare(b));
+            const sorted = [...wordsModalCommon].sort((a, b) => a.length - b.length || a.localeCompare(b));
             sorted.forEach(word => {
                 html += `<div class="word-item">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
             });
         } else if (tab === 'viable') {
-            const sorted = [...wordsModalViable].sort((a, b) => a.localeCompare(b));
+            const sorted = [...wordsModalViable].sort((a, b) => a.length - b.length || a.localeCompare(b));
             sorted.forEach(word => {
                 html += `<div class="word-item">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
             });
@@ -2204,9 +2224,14 @@
                 html = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
             } else {
                 wordsModalUsed.forEach((entry, idx) => {
-                    // Check if this is the word the current user played
-                    const isMyWord = wordsModalPlayerWord && entry.word === wordsModalPlayerWord.toLowerCase();
-                    const badge = isMyWord ? ' <span class="lb-badge lb-badge-you" style="font-size:0.7rem;">YOU</span>' : '';
+                    // Check if this is the word/skip the current user did
+                    let isMyEntry = false;
+                    if (entry.isSkip && wordsModalMySkipped) {
+                        isMyEntry = true;
+                    } else if (!entry.isSkip && wordsModalMyWord && entry.word === wordsModalMyWord) {
+                        isMyEntry = true;
+                    }
+                    const badge = isMyEntry ? ' <span class="lb-badge lb-badge-you" style="font-size:0.7rem;">YOU</span>' : '';
 
                     const wordDisplay = entry.isSkip
                         ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
@@ -2219,14 +2244,18 @@
                     html += `<div style="min-width:40px;text-align:right;color:#6b7280;">${entry.pct}%</div>`;
                     html += `<div id="usedChevron${idx}" style="color:#9ca3af;margin-left:8px;transition:transform 0.2s;">&#8250;</div>`;
                     html += `</div>`;
-                    // Expandable detail (hidden by default)
+                    // Expandable detail
                     html += `<div id="usedDetail${idx}" style="display:none;padding:4px 0 8px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;">`;
                     entry.users.sort((a, b) => a.time - b.time).forEach(u => {
                         const isMe = currentUser && u.userId === currentUser.id;
                         const nameStyle = isMe ? 'color:#9370db;font-weight:600;' : 'color:#374151;';
+                        let timeDisplay = u.time.toFixed(1) + 's';
+                        if (u.skipped && u.penalty) {
+                            timeDisplay = `${u.time.toFixed(1)}s (+${u.penalty}s)`;
+                        }
                         html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.9rem;">`;
                         html += `<span style="${nameStyle}">${u.name}</span>`;
-                        html += `<span style="color:#6b7280;">${u.time.toFixed(1)}s</span>`;
+                        html += `<span style="color:#6b7280;">${timeDisplay}</span>`;
                         html += `</div>`;
                     });
                     html += `</div></div>`;
