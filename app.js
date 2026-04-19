@@ -329,8 +329,7 @@
             word: entry.skipped ? null : (entry.word || '').toLowerCase(),
             thinking_seconds: Math.floor(entry.thinkingSeconds * 10) / 10,
             skipped: entry.skipped || false,
-            penalty_seconds: entry.penaltySeconds || 0,
-            user_id: currentUser.id
+            penalty_seconds: entry.penaltySeconds || 0
         }));
 
         const { error: insertError } = await sb.from('daily_run_entries').insert(entries);
