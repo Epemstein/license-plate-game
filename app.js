@@ -1398,12 +1398,14 @@
     function setWordsSortMode(mode) {
         currentWordsModalSortMode = mode;
 
-        if (mode === "alpha") {
-            wordsSortAlphaBtnEl.classList.add("active");
-            wordsSortLengthBtnEl.classList.remove("active");
-        } else {
-            wordsSortAlphaBtnEl.classList.remove("active");
-            wordsSortLengthBtnEl.classList.add("active");
+        if (wordsSortAlphaBtnEl && wordsSortLengthBtnEl) {
+            if (mode === "alpha") {
+                wordsSortAlphaBtnEl.classList.add("active");
+                wordsSortLengthBtnEl.classList.remove("active");
+            } else {
+                wordsSortAlphaBtnEl.classList.remove("active");
+                wordsSortLengthBtnEl.classList.add("active");
+            }
         }
 
         if (window.currentViableWords) {
@@ -1853,8 +1855,9 @@
         if (e.target === wordsModalBackdropEl) closeWordsModal();
     });
 
-    wordsSortAlphaBtnEl.addEventListener("click", () => setWordsSortMode("alpha"));
-    wordsSortLengthBtnEl.addEventListener("click", () => setWordsSortMode("length"));
+    // Sort buttons replaced by Common/Viable/Used tabs
+    if (wordsSortAlphaBtnEl) wordsSortAlphaBtnEl.addEventListener("click", () => setWordsSortMode("alpha"));
+    if (wordsSortLengthBtnEl) wordsSortLengthBtnEl.addEventListener("click", () => setWordsSortMode("length"));
 
     gameModalPrimaryBtnEl.addEventListener("click", () => {
         if (gameModalMode === "start") startGameFromModal();
