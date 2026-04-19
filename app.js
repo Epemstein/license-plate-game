@@ -148,10 +148,65 @@
         if (el('statOverall')) el('statOverall').textContent = stats.overall;
     }
 
-    function showHistoricalScores() {
-        // Switch to leaderboard tab as a simple fallback for now
-        // TODO: build full calendar view
-        switchTab('leaderboard');
+    async function showHistoricalScores() {
+        if (!currentUser) return;
+        const container = document.getElementById('profileContent');
+        const origHtml = container.innerHTML;
+
+        container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
+
+        try {
+            const { data: runs } = await sb
+                .from('daily_runs')
+                .select('date, total_seconds')
+                .eq('user_id', currentUser.id)
+                .not('total_seconds', 'is', null)
+                .order('date', { ascending: false });
+
+            if (!runs || !runs.length) {
+                container.innerHTML = `
+                    <button onclick="updateProfileTab()" style="padding:8px 16px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;margin-bottom:16px;">&larr; Back</button>
+                    <p style="text-align:center;color:#6b7280;">No daily scores yet.</p>`;
+                return;
+            }
+
+            // Get percentiles from leaderboard for each date
+            let html = '<button onclick="updateProfileTab()" style="padding:8px 16px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;margin-bottom:16px;">&larr; Back</button>';
+            html += '<h3 style="margin:0 0 12px;">Historical Scores</h3>';
+
+            for (const run of runs) {
+                const dateDisplay = formatDateForDisplay(run.date);
+                const time = run.total_seconds.toFixed(1);
+
+                // Try to get percentile from cached leaderboard
+                let pctText = '';
+                const cacheKey = 'lb_' + run.date + '_' + currentUser.id;
+                try {
+                    const cached = JSON.parse(localStorage.getItem(cacheKey));
+                    if (cached) {
+                        const me = cached.find(s => s.isMe);
+                        if (me && me.percentile != null) {
+                            pctText = `Top ${Math.round(100 - me.percentile)}%`;
+                        }
+                    }
+                } catch(e) {}
+
+                html += `<div onclick="switchTab('leaderboard');setTimeout(()=>{document.getElementById('leaderboardDatePicker').value='${run.date}';displayLeaderboard('${run.date}');},100);viewPlayerRun('${currentUser.id}','${run.date}','My Run',${run.total_seconds},0,0,0,0)" style="display:flex;align-items:center;padding:12px;margin-bottom:4px;background:#f9fafb;border-radius:10px;cursor:pointer;">`;
+                html += `<div style="flex:1;"><div style="font-weight:600;">${dateDisplay}</div></div>`;
+                html += `<div style="text-align:right;"><div style="font-weight:700;color:#16a34a;">${time}s</div>`;
+                if (pctText) html += `<div style="font-size:0.8rem;color:#6b7280;">${pctText}</div>`;
+                html += `</div>`;
+                html += `<div style="color:#9ca3af;margin-left:8px;">&#8250;</div>`;
+                html += `</div>`;
+            }
+
+            container.innerHTML = html;
+        } catch(e) {
+            console.error('Error loading historical scores:', e);
+            container.innerHTML = `
+                <button onclick="updateProfileTab()" style="padding:8px 16px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;margin-bottom:16px;">&larr; Back</button>
+                <p style="text-align:center;color:#dc2626;">Error loading scores</p>`;
+        }
     }
     window.showHistoricalScores = showHistoricalScores;
 
@@ -234,6 +289,7 @@
         } else {
             currentUser = null;
             updateProfileTab();
+            updateDailyBtnState();
         }
     });
 
@@ -334,16 +390,28 @@
     }
 
     async function updateDailyBtnState() {
-        if (!currentUser) return;
-        const played = await checkIfPlayedToday();
         const btn = document.getElementById('dailyChallengeBtn');
+        if (!currentUser) {
+            btn.textContent = 'Sign in to play Daily';
+            btn.style.background = '#e5e7eb';
+            btn.style.color = '#9ca3af';
+            btn.style.cursor = 'not-allowed';
+            btn.disabled = true;
+            return;
+        }
+        const played = await checkIfPlayedToday();
         if (played && todaysDailyTime) {
             btn.textContent = `Daily Challenge: ${todaysDailyTime.toFixed(1)}s`;
             btn.style.background = '#e5e7eb';
             btn.style.color = '#9ca3af';
             btn.style.cursor = 'not-allowed';
             btn.disabled = true;
-            btn.onmouseenter = () => { btn.style.cursor = 'not-allowed'; };
+        } else {
+            btn.textContent = 'Daily Challenge';
+            btn.style.background = '#fbbf24';
+            btn.style.color = '#92400e';
+            btn.style.cursor = 'pointer';
+            btn.disabled = false;
         }
     }
 
@@ -2399,9 +2467,12 @@
     }
     window.changeDateBy = changeDateBy;
 
+    const EARLIEST_DATE = '2026-04-15';
+
     function updateNavigationButtons() {
         const picker = document.getElementById('leaderboardDatePicker');
         const nextBtn = document.getElementById('nextDayBtn');
+        const prevBtn = document.getElementById('prevDayBtn');
         const today = getTodayString();
 
         if (picker.value === today) {
@@ -2412,6 +2483,16 @@
             nextBtn.disabled = false;
             nextBtn.style.opacity = '1';
             nextBtn.style.cursor = 'pointer';
+        }
+
+        if (picker.value <= EARLIEST_DATE) {
+            prevBtn.disabled = true;
+            prevBtn.style.opacity = '0.5';
+            prevBtn.style.cursor = 'not-allowed';
+        } else {
+            prevBtn.disabled = false;
+            prevBtn.style.opacity = '1';
+            prevBtn.style.cursor = 'pointer';
         }
     }
 
@@ -2818,6 +2899,14 @@
 
     loadDictionary();
     loadDifficulty();
+
+    // Precache yesterday's leaderboard silently
+    setTimeout(() => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yStr = yesterday.toISOString().split('T')[0];
+        if (yStr >= EARLIEST_DATE) loadLeaderboard(yStr);
+    }, 2000);
 
 // Auto-load today's leaderboard when page is fully loaded
 window.addEventListener('load', function() {
