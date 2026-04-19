@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Speller v14</title>
-    <link rel="stylesheet" href="styles.css?v=14">
+    <title>Plate Speller v15</title>
+    <link rel="stylesheet" href="styles.css?v=15">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -177,13 +177,11 @@
             <button class="modal-close-btn" id="wordsModalCloseBtn" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-            <div id="wordsModalStatus" style="margin-bottom:6px; color:#6b7280; font-size:0.9rem;">
-                Loading...
-            </div>
-            <div id="wordsModalSortControls" class="words-sort-controls">
-                <span class="words-sort-label">Sort:</span>
-                <button id="wordsSortAlphaBtn" class="words-sort-button active">A-Z</button>
-                <button id="wordsSortLengthBtn" class="words-sort-button">Shortest -> longest</button>
+            <div id="wordsModalStatus" style="margin-bottom:6px; color:#6b7280; font-size:0.9rem;"></div>
+            <div class="segmented-control" style="margin-bottom:12px;">
+                <button class="active" id="wordsTabCommon" onclick="switchWordsTab('common')">Common</button>
+                <button id="wordsTabViable" onclick="switchWordsTab('viable')">Viable</button>
+                <button id="wordsTabUsed" onclick="switchWordsTab('used')">Used</button>
             </div>
             <div id="wordsModalList" class="words-list"></div>
         </div>
@@ -322,7 +320,7 @@
     &copy; 2026 Ezra Pemstein. All rights reserved.
 </footer>
 
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 
 </body>
 </html>

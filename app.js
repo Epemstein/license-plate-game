@@ -1975,79 +1975,154 @@
     }
     window.closeRunDetailsModal = closeRunDetailsModal;
 
-    // Show viable words for a plate in the comparison table
+    // === COMMON WORDS ===
+    let COMMON_WORDS = new Set();
+    async function loadCommonWords() {
+        try {
+            const res = await fetch('common-words.txt');
+            const text = await res.text();
+            for (const line of text.split(/\r?\n/)) {
+                const w = line.trim().toLowerCase();
+                if (w && /^[a-z]+$/.test(w)) COMMON_WORDS.add(w);
+            }
+            console.log('Loaded', COMMON_WORDS.size, 'common words');
+        } catch(e) {
+            console.warn('Could not load common-words.txt:', e);
+        }
+    }
+    loadCommonWords();
+
+    // Words modal state
+    let wordsModalPlate = '';
+    let wordsModalDate = '';
+    let wordsModalViable = [];
+    let wordsModalCommon = [];
+    let wordsModalUsed = [];
+    let wordsModalActiveTab = 'common';
+
+    function getViableWordsForPlate(plate) {
+        const viable = [];
+        const upperPlate = plate.toUpperCase();
+        if (typeof WORDS !== 'undefined') {
+            for (const word of WORDS) {
+                if (wordMatchesPlate(plate, word)) viable.push(word);
+            }
+        }
+        return viable;
+    }
+
     function showViableWordsForPlate(plate) {
         if (!plate || plate === '\u2014') return;
 
-        const viableWords = [];
-        const upperPlate = plate.toUpperCase();
+        wordsModalPlate = plate.toUpperCase();
+        wordsModalDate = currentViewingDate || getTodayString();
+        wordsModalViable = getViableWordsForPlate(plate);
+        wordsModalCommon = wordsModalViable.filter(w => COMMON_WORDS.has(w.toLowerCase()));
+        wordsModalUsed = [];
+        wordsModalActiveTab = 'common';
 
-        if (typeof DICTIONARY !== 'undefined' && DICTIONARY.size > 0) {
-            for (const word of DICTIONARY) {
-                const upperWord = word.toUpperCase();
-                let plateIdx = 0;
-                for (let i = 0; i < upperWord.length && plateIdx < upperPlate.length; i++) {
-                    if (upperWord[i] === upperPlate[plateIdx]) plateIdx++;
-                }
-                if (plateIdx === upperPlate.length) viableWords.push(word);
-            }
-        }
+        document.getElementById('wordsModalTitle').textContent = `Plate: ${wordsModalPlate}`;
+        document.getElementById('wordsModalBackdrop').classList.add('show');
 
-        if (viableWords.length === 0) {
-            alert(`No viable words found for plate ${plate}. Dictionary may not be loaded yet.`);
-            return;
-        }
+        // Update tab labels with counts
+        document.getElementById('wordsTabCommon').textContent = `Common (${wordsModalCommon.length})`;
+        document.getElementById('wordsTabViable').textContent = `Viable (${wordsModalViable.length.toLocaleString()})`;
+        document.getElementById('wordsTabUsed').textContent = 'Used';
 
-        const wordsModalBackdrop = document.getElementById('wordsModalBackdrop');
-        const wordsModalTitle = document.getElementById('wordsModalTitle');
+        renderWordsTab('common');
 
-        wordsModalTitle.textContent = `Plate: ${plate}`;
-
-        window.currentViableWords = viableWords;
-        window.currentPlateName = plate;
-
-        displayViableWords('alpha');
-        wordsModalBackdrop.classList.add('show');
+        // Load used words from Supabase (non-blocking)
+        sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate })
+            .then(({ data }) => {
+                if (!data) return;
+                // Group by word, count uses
+                const wordCounts = {};
+                let totalPlays = 0;
+                data.forEach(row => {
+                    totalPlays++;
+                    if (row.skipped) {
+                        wordCounts['__skipped__'] = (wordCounts['__skipped__'] || 0) + 1;
+                    } else if (row.word) {
+                        const w = row.word.toLowerCase();
+                        wordCounts[w] = (wordCounts[w] || 0) + 1;
+                    }
+                });
+                wordsModalUsed = Object.entries(wordCounts)
+                    .filter(([w]) => w !== '__skipped__')
+                    .map(([word, count]) => ({ word, count, pct: Math.round(count / totalPlays * 100) }))
+                    .sort((a, b) => b.count - a.count);
+                document.getElementById('wordsTabUsed').textContent = `Used`;
+                if (wordsModalActiveTab === 'used') renderWordsTab('used');
+            })
+            .catch(e => console.error('Failed to load used words:', e));
     }
 
-    function displayViableWords(sortType) {
-        const viableWords = window.currentViableWords || [];
-        const plate = window.currentPlateName || '';
-        const wordsModalList = document.getElementById('wordsModalList');
-        const wordsCountEl = document.getElementById('wordsModalStatus');
+    function switchWordsTab(tab) {
+        wordsModalActiveTab = tab;
+        document.getElementById('wordsTabCommon').classList.toggle('active', tab === 'common');
+        document.getElementById('wordsTabViable').classList.toggle('active', tab === 'viable');
+        document.getElementById('wordsTabUsed').classList.toggle('active', tab === 'used');
+        renderWordsTab(tab);
+    }
+    window.switchWordsTab = switchWordsTab;
 
-        let sorted = [...viableWords];
-        if (sortType === 'length') {
-            sorted.sort((a, b) => a.length - b.length || a.localeCompare(b));
-        } else {
-            sorted.sort((a, b) => a.localeCompare(b));
-        }
-
+    function highlightWordWithPlate(word, plate) {
         const upperPlate = plate.toUpperCase();
+        const upperWord = word.toUpperCase();
+        let highlighted = '';
+        let plateIdx = 0;
+        for (let i = 0; i < word.length; i++) {
+            if (plateIdx < upperPlate.length && upperWord[i] === upperPlate[plateIdx]) {
+                highlighted += `<strong style="color:#16a34a;">${word[i]}</strong>`;
+                plateIdx++;
+            } else {
+                highlighted += word[i];
+            }
+        }
+        return highlighted;
+    }
+
+    function renderWordsTab(tab) {
+        const listEl = document.getElementById('wordsModalList');
+        const statusEl = document.getElementById('wordsModalStatus');
         let html = '';
 
-        sorted.forEach(word => {
-            const upperWord = word.toUpperCase();
-            let highlighted = '';
-            let plateIdx = 0;
-
-            for (let i = 0; i < word.length; i++) {
-                if (plateIdx < upperPlate.length && upperWord[i] === upperPlate[plateIdx]) {
-                    highlighted += `<strong style="color:#16a34a;">${word[i].toLowerCase()}</strong>`;
-                    plateIdx++;
-                } else {
-                    highlighted += word[i].toLowerCase();
-                }
+        if (tab === 'common') {
+            const sorted = [...wordsModalCommon].sort((a, b) => a.localeCompare(b));
+            statusEl.textContent = '';
+            sorted.forEach(word => {
+                html += `<div class="word-item">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
+            });
+        } else if (tab === 'viable') {
+            const sorted = [...wordsModalViable].sort((a, b) => a.localeCompare(b));
+            statusEl.textContent = '';
+            sorted.forEach(word => {
+                html += `<div class="word-item">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
+            });
+        } else if (tab === 'used') {
+            statusEl.textContent = '';
+            if (wordsModalUsed.length === 0) {
+                html = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
+            } else {
+                wordsModalUsed.forEach(entry => {
+                    const isMe = currentUser && entry.word === (document.getElementById('userName').textContent || '').toLowerCase();
+                    const badge = isMe ? ' <span class="lb-badge lb-badge-you" style="font-size:0.7rem;">YOU</span>' : '';
+                    html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
+                    html += `<div style="flex:1;">${highlightWordWithPlate(entry.word, wordsModalPlate)}${badge}</div>`;
+                    html += `<div style="min-width:30px;text-align:right;font-weight:600;color:#374151;">${entry.count}</div>`;
+                    html += `<div style="min-width:40px;text-align:right;color:#6b7280;">${entry.pct}%</div>`;
+                    html += `<div style="color:#9ca3af;margin-left:8px;">&#8250;</div>`;
+                    html += `</div>`;
+                });
             }
+        }
 
-            html += `<div class="word-item">${highlighted}</div>`;
-        });
+        listEl.innerHTML = html;
+    }
 
-        wordsModalList.innerHTML = html;
-        wordsCountEl.textContent = `${viableWords.length} viable words`;
-
-        document.getElementById('wordsSortAlphaBtn').classList.toggle('active', sortType === 'alpha');
-        document.getElementById('wordsSortLengthBtn').classList.toggle('active', sortType === 'length');
+    // Legacy compat
+    function displayViableWords(sortType) {
+        switchWordsTab(sortType === 'alpha' ? 'common' : 'viable');
     }
     window.displayViableWords = displayViableWords;
     window.showViableWordsForPlate = showViableWordsForPlate;
