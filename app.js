@@ -57,36 +57,40 @@
     window.viewMyRun = viewMyRun;
 
     // Update profile tab based on auth state
-    async function updateProfileTab() {
+    function renderProfile(container, displayName, handle) {
+        const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'P';
+        container.innerHTML = `
+            <div class="profile-avatar">${initials}</div>
+            <div class="profile-name">${displayName}</div>
+            ${handle ? `<div class="profile-handle">@${handle}</div>` : ''}
+            <button class="profile-signout-btn" onclick="signOut()">Sign Out</button>
+        `;
+    }
+
+    function updateProfileTab() {
         console.log('updateProfileTab called, currentUser:', !!currentUser);
         const container = document.getElementById('profileContent');
-        if (!container) { console.error('profileContent not found'); return; }
+        if (!container) return;
         if (currentUser) {
-            // Load profile from Supabase
-            let displayName = 'Player';
-            let handle = '';
-            try {
-                const { data: profile, error } = await sb
-                    .from('profiles')
-                    .select('display_name, handle')
-                    .eq('id', currentUser.id)
-                    .single();
-                console.log('Profile query result:', profile, 'error:', error);
-                if (profile) {
-                    displayName = profile.display_name || currentUser.email || 'Player';
-                    handle = profile.handle || '';
-                }
-            } catch(e) {
-                console.error('Profile query exception:', e);
-                displayName = currentUser.email || 'Player';
-            }
-            const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'P';
-            container.innerHTML = `
-                <div class="profile-avatar">${initials}</div>
-                <div class="profile-name">${displayName}</div>
-                ${handle ? `<div class="profile-handle">@${handle}</div>` : ''}
-                <button class="profile-signout-btn" onclick="signOut()">Sign Out</button>
-            `;
+            // Show immediately with cached name
+            const cachedName = document.getElementById('userName').textContent || currentUser.email || 'Player';
+            renderProfile(container, cachedName, '');
+
+            // Then load full profile from Supabase (non-blocking)
+            sb.from('profiles')
+                .select('display_name, handle')
+                .eq('id', currentUser.id)
+                .single()
+                .then(({ data: profile, error }) => {
+                    console.log('Profile loaded:', profile, error);
+                    if (profile) {
+                        const name = profile.display_name || currentUser.email || 'Player';
+                        const handle = profile.handle || '';
+                        document.getElementById('userName').textContent = name;
+                        renderProfile(container, name, handle);
+                    }
+                })
+                .catch(e => console.error('Profile load error:', e));
         } else {
             container.innerHTML = `
                 <div style="margin-top:60px;">
