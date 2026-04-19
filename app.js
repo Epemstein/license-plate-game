@@ -124,6 +124,15 @@
     let currentViewingDate = null;
     let currentDailyRunId = null;
 
+    // Words modal state
+    let COMMON_WORDS = new Set();
+    let wordsModalPlate = '';
+    let wordsModalDate = '';
+    let wordsModalViable = [];
+    let wordsModalCommon = [];
+    let wordsModalUsed = [];
+    let wordsModalActiveTab = 'common';
+
     // Auth state listener — MUST NOT be async to avoid deadlocking Supabase client
     sb.auth.onAuthStateChange((event, session) => {
         console.log('Auth event:', event, 'session:', !!session);
@@ -1976,7 +1985,6 @@
     window.closeRunDetailsModal = closeRunDetailsModal;
 
     // === COMMON WORDS ===
-    let COMMON_WORDS = new Set();
     async function loadCommonWords() {
         try {
             const res = await fetch('common-words.txt');
@@ -1991,14 +1999,6 @@
         }
     }
     loadCommonWords();
-
-    // Words modal state
-    let wordsModalPlate = '';
-    let wordsModalDate = '';
-    let wordsModalViable = [];
-    let wordsModalCommon = [];
-    let wordsModalUsed = [];
-    let wordsModalActiveTab = 'common';
 
     function getViableWordsForPlate(plate) {
         const viable = [];
