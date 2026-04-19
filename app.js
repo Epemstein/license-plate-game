@@ -97,38 +97,55 @@
         if (currentUser) loadProfileStats();
     }
 
-    async function loadProfileStats() {
+    async function loadProfileStats(forceRefresh) {
         if (!currentUser) return;
-        // Dailies count + avg time
-        sb.from('daily_runs')
-            .select('total_seconds')
-            .eq('user_id', currentUser.id)
-            .not('total_seconds', 'is', null)
-            .then(({ data }) => {
-                if (!data) return;
-                const el = document.getElementById('statDailies');
-                const avgEl = document.getElementById('statAvgTime');
-                if (el) el.textContent = data.length;
-                if (avgEl && data.length > 0) {
-                    const avg = data.reduce((s, r) => s + r.total_seconds, 0) / data.length;
-                    avgEl.textContent = avg.toFixed(1) + 's';
-                }
-            });
+        const cacheKey = 'profile_stats_' + currentUser.id;
 
-        // Overall stats
-        sb.rpc('user_overall_stats', { p_user_id: currentUser.id })
-            .then(({ data }) => {
-                if (!data || !data.length) return;
+        // Use cached stats if available and not forced refresh
+        if (!forceRefresh) {
+            try {
+                const cached = JSON.parse(localStorage.getItem(cacheKey));
+                if (cached) {
+                    applyProfileStats(cached);
+                    return;
+                }
+            } catch(e) {}
+        }
+
+        // Fetch fresh
+        const stats = { dailies: '--', avgTime: '--', beat: '--', overall: '--' };
+        try {
+            const { data } = await sb.from('daily_runs')
+                .select('total_seconds')
+                .eq('user_id', currentUser.id)
+                .not('total_seconds', 'is', null);
+            if (data) {
+                stats.dailies = data.length;
+                if (data.length > 0) {
+                    stats.avgTime = (data.reduce((s, r) => s + r.total_seconds, 0) / data.length).toFixed(1) + 's';
+                }
+            }
+        } catch(e) {}
+
+        try {
+            const { data } = await sb.rpc('user_overall_stats', { p_user_id: currentUser.id });
+            if (data && data.length) {
                 const row = data[0];
-                const beatEl = document.getElementById('statBeat');
-                const overallEl = document.getElementById('statOverall');
-                if (beatEl && row.ratio != null) {
-                    beatEl.textContent = Math.round(row.ratio * 100) + '%';
-                }
-                if (overallEl && row.percentile_rank != null) {
-                    overallEl.textContent = 'Top ' + Math.round(100 - row.percentile_rank) + '%';
-                }
-            });
+                if (row.ratio != null) stats.beat = Math.round(row.ratio * 100) + '%';
+                if (row.percentile_rank != null) stats.overall = 'Top ' + Math.round(100 - row.percentile_rank) + '%';
+            }
+        } catch(e) {}
+
+        try { localStorage.setItem(cacheKey, JSON.stringify(stats)); } catch(e) {}
+        applyProfileStats(stats);
+    }
+
+    function applyProfileStats(stats) {
+        const el = (id) => document.getElementById(id);
+        if (el('statDailies')) el('statDailies').textContent = stats.dailies;
+        if (el('statAvgTime')) el('statAvgTime').textContent = stats.avgTime;
+        if (el('statBeat')) el('statBeat').textContent = stats.beat;
+        if (el('statOverall')) el('statOverall').textContent = stats.overall;
     }
 
     function showHistoricalScores() {
@@ -204,6 +221,7 @@
             currentUser = session.user;
             document.getElementById('userName').textContent = session.user.email || 'Player';
             updateProfileTab();
+            updateDailyBtnState();
 
             // Check if there's a challenge ID in the URL
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
@@ -289,6 +307,7 @@
     }
 
     async function signOut() {
+        if (!confirm('Are you sure you want to sign out?')) return;
         await sb.auth.signOut();
         currentUser = null;
         updateProfileTab();
@@ -296,16 +315,36 @@
     window.signInWithApple = signInWithApple;
     window.signOut = signOut;
 
+    let todaysDailyTime = null;
+
     async function checkIfPlayedToday() {
         if (!currentUser) return false;
         const t = getTodayString();
         const { data } = await sb
             .from('daily_runs')
-            .select('id')
+            .select('id, total_seconds')
             .eq('user_id', currentUser.id)
             .eq('date', t)
             .limit(1);
-        return data && data.length > 0;
+        if (data && data.length > 0) {
+            todaysDailyTime = data[0].total_seconds;
+            return true;
+        }
+        return false;
+    }
+
+    async function updateDailyBtnState() {
+        if (!currentUser) return;
+        const played = await checkIfPlayedToday();
+        const btn = document.getElementById('dailyChallengeBtn');
+        if (played && todaysDailyTime) {
+            btn.textContent = `Daily Challenge: ${todaysDailyTime.toFixed(1)}s`;
+            btn.style.background = '#e5e7eb';
+            btn.style.color = '#9ca3af';
+            btn.style.cursor = 'not-allowed';
+            btn.disabled = true;
+            btn.onmouseenter = () => { btn.style.cursor = 'not-allowed'; };
+        }
     }
 
     async function saveScore(time, solved, skipped) {
@@ -339,6 +378,10 @@
         } else {
             console.log('Saved', entries.length, 'run entries');
         }
+
+        // Update daily button and refresh profile stats
+        updateDailyBtnState();
+        loadProfileStats(true);
 
         setTimeout(() => {
             displayLeaderboard(today);
@@ -380,8 +423,7 @@
     }
 
     function isDateSettled(dateStr) {
-        const d = new Date(dateStr + 'T00:00:00');
-        return (Date.now() - d.getTime()) > 36 * 3600 * 1000;
+        return dateStr < getTodayString();
     }
 
     async function loadLeaderboard(dateStr) {
@@ -1196,6 +1238,30 @@
         historyEmptyEl.style.display = "block";
     }
 
+    function showCountdown() {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2000;';
+            const num = document.createElement('div');
+            num.style.cssText = 'font-size:6rem;font-weight:800;color:white;font-family:system-ui;';
+            overlay.appendChild(num);
+            document.body.appendChild(overlay);
+
+            let count = 3;
+            num.textContent = count;
+            const interval = setInterval(() => {
+                count--;
+                if (count <= 0) {
+                    clearInterval(interval);
+                    overlay.remove();
+                    resolve();
+                } else {
+                    num.textContent = count;
+                }
+            }, 1000);
+        });
+    }
+
     async function beginNewRun() {
         if (gameMode === 'h2h_challenge' && pendingOpponent && !currentChallengeId) {
             await createChallengeWithOpponent();
@@ -1206,8 +1272,6 @@
         gameStarted = true;
         gameOver = false;
 
-        // difficultyLabel hidden in web version
-
         // Scroll to plate on mobile
         if (window.innerWidth <= 768) {
             const carWrapper = document.querySelector('.car-wrapper');
@@ -1215,6 +1279,9 @@
                 carWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
+
+        // 3, 2, 1 countdown
+        await showCountdown();
 
         startTime = performance.now();
         timerIntervalId = setInterval(updateTimer, 100);
