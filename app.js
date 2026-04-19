@@ -58,22 +58,26 @@
 
     // Update profile tab based on auth state
     async function updateProfileTab() {
+        console.log('updateProfileTab called, currentUser:', !!currentUser);
         const container = document.getElementById('profileContent');
+        if (!container) { console.error('profileContent not found'); return; }
         if (currentUser) {
             // Load profile from Supabase
             let displayName = 'Player';
             let handle = '';
             try {
-                const { data: profile } = await sb
+                const { data: profile, error } = await sb
                     .from('profiles')
                     .select('display_name, handle')
                     .eq('id', currentUser.id)
                     .single();
+                console.log('Profile query result:', profile, 'error:', error);
                 if (profile) {
                     displayName = profile.display_name || currentUser.email || 'Player';
                     handle = profile.handle || '';
                 }
             } catch(e) {
+                console.error('Profile query exception:', e);
                 displayName = currentUser.email || 'Player';
             }
             const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'P';
