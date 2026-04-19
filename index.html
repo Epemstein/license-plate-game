@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Speller v5</title>
+    <title>Plate Speller v6</title>
     <style>
 
         @keyframes pulse {
@@ -27,7 +27,7 @@
 
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            max-width: 600px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 0 0 80px;
             line-height: 1.5;
@@ -65,11 +65,6 @@
             border-bottom-color: #9370db;
             font-weight: 600;
         }
-        .tab-bar-item .tab-icon {
-            font-size: 1.3rem;
-            display: block;
-            margin-bottom: 2px;
-        }
 
         /* ===== TAB CONTENT ===== */
         .tab-content {
@@ -91,19 +86,19 @@
 
         .mode-buttons {
             display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: center;
+            flex-direction: row;
+            gap: 8px;
+            justify-content: center;
             margin-bottom: 12px;
         }
         .mode-btn {
-            width: 100%;
-            max-width: 320px;
-            padding: 14px 20px;
-            font-size: 1rem;
+            flex: 1;
+            max-width: 180px;
+            padding: 10px 12px;
+            font-size: 0.9rem;
             font-weight: 700;
             border: none;
-            border-radius: 14px;
+            border-radius: 10px;
             cursor: pointer;
             transition: filter 0.2s;
         }
@@ -120,10 +115,23 @@
             background: #f3f4f6;
             color: #6b7280;
             font-weight: 600;
-            font-size: 0.9rem;
-            padding: 10px 20px;
-            max-width: 200px;
-            border-radius: 10px;
+        }
+
+        .game-layout {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+        }
+        .game-left {
+            flex: 0 0 55%;
+        }
+        .game-right {
+            flex: 1;
+        }
+        @media (max-width: 700px) {
+            .game-layout {
+                flex-direction: column;
+            }
         }
 
         .car-wrapper {
@@ -133,7 +141,6 @@
             max-width: 360px;
             height: 380px;
             overflow: hidden;
-            margin: 0 auto;
         }
 
         .car-image {
@@ -673,6 +680,11 @@
             color: #6b7280;
             margin-bottom: 24px;
         }
+        .profile-handle {
+            font-size: 0.95rem;
+            color: #9370db;
+            margin-bottom: 20px;
+        }
         .profile-signout-btn {
             padding: 10px 24px;
             background: #ef4444;
@@ -713,18 +725,9 @@
 
 <!-- ===== TAB BAR ===== -->
 <div class="tab-bar">
-    <button class="tab-bar-item active" onclick="switchTab('game')">
-        <span class="tab-icon">&#127918;</span>
-        Game
-    </button>
-    <button class="tab-bar-item" onclick="switchTab('leaderboard')">
-        <span class="tab-icon">&#128202;</span>
-        Leaderboard
-    </button>
-    <button class="tab-bar-item" onclick="switchTab('profile')">
-        <span class="tab-icon">&#128100;</span>
-        Profile
-    </button>
+    <button class="tab-bar-item active" onclick="switchTab('game')">Game</button>
+    <button class="tab-bar-item" onclick="switchTab('leaderboard')">Leaderboard</button>
+    <button class="tab-bar-item" onclick="switchTab('profile')">Profile</button>
 </div>
 
 <!-- Hidden elements needed by JS -->
@@ -749,50 +752,53 @@
 
     <div id="modeIndicator" style="padding:10px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:10px;margin-bottom:12px;font-weight:600;text-align:center;color:#000000;">Select a game mode above to begin</div>
 
-    <div class="car-wrapper">
-        <img src="car.png" alt="Car with license plate" class="car-image">
-        <div id="plate" class="plate-text">---</div>
-    </div>
+    <!-- Hidden elements for JS compat -->
+    <div id="difficultyLabel" style="display:none;"></div>
+    <div id="viableCountLabel" style="display:none;"></div>
 
-    <div id="difficultyLabel" class="difficulty diff-med" style="display:none;">
-        Difficulty: —
-    </div>
-    <div id="viableCountLabel" style="color:#6b7280; font-size:0.9rem; margin-top:2px; text-align:center;">
-    </div>
+    <div class="game-layout">
+        <div class="game-left">
+            <div class="car-wrapper">
+                <img src="car.png" alt="Car with license plate" class="car-image">
+                <div id="plate" class="plate-text">---</div>
+            </div>
 
-    <div id="timerRow">
-        <span id="timerDisplay">Time: 0.0 s</span>
-        <span id="progressDisplay">Solved: 0 / 10</span>
-    </div>
+            <div id="timerRow">
+                <span id="timerDisplay">Time: 0.0 s</span>
+                <span id="progressDisplay">Solved: 0 / 10</span>
+            </div>
 
-    <div class="controls">
-        <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
-        <div class="button-row">
-            <button id="startButton">Start Game</button>
-            <button id="checkButton">Check</button>
-            <button id="skipButton">Skip +5s</button>
+            <div class="controls">
+                <input id="wordInput" type="text" placeholder="Type a word" autocomplete="off">
+                <div class="button-row">
+                    <button id="startButton">Start Game</button>
+                    <button id="checkButton">Check</button>
+                    <button id="skipButton">Skip +5s</button>
+                </div>
+            </div>
+
+            <div id="result"></div>
+            <button id="chartButton">View run chart</button>
+            <div id="debug" style="color:#9ca3af;font-size:0.9rem;margin-top:10px;">Loading game data...</div>
         </div>
-    </div>
 
-    <div id="result"></div>
-    <button id="chartButton">View run chart</button>
-    <div id="debug" style="color:#9ca3af;font-size:0.9rem;margin-top:10px;">Loading game data...</div>
-
-    <div class="solved-card">
-        <h3>Solved Plates</h3>
-        <table>
-            <thead>
-            <tr>
-                <th>Plate</th>
-                <th>Word / Penalty</th>
-                <th>Time</th>
-                <th>Difficulty</th>
-            </tr>
-            </thead>
-            <tbody id="historyBody"></tbody>
-        </table>
-        <div id="historyEmpty" class="history-empty">
-            No solved plates yet.
+        <div class="game-right">
+            <div class="solved-card">
+                <h3 style="margin-top:0;">Solved Plates</h3>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Plate</th>
+                        <th>Word / Penalty</th>
+                        <th>Time</th>
+                    </tr>
+                    </thead>
+                    <tbody id="historyBody"></tbody>
+                </table>
+                <div id="historyEmpty" class="history-empty">
+                    No solved plates yet.
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -1088,16 +1094,30 @@
     window.viewMyRun = viewMyRun;
 
     // Update profile tab based on auth state
-    function updateProfileTab() {
+    async function updateProfileTab() {
         const container = document.getElementById('profileContent');
         if (currentUser) {
-            const displayName = document.getElementById('userName').textContent || 'Player';
-            const email = currentUser.email || '';
+            // Load profile from Supabase
+            let displayName = 'Player';
+            let handle = '';
+            try {
+                const { data: profile } = await sb
+                    .from('profiles')
+                    .select('display_name, handle')
+                    .eq('id', currentUser.id)
+                    .single();
+                if (profile) {
+                    displayName = profile.display_name || currentUser.email || 'Player';
+                    handle = profile.handle || '';
+                }
+            } catch(e) {
+                displayName = currentUser.email || 'Player';
+            }
             const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'P';
             container.innerHTML = `
                 <div class="profile-avatar">${initials}</div>
                 <div class="profile-name">${displayName}</div>
-                <div class="profile-email">${email}</div>
+                ${handle ? `<div class="profile-handle">@${handle}</div>` : ''}
                 <button class="profile-signout-btn" onclick="signOut()">Sign Out</button>
             `;
         } else {
@@ -1237,6 +1257,8 @@
         currentUser = null;
         updateProfileTab();
     }
+    window.signInWithApple = signInWithApple;
+    window.signOut = signOut;
 
     async function checkIfPlayedToday() {
         if (!currentUser) return false;
@@ -1306,10 +1328,10 @@
     }
 
     async function loadLeaderboard(dateStr) {
-        if (!currentUser) return [];
+        const userId = currentUser ? currentUser.id : '00000000-0000-0000-0000-000000000000';
         const { data } = await sb.rpc('leaderboard_for_date', {
             p_date: dateStr,
-            p_user_id: currentUser.id
+            p_user_id: userId
         });
         if (!data || !data.length) return [];
 
@@ -1321,7 +1343,7 @@
             skipped: 0,
             streak: row.out_streak,
             percentile: row.out_percentile,
-            isMe: row.out_user_id === currentUser?.id,
+            isMe: currentUser && row.out_user_id === currentUser.id,
             isFriend: row.out_is_friend || false
         }));
     }
@@ -2118,7 +2140,7 @@
         gameStarted = true;
         gameOver = false;
 
-        document.getElementById('difficultyLabel').style.display = 'block';
+        // difficultyLabel hidden in web version
 
         // Scroll to plate on mobile
         if (window.innerWidth <= 768) {
@@ -2336,7 +2358,6 @@
         const plateTd = document.createElement("td");
         const wordTd = document.createElement("td");
         const timeTd = document.createElement("td");
-        const diffTd = document.createElement("td");
 
         plateTd.textContent = plate;
 
@@ -2358,17 +2379,9 @@
 
         timeTd.textContent = timeLabel || "\u2014";
 
-        if (diffScore === null || diffScore <= 0) {
-            diffTd.textContent = "\u2014";
-        } else {
-            diffTd.textContent = diffScore;
-            diffTd.className = classifyDifficulty(diffScore);
-        }
-
         row.appendChild(plateTd);
         row.appendChild(wordTd);
         row.appendChild(timeTd);
-        row.appendChild(diffTd);
 
         if (historyBodyEl.firstChild) {
             historyBodyEl.insertBefore(row, historyBodyEl.firstChild);
@@ -2386,12 +2399,9 @@
         const wordFrom = fromRectWord || wordInputEl.getBoundingClientRect();
         const plateTo = plateTd.getBoundingClientRect();
         const wordTo = wordTd.getBoundingClientRect();
-        const diffTo = diffTd.getBoundingClientRect();
 
         const plateClone = createFloatingLabel(plate, plateFrom, plateTo, "float-label-plate");
         const wordClone = createFloatingLabel(word, wordFrom, wordTo, "float-label-word");
-        const diffText = (diffScore === null || diffScore <= 0) ? "\u2014" : String(diffScore);
-        const diffClone = createFloatingLabel(diffText, plateFrom, diffTo, "float-label-diff");
 
         if (typeof onComplete === "function") {
             onComplete();
@@ -2400,7 +2410,7 @@
         const animDuration = 400;
         setTimeout(() => {
             row.style.opacity = "1";
-            [plateClone, wordClone, diffClone].forEach(clone => {
+            [plateClone, wordClone].forEach(clone => {
                 if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
             });
         }, animDuration);
@@ -3072,9 +3082,12 @@
 
         const newDateStr = currentDate.toISOString().split('T')[0];
         picker.value = newDateStr;
+        const dateDisplay = document.getElementById('leaderboardDateDisplay');
+        if (dateDisplay) dateDisplay.textContent = formatDateForDisplay(newDateStr);
         displayLeaderboard(newDateStr);
         updateNavigationButtons();
     }
+    window.changeDateBy = changeDateBy;
 
     function updateNavigationButtons() {
         const picker = document.getElementById('leaderboardDatePicker');
