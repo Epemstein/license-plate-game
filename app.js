@@ -1050,14 +1050,26 @@
         const matchedIndices = [];
 
         for (let i = 0; i < upperWord.length; i++) {
-            if (expectedPlateIndex >= plate.length) break;
-            if (upperWord[i] === plate[expectedPlateIndex]) {
+            const ch = upperWord[i];
+
+            // 1) Does this character match the next expected plate letter?
+            if (expectedPlateIndex < plate.length && ch === plate[expectedPlateIndex]) {
                 matchedIndices.push(i);
                 expectedPlateIndex++;
                 if (expectedPlateIndex === plate.length) {
                     return matchedIndices;
                 }
+                continue;
             }
+
+            // 2) Does this character appear later in the plate? That's an
+            //    out-of-order violation (e.g. "sloths" for plate "LOS" —
+            //    the S shows up before the L).
+            if (plate.slice(expectedPlateIndex).includes(ch)) {
+                return null;
+            }
+
+            // 3) Letter is absent from remaining plate — harmless, skip.
         }
         return null;
     }
