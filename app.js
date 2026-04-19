@@ -47,12 +47,19 @@
     }
     window.setLeaderboardFilter = setLeaderboardFilter;
 
+    let cachedScores = [];
+
     // View my run shortcut
     function viewMyRun() {
         if (!currentUser || !currentViewingDate) return;
         const dateStr = currentViewingDate;
-        // Find my score from cached data
-        viewPlayerRun(currentUser.id, dateStr, 'My Run', 0, 0, 0);
+        const myScore = cachedScores.find(s => s.isMe || s.userId === currentUser.id);
+        if (myScore) {
+            viewPlayerRun(currentUser.id, dateStr, document.getElementById('userName').textContent || 'My Run',
+                myScore.totalTime, Math.round(myScore.percentile||0), myScore.median||0, myScore.totalPlayers||0, myScore.rank||0);
+        } else {
+            viewPlayerRun(currentUser.id, dateStr, 'My Run', 0, 0, 0, 0, 0);
+        }
     }
     window.viewMyRun = viewMyRun;
 
@@ -293,7 +300,7 @@
         console.log('loadLeaderboard result:', data?.length, 'rows, error:', error);
         if (!data || !data.length) return [];
 
-        return data.map(row => ({
+        return data.map((row, idx) => ({
             userId: row.out_user_id,
             userName: row.out_display_name || (row.out_handle ? '@' + row.out_handle : 'Anonymous'),
             totalTime: row.out_total_seconds,
@@ -301,6 +308,9 @@
             skipped: 0,
             streak: row.out_streak,
             percentile: row.out_percentile,
+            totalPlayers: row.out_total_players,
+            median: row.out_median_seconds,
+            rank: idx + 1,
             isMe: currentUser && row.out_user_id === currentUser.id,
             isFriend: row.out_is_friend || false
         }));
@@ -513,6 +523,7 @@
                 return;
             }
 
+            cachedScores = scores;
             userHasPlayed = currentUser && scores.some(score => score.userId === currentUser.id || score.isMe);
             isPastDate = dateStr !== getTodayString();
 
@@ -564,10 +575,10 @@
                     timeHtml = `<span class="lb-time blurred-score">${s.totalTime.toFixed(1)}s</span>`;
                 }
 
-                // Click handler
+                // Click handler — store score data for access in viewPlayerRun
                 let clickAttr = '';
                 if (userHasPlayed || isPastDate) {
-                    clickAttr = `onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\\'")}',${s.totalTime},${s.solved||0},${s.skipped||0})"`;
+                    clickAttr = `onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\\'")}',${s.totalTime},${Math.round(s.percentile||0)},${s.median||0},${s.totalPlayers||0},${s.rank||0})"`;
                 }
 
                 h += `<div class="lb-row${meClass}" ${clickAttr}>`;
@@ -1885,54 +1896,69 @@
     }
 
     // View player run details
-    async function viewPlayerRun(userId, dateString, userName, totalTime, solved, skipped) {
+    async function viewPlayerRun(userId, dateString, userName, totalTime, percentile, median, totalPlayers, rank) {
         const backdrop = document.getElementById('runDetailsModalBackdrop');
         const titleEl = document.getElementById('runDetailsModalTitle');
         const contentEl = document.getElementById('runDetailsContent');
 
-        titleEl.textContent = `${userName}'s Run`;
-        contentEl.innerHTML = 'Loading...';
+        titleEl.textContent = `${userName} | ${formatDateForDisplay(dateString)}`;
+        contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
         backdrop.classList.add('show');
 
         try {
             const data = await loadPlayerHistory(userId, dateString);
 
             if (!data || !data.history || data.history.length === 0) {
-                contentEl.innerHTML = `
-                    <p style="text-align:center;color:#6b7280;padding:20px;">
-                        <strong>Summary Stats:</strong><br>
-                        Total Time: ${totalTime.toFixed(1)}s<br>
-                        Solved: ${solved}<br>
-                        Skipped: ${skipped}<br><br>
-                        <em>Detailed breakdown not available</em>
-                    </p>`;
+                contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Detailed breakdown not available</p>';
                 return;
             }
 
-            let html = `<p style="margin-bottom:16px;"><strong>Total Time:</strong> ${data.totalTime.toFixed(1)}s</p>`;
-            html += '<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;">';
-            html += '<th style="padding:8px;text-align:left;">Plate</th>';
-            html += '<th style="padding:8px;text-align:left;">Word / Penalty</th>';
-            html += '<th style="padding:8px;text-align:right;">Time</th></tr></thead><tbody>';
+            // Stats card
+            let html = '<div style="background:#f9fafb;border-radius:12px;padding:16px;margin-bottom:20px;">';
+            html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
+            html += `<span>Total time</span><span style="font-weight:600;color:#16a34a;">${data.totalTime.toFixed(1)}s${percentile ? '  (Top ' + percentile + '%)' : ''}</span>`;
+            html += `</div>`;
+            if (median) {
+                html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
+                html += `<span>Median time</span><span style="color:#6b7280;">${parseFloat(median).toFixed(1)}s</span>`;
+                html += `</div>`;
+            }
+            if (rank && totalPlayers) {
+                html += `<div style="display:flex;justify-content:space-between;padding:8px 0;">`;
+                html += `<span>Global rank</span><span style="color:#6b7280;">${rank} of ${totalPlayers}</span>`;
+                html += `</div>`;
+            }
+            html += '</div>';
 
-            data.history.forEach((entry, idx) => {
-                const bg = idx % 2 === 0 ? '#f9fafb' : '#fff';
-                html += `<tr style="background:${bg};">`;
-                html += `<td style="padding:8px;font-weight:600;">${entry.plate}</td>`;
+            // Plates header
+            html += '<div style="font-size:0.8rem;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-left:4px;">Plates</div>';
+
+            // Plate rows with time gradient
+            data.history.forEach((entry) => {
+                const time = entry.skipped
+                    ? (entry.thinkingSeconds || 0) + (entry.penaltySeconds || 0)
+                    : entry.thinkingSeconds;
+                const bgColor = entry.skipped ? '#1f2937' : getTimeColor(time);
+                const textColor = entry.skipped ? '#ef4444' : '#000';
+                const plateColor = entry.skipped ? '#ef4444' : '#000';
+
+                html += `<div onclick="showViableWordsForPlate('${entry.plate}')" style="display:flex;align-items:center;padding:12px;margin-bottom:2px;border-radius:8px;background:${bgColor};cursor:pointer;">`;
+                html += `<span style="font-weight:700;min-width:50px;color:${plateColor};">${entry.plate}</span>`;
+                html += `<span style="color:#6b7280;margin:0 8px;">|</span>`;
 
                 if (entry.skipped) {
-                    html += `<td style="padding:8px;color:#f59e0b;">+${entry.penaltySeconds}s (skipped)</td>`;
-                    html += `<td style="padding:8px;text-align:right;">${entry.thinkingSeconds.toFixed(1)}s (+${entry.penaltySeconds}s)</td>`;
+                    html += `<span style="flex:1;color:#ef4444;font-weight:500;">skipped</span>`;
+                    html += `<span style="color:#ef4444;font-weight:600;">${entry.thinkingSeconds.toFixed(1)}s</span>`;
+                    html += `<span style="color:#ef4444;margin-left:4px;">(+${entry.penaltySeconds}s)</span>`;
                 } else {
-                    const highlightedWord = highlightPlateInWord(entry.plate, entry.word);
-                    html += `<td style="padding:8px;color:#16a34a;">${highlightedWord}</td>`;
-                    html += `<td style="padding:8px;text-align:right;">${entry.thinkingSeconds.toFixed(1)}s</td>`;
+                    html += `<span style="flex:1;color:${textColor};font-weight:500;">${entry.word || ''}</span>`;
+                    html += `<span style="color:${textColor};font-weight:600;">${time.toFixed(1)}s</span>`;
                 }
 
-                html += '</tr>';
+                html += `<span style="margin-left:8px;color:${entry.skipped ? '#ef4444' : '#9ca3af'};">&#8250;</span>`;
+                html += `</div>`;
             });
 
-            html += '</tbody></table>';
             contentEl.innerHTML = html;
 
         } catch (error) {
