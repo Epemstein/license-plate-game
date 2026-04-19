@@ -309,7 +309,11 @@
     }
 
     async function saveScore(time, solved, skipped) {
-        if (!currentUser || gameMode !== 'daily' || !currentDailyRunId) return;
+        console.log('saveScore called:', { time, solved, skipped, gameMode, currentDailyRunId, historyLen: gameHistory.length });
+        if (!currentUser || gameMode !== 'daily' || !currentDailyRunId) {
+            console.log('saveScore skipped:', { hasUser: !!currentUser, gameMode, runId: currentDailyRunId });
+            return;
+        }
         const today = getTodayString();
         const totalSeconds = Math.floor(time * 10) / 10;
 
@@ -329,7 +333,13 @@
             user_id: currentUser.id
         }));
 
-        await sb.from('daily_run_entries').insert(entries);
+        const { error: insertError } = await sb.from('daily_run_entries').insert(entries);
+        if (insertError) {
+            console.error('Failed to save run entries:', insertError);
+            alert('Warning: your plate details may not have saved. Error: ' + insertError.message);
+        } else {
+            console.log('Saved', entries.length, 'run entries');
+        }
 
         setTimeout(() => {
             displayLeaderboard(today);
