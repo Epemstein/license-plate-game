@@ -109,44 +109,37 @@
     let currentViewingDate = null;
     let currentDailyRunId = null;
 
-    // Check initial session
-    sb.auth.getSession().then(async ({ data: { session } }) => {
-        if (session?.user) {
-            currentUser = session.user;
-            const { data: profile } = await sb
-                .from('profiles')
-                .select('display_name, handle')
-                .eq('id', session.user.id)
-                .single();
-            document.getElementById('userName').textContent =
-                profile?.display_name || profile?.handle || session.user.email || 'Player';
-        }
-        updateProfileTab();
-    });
-
-    // Auth state listener
+    // Auth state listener — handles initial session and all changes
     sb.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth event:', event, 'session:', !!session);
         if (session?.user) {
             currentUser = session.user;
             // Load profile name
-            const { data: profile } = await sb
-                .from('profiles')
-                .select('display_name, handle')
-                .eq('id', session.user.id)
-                .single();
-            document.getElementById('userName').textContent =
-                profile?.display_name || profile?.handle || session.user.email || 'Player';
+            try {
+                const { data: profile } = await sb
+                    .from('profiles')
+                    .select('display_name, handle')
+                    .eq('id', session.user.id)
+                    .single();
+                document.getElementById('userName').textContent =
+                    profile?.display_name || profile?.handle || session.user.email || 'Player';
+            } catch(e) {
+                console.error('Profile load error:', e);
+                document.getElementById('userName').textContent = session.user.email || 'Player';
+            }
 
-            // Update profile tab if visible
+            // Update profile tab
             updateProfileTab();
 
             // Check if there's a challenge ID in the URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const challengeId = urlParams.get('challenge');
-            if (challengeId) {
-                setTimeout(() => {
-                    playChallenge(challengeId);
-                }, 500);
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                const urlParams = new URLSearchParams(window.location.search);
+                const challengeId = urlParams.get('challenge');
+                if (challengeId) {
+                    setTimeout(() => {
+                        playChallenge(challengeId);
+                    }, 500);
+                }
             }
         } else {
             currentUser = null;
