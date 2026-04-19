@@ -908,21 +908,13 @@
         const matchedIndices = [];
 
         for (let i = 0; i < upperWord.length; i++) {
-            const ch = upperWord[i];
-            const posInPlate = plate.indexOf(ch);
-
-            if (posInPlate === -1) continue;
-
-            if (posInPlate === expectedPlateIndex) {
+            if (expectedPlateIndex >= plate.length) break;
+            if (upperWord[i] === plate[expectedPlateIndex]) {
                 matchedIndices.push(i);
                 expectedPlateIndex++;
                 if (expectedPlateIndex === plate.length) {
                     return matchedIndices;
                 }
-            } else if (posInPlate > expectedPlateIndex) {
-                return null;
-            } else {
-                continue;
             }
         }
         return null;
