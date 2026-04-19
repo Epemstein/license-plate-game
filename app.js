@@ -301,10 +301,12 @@
 
     async function loadLeaderboard(dateStr) {
         const userId = currentUser ? currentUser.id : '00000000-0000-0000-0000-000000000000';
-        const { data } = await sb.rpc('leaderboard_for_date', {
+        console.log('loadLeaderboard calling RPC for', dateStr, 'user:', userId);
+        const { data, error } = await sb.rpc('leaderboard_for_date', {
             p_date: dateStr,
             p_user_id: userId
         });
+        console.log('loadLeaderboard result:', data?.length, 'rows, error:', error);
         if (!data || !data.length) return [];
 
         return data.map(row => ({
