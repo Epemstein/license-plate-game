@@ -110,10 +110,18 @@
     let currentDailyRunId = null;
 
     // Check initial session
-    sb.auth.getSession().then(({ data: { session } }) => {
-        if (!session) {
-            // not signed in
+    sb.auth.getSession().then(async ({ data: { session } }) => {
+        if (session?.user) {
+            currentUser = session.user;
+            const { data: profile } = await sb
+                .from('profiles')
+                .select('display_name, handle')
+                .eq('id', session.user.id)
+                .single();
+            document.getElementById('userName').textContent =
+                profile?.display_name || profile?.handle || session.user.email || 'Player';
         }
+        updateProfileTab();
     });
 
     // Auth state listener
