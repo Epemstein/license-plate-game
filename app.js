@@ -346,7 +346,12 @@
     }
 
 
+    const playerHistoryCache = {};
+
     async function loadPlayerHistory(userId, dateStr) {
+        const cacheKey = userId + '_' + dateStr;
+        if (playerHistoryCache[cacheKey]) return playerHistoryCache[cacheKey];
+
         const { data: runs } = await sb
             .from('daily_runs')
             .select('id, total_seconds')
@@ -360,7 +365,7 @@
             .select('*')
             .eq('run_id', run.id)
             .order('plate_index');
-        return {
+        const result = {
             totalTime: run.total_seconds,
             history: (entries || []).map(e => ({
                 plate: e.plate,
@@ -370,19 +375,32 @@
                 penaltySeconds: e.penalty_seconds
             }))
         };
+        playerHistoryCache[cacheKey] = result;
+        return result;
+    }
+
+    function isDateSettled(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        return (Date.now() - d.getTime()) > 36 * 3600 * 1000;
     }
 
     async function loadLeaderboard(dateStr) {
         const userId = currentUser ? currentUser.id : '00000000-0000-0000-0000-000000000000';
-        console.log('loadLeaderboard calling RPC for', dateStr, 'user:', userId);
+        // Check localStorage cache for settled dates
+        const cacheKey = 'lb_' + dateStr + '_' + userId;
+        if (isDateSettled(dateStr)) {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
         const { data, error } = await sb.rpc('leaderboard_for_date', {
             p_date: dateStr,
             p_user_id: userId
         });
-        console.log('loadLeaderboard result:', data?.length, 'rows, error:', error);
         if (!data || !data.length) return [];
 
-        return data.map((row, idx) => ({
+        const result = data.map((row, idx) => ({
             userId: row.out_user_id,
             userName: row.out_display_name || (row.out_handle ? '@' + row.out_handle : 'Anonymous'),
             totalTime: row.out_total_seconds,
@@ -396,6 +414,11 @@
             isMe: currentUser && row.out_user_id === currentUser.id,
             isFriend: row.out_is_friend || false
         }));
+        // Cache settled dates
+        if (isDateSettled(dateStr)) {
+            try { localStorage.setItem(cacheKey, JSON.stringify(result)); } catch(e) {}
+        }
+        return result;
     }
 
 
@@ -825,7 +848,7 @@
             }
 
             dictionaryReady = true;
-            debugEl.textContent = `Loaded ${WORDS.length.toLocaleString()} words.`;
+            debugEl.textContent = '';
 
             tryBuildPlateList();
         } catch (err) {
@@ -893,7 +916,7 @@
 
         platesReady = true;
 
-        debugEl.textContent += ` | ${ALL_PLATES.length.toLocaleString()} plates`;
+        // plates loaded
 
         maybeEnableStart();
     }
@@ -1127,7 +1150,7 @@
 
     function showChartButton() {
         if (gameHistory.length > 0) {
-            chartButtonEl.style.display = "inline-block";
+            // chart button hidden in web version
         }
     }
 
