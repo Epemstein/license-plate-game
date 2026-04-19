@@ -419,9 +419,7 @@
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -440,13 +438,13 @@
 
 <!-- Row 2: Auth section -->
 <div id="authSection" style="margin-bottom:20px;">
-    <div id="authPlaceholder" style="padding:10px;background:#f3f4f6;border-radius:4px;color:#9ca3af;display:inline-block;">
+    <div id="authPlaceholder" style="padding:10px;background:#f3f4f6;border-radius:4px;color:#9ca3af;display:none;">
         Loading...
     </div>
-    <button id="signInBtn" onclick="signInWithGoogle()" style="display:none;padding:8px 16px;cursor:pointer;background:#4285f4;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Google</button>
-    <div id="userInfo" style="display:none;padding:10px;background:#f3f4f6;border-radius:4px;display:inline-block;">
+    <button id="signInBtn" onclick="signInWithApple()" style="padding:8px 16px;cursor:pointer;background:#000;color:white;border:none;border-radius:4px;font-weight:600;">Sign In with Apple</button>
+    <div id="userInfo" style="display:none;padding:10px;background:#f3f4f6;border-radius:4px;">
         Signed in: <strong id="userName"></strong>
-        <button id="signOutBtn" onclick="firebase.auth().signOut()" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
+        <button id="signOutBtn" onclick="signOut()" style="margin-left:10px;padding:4px 8px;cursor:pointer;">Sign Out</button>
     </div>
     </div>
 </div>
@@ -571,51 +569,46 @@
 
 <script>
 
-    // === FIREBASE ===
-    const firebaseConfig = {
-        apiKey: "AIzaSyBEa4aJf-cB25uzvEXdpNf1bG5kOOL5PXs",
-        authDomain: "license-plate-game-2ea96.firebaseapp.com",
-        databaseURL: "https://license-plate-game-2ea96-default-rtdb.firebaseio.com",
-        projectId: "license-plate-game-2ea96",
-        storageBucket: "license-plate-game-2ea96.firebasestorage.app",
-        messagingSenderId: "247985429580",
-        appId: "1:247985429580:web:4927cee2ca3581b569a8e9"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const database = firebase.database();
+    // === SUPABASE ===
+    const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTkwNTUsImV4cCI6MjA5MTQ5NTA1NX0.RRQA0fW02H6XKj7xKUTSnR9zrGbWuE2kSmspCeHCfyQ';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Stub for removed Firebase — prevents H2H code from crashing.
+    // H2H challenges are not yet ported to Supabase.
+    const database = { ref: () => ({ set: async () => {}, once: async () => ({ exists: () => false, val: () => null }), push: () => ({ key: null }), remove: async () => {}, update: async () => {} }) };
     let gameMode = 'practice';
     let currentUser = null;
     let dailyPlateSequence = null;
-    let currentViewingDate = null; // Track which date we're viewing
+    let currentViewingDate = null;
+    let currentDailyRunId = null;
 
-    auth.onAuthStateChanged(async (user) => {
-        currentUser = user;
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+            document.getElementById('authPlaceholder').style.display = 'none';
+            document.getElementById('signInBtn').style.display = 'inline-block';
+        }
+    });
+
+    // Auth state listener
+    supabase.auth.onAuthStateChange(async (event, session) => {
         const signInBtn = document.getElementById('signInBtn');
         const userInfo = document.getElementById('userInfo');
-        if (user) {
+        if (session?.user) {
+            currentUser = session.user;
             signInBtn.style.display = 'none';
             document.getElementById('authPlaceholder').style.display = 'none';
-                userInfo.style.display = 'block';
-            document.getElementById('userName').textContent = user.displayName || user.email;
-            
-            // Register user for H2H (without requiring permissions - will use users node later)
-            try {
-                await database.ref(`users/${user.uid}`).set({
-                    displayName: user.displayName || user.email,
-                    email: user.email,
-                    lastSeen: Date.now()
-                });
-            } catch (error) {
-                console.log('Could not register user (may need Firebase permissions)', error);
-            }
-            
-            // Check for abandoned challenges
-            checkAbandonedChallenges(user.uid);
-            
-            // Load H2H challenges to update notification badge
-            loadH2HChallenges();
-            
+            userInfo.style.display = 'inline-block';
+            // Load profile name
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('display_name, handle')
+                .eq('id', session.user.id)
+                .single();
+            document.getElementById('userName').textContent =
+                profile?.display_name || profile?.handle || session.user.email || 'Player';
+
             // Check if there's a challenge ID in the URL
             const urlParams = new URLSearchParams(window.location.search);
             const challengeId = urlParams.get('challenge');
@@ -629,8 +622,9 @@
                 }, 500);
             }
         } else {
+            currentUser = null;
             document.getElementById('authPlaceholder').style.display = 'none';
-                signInBtn.style.display = 'inline-block';
+            signInBtn.style.display = 'inline-block';
             userInfo.style.display = 'none';
         }
     });
@@ -694,91 +688,115 @@
         return dailyPlates;
     }
 
-    async function signInWithGoogle() {
+    async function signInWithApple() {
         try {
-            await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'apple',
+                options: { redirectTo: window.location.origin + window.location.pathname }
+            });
+            if (error) throw error;
             return true;
         } catch(e) {
-            alert('Sign in failed: '+e.message);
+            alert('Sign in failed: ' + e.message);
             return false;
         }
+    }
+
+    async function signOut() {
+        await supabase.auth.signOut();
+        currentUser = null;
     }
 
     async function checkIfPlayedToday() {
         if (!currentUser) return false;
         const t = getTodayString();
-        const s1 = await database.ref(`scores/${t}/${currentUser.uid}`).once('value');
-        if (s1.exists()) return true;
-        const s2 = await database.ref(`started/${t}/${currentUser.uid}`).once('value');
-        return s2.exists();
+        const { data } = await supabase
+            .from('daily_runs')
+            .select('id')
+            .eq('user_id', currentUser.id)
+            .eq('date', t)
+            .limit(1);
+        return data && data.length > 0;
     }
 
-    async function saveScore(time,solved,skipped) {
-        if (!currentUser || gameMode!=='daily') return;
+    async function saveScore(time, solved, skipped) {
+        if (!currentUser || gameMode !== 'daily' || !currentDailyRunId) return;
         const today = getTodayString();
-        
-        // Prepare game history for saving
-        const historyData = gameHistory.map(entry => ({
+        const totalSeconds = Math.floor(time * 10) / 10;
+
+        // Submit total time
+        await supabase
+            .from('daily_runs')
+            .update({ total_seconds: totalSeconds, completed_at: new Date().toISOString() })
+            .eq('id', currentDailyRunId);
+
+        // Submit individual plate entries
+        const entries = gameHistory.map((entry, idx) => ({
+            run_id: currentDailyRunId,
+            plate_index: idx,
             plate: entry.plate,
-            word: entry.word,
+            word: entry.skipped ? null : (entry.word || '').toLowerCase(),
+            thinking_seconds: Math.floor(entry.thinkingSeconds * 10) / 10,
             skipped: entry.skipped || false,
-            thinkingSeconds: Math.floor(entry.thinkingSeconds * 10) / 10,
-            penaltySeconds: entry.penaltySeconds || 0
+            penalty_seconds: entry.penaltySeconds || 0,
+            user_id: currentUser.id
         }));
-        
-        await database.ref(`scores/${today}/${currentUser.uid}`).set({
-            userId: currentUser.uid,
-            userName: currentUser.displayName || currentUser.email,
-            totalTime: Math.floor(time*10)/10,
-            solved: solved,
-            skipped: skipped,
-            timestamp: Date.now(),
-            history: historyData
-        });
-        
-        // Refresh leaderboard to unlock View buttons and Compare button
-        // Small delay to ensure Firebase write propagates
+
+        await supabase.from('daily_run_entries').insert(entries);
+
+        // Refresh leaderboard
         setTimeout(() => {
             displayLeaderboard(today);
         }, 500);
     }
 
 
-    // Load a specific player's run history (only when View is clicked)
+    // Load a specific player's run entries
     async function loadPlayerHistory(userId, dateStr) {
-        const ref = database.ref(`scores/${dateStr}/${userId}`);
-        const snapshot = await ref.once('value');
-        if (!snapshot.exists()) return null;
-        return snapshot.val();
+        const { data: runs } = await supabase
+            .from('daily_runs')
+            .select('id, total_seconds')
+            .eq('user_id', userId)
+            .eq('date', dateStr)
+            .limit(1);
+        if (!runs || !runs.length) return null;
+        const run = runs[0];
+        const { data: entries } = await supabase
+            .from('daily_run_entries')
+            .select('*')
+            .eq('run_id', run.id)
+            .order('plate_index');
+        return {
+            totalTime: run.total_seconds,
+            history: (entries || []).map(e => ({
+                plate: e.plate,
+                word: e.word,
+                skipped: e.skipped,
+                thinkingSeconds: e.thinking_seconds,
+                penaltySeconds: e.penalty_seconds
+            }))
+        };
     }
 
     async function loadLeaderboard(dateStr) {
-        const ref = database.ref(`scores/${dateStr}`);
-        const snapshot = await ref.once('value');
-        if (!snapshot.exists()) return [];
-        
-        const arr = [];
-        const rawData = snapshot.val();
-        
-        // Process each user's score WITHOUT including history
-        for (const userId in rawData) {
-            const data = rawData[userId];
-            // DON'T include history to prevent cheating via console
-            arr.push({
-                userId: data.userId,
-                userName: data.userName,
-                totalTime: data.totalTime,
-                solved: data.solved,
-                skipped: data.skipped,
-                timestamp: data.timestamp
-                // history is intentionally excluded
-            });
-        }
-        
-        arr.sort((a, b) => a.totalTime - b.totalTime);
-        
-        // Only log count, not actual data
-        return arr;
+        if (!currentUser) return [];
+        const { data } = await supabase.rpc('leaderboard_for_date', {
+            p_date: dateStr,
+            p_user_id: currentUser.id
+        });
+        if (!data || !data.length) return [];
+
+        return data.map(row => ({
+            userId: row.out_user_id,
+            userName: row.out_display_name || (row.out_handle ? '@' + row.out_handle : 'Anonymous'),
+            totalTime: row.out_total_seconds,
+            solved: 10,
+            skipped: 0,
+            streak: row.out_streak,
+            percentile: row.out_percentile,
+            isMe: row.out_user_id === currentUser?.id
+        }));
+        // Already sorted by time from the RPC
     }
 
 
@@ -996,7 +1014,7 @@
                 return;
             }
             // Calculate these ONCE before the loop
-            userHasPlayed = currentUser && scores.some(score => score.userId === currentUser.uid);
+            userHasPlayed = currentUser && scores.some(score => score.userId === currentUser.id || score.isMe);
             isPastDate = dateStr !== getTodayString();
             
             let h = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;">';
@@ -1024,7 +1042,7 @@
         try {
             const compareBtn = document.getElementById('compareRunsBtn');
             console.log('=== COMPARE BUTTON STATE ===');
-            console.log('currentUser:', currentUser ? currentUser.uid : 'null');
+            console.log('currentUser:', currentUser ? currentUser.id : 'null');
             console.log('userHasPlayed:', userHasPlayed);
             console.log('isPastDate:', isPastDate);
             
@@ -1603,33 +1621,39 @@
         }
         
         if (gameMode==='daily' && currentUser) {
-            // Save started flag to Firebase
-            database.ref(`started/${getTodayString()}/${currentUser.uid}`).set({
-                userName: currentUser.displayName || currentUser.email,
-                timestamp: Date.now(),
-                started: true
-            });
-            
+            // Start daily run on server
+            try {
+                const { data } = await supabase.rpc('start_daily_run', {
+                    p_date: getTodayString()
+                });
+                if (data && data.length > 0) {
+                    const run = data[0];
+                    currentDailyRunId = run.run_id;
+                    if (run.state === 'completed' || run.state === 'in_progress') {
+                        alert('You have already played today!');
+                        resetGameState();
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to start daily run:', e);
+            }
+
+            // Fetch daily plates from server
+            const { data: plateRow } = await supabase
+                .from('daily_plates')
+                .select('plates')
+                .eq('date', getTodayString())
+                .single();
+            if (plateRow) {
+                dailyPlateSequence = plateRow.plates;
+                plateSequenceIndex = 0;
+            }
+
             window.onbeforeunload = e => {
                 if (gameStarted && !gameOver && gameMode==='daily') {
                     e.preventDefault();
                     return 'Leave? Daily attempt will be used!';
-                }
-            };
-        }
-        
-        // H2H Challenge - mark as in_progress when actually starting
-        if (gameMode === 'h2h_challenge' && currentChallengeId && currentUser) {
-            challengeStartTime = Date.now();
-            database.ref(`challenges/${currentChallengeId}/results/${currentUser.uid}`).set({
-                status: 'in_progress',
-                startedAt: challengeStartTime
-            });
-            
-            window.onbeforeunload = e => {
-                if (gameStarted && !gameOver && gameMode==='h2h_challenge') {
-                    e.preventDefault();
-                    return 'Leave? Challenge will be marked as Abandoned!';
                 }
             };
         }
@@ -2468,8 +2492,7 @@
         backdrop.classList.add('show');
         
         try {
-            const snapshot = await database.ref(`scores/${dateString}/${userId}`).once('value');
-            const data = snapshot.val();
+            const data = await loadPlayerHistory(userId, dateString);
             
             if (!data || !data.history || data.history.length === 0) {
                 contentEl.innerHTML = `
@@ -2830,7 +2853,7 @@
         displayLeaderboard(t);
     });
     
-    document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+    document.getElementById('signOutBtn').addEventListener('click', () => signOut());
     });
     // === END FIREBASE HANDLERS ===
 
