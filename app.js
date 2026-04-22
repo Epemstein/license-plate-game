@@ -262,6 +262,7 @@
 
     // Words modal state
     let COMMON_WORDS = new Set();
+    let PROFANITY = new Set();
     let wordsModalPlate = '';
     let wordsModalDate = '';
     let wordsModalViable = [];
@@ -1968,6 +1969,12 @@
         }
         if (plateLocked) return;
 
+        if (PROFANITY.has(rawWord.toLowerCase())) {
+            resultEl.textContent = "Not tolerated in a family game.";
+            resultEl.style.color = "red";
+            return;
+        }
+
         if (!DICTIONARY.has(rawWord.toUpperCase())) {
             resultEl.textContent = `"${rawWord}" is not in the dictionary.`;
             resultEl.style.color = "red";
@@ -2236,6 +2243,18 @@
         }
     }
     loadCommonWords();
+
+    async function loadProfanity() {
+        try {
+            const res = await fetch('profanity.txt');
+            const text = await res.text();
+            for (const line of text.split(/\r?\n/)) {
+                const w = line.trim().toLowerCase();
+                if (w) PROFANITY.add(w);
+            }
+        } catch(e) {}
+    }
+    loadProfanity();
 
     function getViableWordsForPlate(plate) {
         const viable = [];
