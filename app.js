@@ -1583,6 +1583,8 @@
     async function startOrRestartFromMain() {
         unlockAudio();
         startMusic();
+        document.getElementById('practiceSettings').style.display = 'none';
+        document.getElementById('practiceSettingsBtn').style.display = 'none';
         const ready = dictionaryReady && difficultyReady && platesReady;
         if (!ready) {
             resultEl.textContent = "Still loading\u2026";
@@ -1655,6 +1657,7 @@
         showChartButton();
         document.getElementById('dailyChallengeBtn').disabled = false;
         document.getElementById('practiceBtn').disabled = false;
+        document.getElementById('practiceSettingsBtn').style.display = '';
         window.onbeforeunload = null;
 
         if (currentUser) {
@@ -2800,6 +2803,7 @@
         document.getElementById('practiceBtn').addEventListener('click', () => {
             gameMode = 'practice';
             dailyPlateSequence = null;
+            document.getElementById('practiceSettingsBtn').style.display = '';
 
             // Reset game state from any previous game
             if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
