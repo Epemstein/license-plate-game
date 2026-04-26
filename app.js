@@ -2879,9 +2879,7 @@
     }
 
     function getDifficultyLabel(d) {
-        if (d <= 30) return 'Easy';
-        if (d <= 69) return 'Normal';
-        return 'Hard';
+        return 'Difficulty ' + d;
     }
 
     function renderChallengesList() {
