@@ -3790,6 +3790,13 @@
         document.getElementById('profileModalBackdrop').classList.remove('show');
     };
 
+    // Submit practice stats when tab is hidden or closed
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && gameMode === 'practice' && gameStarted && !gameOver && gameHistory.length > 0) {
+            submitPracticePlateStats();
+        }
+    });
+
     loadDictionary();
     loadDifficulty();
 
