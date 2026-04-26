@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Speller v28</title>
-    <link rel="stylesheet" href="styles.css?v=28">
+    <title>License Plate Game v29</title>
+    <link rel="stylesheet" href="styles.css?v=29">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -33,12 +33,35 @@
 
 <!-- ===== GAME TAB ===== -->
 <div id="gameTab" class="tab-content active">
-    <div class="game-title">Plate Speller</div>
+    <div class="game-title">License Plate Game</div>
 
     <div class="mode-buttons">
         <button id="dailyChallengeBtn" class="mode-btn">Daily Challenge</button>
-        <button id="practiceBtn" class="mode-btn">Practice Mode</button>
+        <div class="practice-btn-group">
+            <button id="practiceBtn" class="mode-btn">Practice Mode</button>
+            <button id="practiceSettingsBtn" class="mode-btn-settings" title="Practice Settings">&#9881;</button>
+        </div>
         <button id="rulesBtn" class="mode-btn">How to Play</button>
+    </div>
+
+    <!-- Practice Settings Panel (hidden by default) -->
+    <div id="practiceSettings" class="practice-settings" style="display:none;">
+        <div class="practice-settings-header">
+            <span>Practice Settings</span>
+            <button onclick="document.getElementById('practiceSettings').style.display='none'" class="settings-close">&times;</button>
+        </div>
+        <div class="practice-settings-row">
+            <label for="timedToggle">Timed</label>
+            <label class="toggle-switch">
+                <input type="checkbox" id="timedToggle" checked>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div class="practice-settings-row">
+            <label for="difficultySlider">Difficulty: <strong id="difficultyValue">50</strong></label>
+            <input type="range" id="difficultySlider" min="0" max="100" value="50" class="difficulty-slider">
+        </div>
+        <div id="difficultyLabel2" class="difficulty-label">Normal plates</div>
     </div>
 
     <div id="modeIndicator" style="padding:10px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:10px;margin-bottom:12px;font-weight:600;text-align:center;color:#000000;">Select a game mode above to begin</div>
@@ -320,7 +343,7 @@
     &copy; 2026 Ezra Pemstein. All rights reserved.
 </footer>
 
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 
 </body>
 </html>

@@ -881,6 +881,9 @@
     let usedPlates = new Set();
     let currentPlate = null;
 
+    let practiceDifficulty = parseInt(localStorage.getItem('practiceDifficulty') || '50');
+    let practiceTimed = localStorage.getItem('practiceTimed') !== 'false';
+
     let gameStarted = false;
     let gameOver = false;
     let solvedCount = 0;
@@ -1470,7 +1473,11 @@
         if (!gameStarted || !startTime) return;
         const baseElapsedSec = (performance.now() - startTime) / 1000;
         const totalSec = baseElapsedSec + penaltySeconds;
-        timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
+        if (gameMode === 'practice' && !practiceTimed) {
+            timerDisplayEl.textContent = "UNTIMED";
+        } else {
+            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
+        }
 
         if (gameMode === 'h2h_challenge' && currentChallengeId && challengeStartTime) {
             const elapsed = (Date.now() - challengeStartTime) / 1000;
@@ -1496,7 +1503,11 @@
             timerIntervalId = null;
         }
 
-        resultEl.textContent = `Finished! Time: ${totalSec.toFixed(1)} s`;
+        if (gameMode === 'practice' && !practiceTimed) {
+            resultEl.textContent = `Finished! ${solvedCount} plates solved.`;
+        } else {
+            resultEl.textContent = `Finished! Time: ${totalSec.toFixed(1)} s`;
+        }
         resultEl.style.color = "green";
         wordInputEl.blur();
 
@@ -1591,7 +1602,11 @@
             wordTd.textContent = word;
         }
 
-        timeTd.textContent = timeLabel || "\u2014";
+        if (gameMode === 'practice' && !practiceTimed) {
+            timeTd.textContent = '';
+        } else {
+            timeTd.textContent = timeLabel || "\u2014";
+        }
 
         row.appendChild(plateTd);
         row.appendChild(wordTd);
@@ -2612,7 +2627,8 @@
             dailyPlateSequence = null;
 
             const mi = document.getElementById('modeIndicator');
-            mi.textContent = 'Practice Mode - Unlimited attempts';
+            const timedLabel = practiceTimed ? '' : ' | UNTIMED';
+            mi.textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
             mi.style.background = '#f3e8ff';
             mi.style.color = '#6b21a8';
             mi.style.border = '2px solid #e9d5ff';
@@ -2621,6 +2637,41 @@
             startBtn.textContent = 'Start Game';
             startBtn.style.display = 'inline-block';
         });
+
+        // Practice settings
+        const diffSlider = document.getElementById('difficultySlider');
+        const diffValue = document.getElementById('difficultyValue');
+        const diffLabel2 = document.getElementById('difficultyLabel2');
+        const timedToggle = document.getElementById('timedToggle');
+
+        // Initialize from saved values
+        diffSlider.value = practiceDifficulty;
+        diffValue.textContent = practiceDifficulty;
+        timedToggle.checked = practiceTimed;
+        updateDiffLabel(practiceDifficulty);
+
+        diffSlider.addEventListener('input', () => {
+            practiceDifficulty = parseInt(diffSlider.value);
+            diffValue.textContent = practiceDifficulty;
+            localStorage.setItem('practiceDifficulty', practiceDifficulty);
+            updateDiffLabel(practiceDifficulty);
+        });
+
+        timedToggle.addEventListener('change', () => {
+            practiceTimed = timedToggle.checked;
+            localStorage.setItem('practiceTimed', practiceTimed);
+        });
+
+        document.getElementById('practiceSettingsBtn').addEventListener('click', () => {
+            const panel = document.getElementById('practiceSettings');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        });
+
+        function updateDiffLabel(d) {
+            if (d <= 30) diffLabel2.textContent = 'Easy plates';
+            else if (d <= 69) diffLabel2.textContent = 'Normal plates';
+            else diffLabel2.textContent = 'Challenging plates';
+        }
     });
 
     // ========== HEAD-TO-HEAD FEATURE (stubs) ==========
