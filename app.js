@@ -855,14 +855,16 @@
     const VERY_HARD_PROB = 0.03;
     const IMPOSSIBLE_PROB= 0.01;
 
+    // 8 bands matching iOS PlateDifficulty.swift (based on common/viable word counts)
     const BAND_NAMES = [
-        "very_easy",
-        "easy",
-        "medium",
-        "difficult",
-        "hard",
-        "very_hard",
-        "impossible"
+        "very_easy",    // 45+ common
+        "easy",         // 20-44 common
+        "medium_easy",  // 8-19 common
+        "medium",       // 4-7 common
+        "hard",         // 2-3 common
+        "very_hard",    // 1 common
+        "impossible",   // 0 common, 28+ viable
+        "dead"          // 0 common, 1-27 viable
     ];
 
     // --------- GLOBAL STATE ---------
@@ -878,11 +880,12 @@
 
     let VERY_EASY_PLATES = [];
     let EASY_PLATES      = [];
+    let MEDIUM_EASY_PLATES = [];
     let MEDIUM_PLATES    = [];
-    let DIFFICULT_PLATES = [];
     let HARD_PLATES      = [];
     let VERY_HARD_PLATES = [];
     let IMPOSSIBLE_PLATES= [];
+    let DEAD_PLATES      = [];
 
     let usedPlates = new Set();
     let currentPlate = null;
@@ -1010,13 +1013,13 @@
 
     async function loadDifficulty() {
         try {
-            const res = await fetch("plate_difficulty.json?v=2");
+            const res = await fetch("plate_analysis.json?v=1");
             PLATE_DIFFICULTY = await res.json();
             difficultyReady = true;
 
             tryBuildPlateList();
         } catch (err) {
-            console.warn("Difficulty JSON not loaded:", err);
+            console.warn("plate_analysis.json not loaded:", err);
             PLATE_DIFFICULTY = null;
             difficultyReady = false;
         } finally {
@@ -1024,50 +1027,57 @@
         }
     }
 
+    function getBandForPlate(entry) {
+        const common = entry.common || 0;
+        const viable = entry.viable || 0;
+        if (common >= 45) return "very_easy";
+        if (common >= 20) return "easy";
+        if (common >= 8) return "medium_easy";
+        if (common >= 4) return "medium";
+        if (common >= 2) return "hard";
+        if (common >= 1) return "very_hard";
+        if (viable >= 28) return "impossible";
+        if (viable > 0) return "dead";
+        return null; // unplayable
+    }
+
     function tryBuildPlateList() {
         if (!dictionaryReady || !PLATE_DIFFICULTY || platesReady) return;
 
         const all = [];
-        const ve = [];
-        const e  = [];
-        const m  = [];
-        const d  = [];
-        const h  = [];
-        const vh = [];
-        const im = [];
+        const ve = [], e = [], me = [], m = [], h = [], vh = [], im = [], de = [];
 
         for (const plate of Object.keys(PLATE_DIFFICULTY)) {
             const entry = PLATE_DIFFICULTY[plate];
-            if (DICTIONARY.has(plate)) continue;
-
-            let diff = (entry && typeof entry.difficulty === "number")
-                ? entry.difficulty
-                : 50;
+            const band = getBandForPlate(entry);
+            if (!band) continue; // skip unplayable
 
             all.push(plate);
 
-            if (diff <= 10) ve.push(plate);
-            else if (diff <= 34) e.push(plate);
-            else if (diff <= 49) m.push(plate);
-            else if (diff <= 79) d.push(plate);
-            else if (diff <= 88) h.push(plate);
-            else if (diff <= 96) vh.push(plate);
-            else im.push(plate);
+            switch (band) {
+                case "very_easy":   ve.push(plate); break;
+                case "easy":        e.push(plate); break;
+                case "medium_easy": me.push(plate); break;
+                case "medium":      m.push(plate); break;
+                case "hard":        h.push(plate); break;
+                case "very_hard":   vh.push(plate); break;
+                case "impossible":  im.push(plate); break;
+                case "dead":        de.push(plate); break;
+            }
         }
 
-        ALL_PLATES        = all;
-        VERY_EASY_PLATES  = ve;
-        EASY_PLATES       = e;
-        MEDIUM_PLATES     = m;
-        DIFFICULT_PLATES  = d;
-        HARD_PLATES       = h;
-        VERY_HARD_PLATES  = vh;
-        IMPOSSIBLE_PLATES = im;
+        ALL_PLATES         = all;
+        VERY_EASY_PLATES   = ve;
+        EASY_PLATES        = e;
+        MEDIUM_EASY_PLATES = me;
+        MEDIUM_PLATES      = m;
+        HARD_PLATES        = h;
+        VERY_HARD_PLATES   = vh;
+        IMPOSSIBLE_PLATES  = im;
+        DEAD_PLATES        = de;
 
         platesReady = true;
-
-        // plates loaded
-
+        console.log('Plate bands:', {ve:ve.length, e:e.length, me:me.length, m:m.length, h:h.length, vh:vh.length, im:im.length, de:de.length, total:all.length});
         maybeEnableStart();
     }
 
@@ -1132,11 +1142,12 @@
         switch (bandName) {
             case "very_easy":   return VERY_EASY_PLATES;
             case "easy":        return EASY_PLATES;
+            case "medium_easy": return MEDIUM_EASY_PLATES;
             case "medium":      return MEDIUM_PLATES;
-            case "difficult":   return DIFFICULT_PLATES;
             case "hard":        return HARD_PLATES;
             case "very_hard":   return VERY_HARD_PLATES;
             case "impossible":  return IMPOSSIBLE_PLATES;
+            case "dead":        return DEAD_PLATES;
             default:            return [];
         }
     }
@@ -1150,18 +1161,20 @@
     }
 
     // Piecewise linear weight system (ported from iOS PlateDifficulty.swift)
-    // Maps difficulty slider 0-100 to weights across 7 bands
+    // Maps difficulty slider 0-100 to weights across 8 bands using common/viable counts
     const H2H_CONTROL_POINTS = [0, 25, 50, 75, 90, 100];
+    //                                s=0  s=25  s=50  s=75  s=90  s=100
     const H2H_BAND_WEIGHTS = [
-        /* very_easy   */          [42,   28,   20,    2,    0,    0],
-        /* easy        */          [28,   24,   16,    2,    0,    0],
-        /* medium      */          [17,   20,   14,    4,    1,    0],
-        /* difficult   */          [ 8,   14,   17,   10,    3,    4],
-        /* hard        */          [ 3,    8,   17,   20,   14,   18],
-        /* very_hard   */          [ 1,    3,   10,   28,   38,   30],
-        /* impossible  */          [ 1,    3,    6,   34,   44,   48],
+        /* veryEasy   */             [42,   28,   20,    2,    0,    0],
+        /* easy       */             [28,   24,   16,    2,    0,    0],
+        /* mediumEasy */             [17,   20,   14,    4,    1,    0],
+        /* medium     */             [ 8,   14,   17,   10,    3,    4],
+        /* hard       */             [ 3,    8,   17,   20,   14,   18],
+        /* veryHard   */             [ 1,    3,   10,   28,   38,   30],
+        /* impossible */             [ 1,    2,    4,   26,   38,   35],
+        /* dead       */             [ 0,    1,    2,    8,    6,   13],
     ];
-    const H2H_BAND_NAMES_ORDERED = ["very_easy", "easy", "medium", "difficult", "hard", "very_hard", "impossible"];
+    const H2H_BAND_NAMES_ORDERED = ["very_easy", "easy", "medium_easy", "medium", "hard", "very_hard", "impossible", "dead"];
 
     function weightsForDifficulty(difficulty) {
         const d = Math.min(100, Math.max(0, difficulty));
@@ -2782,7 +2795,6 @@
         const used = new Set();
 
         while (sequence.length < 200 && used.size < ALL_PLATES.length) {
-            // Pick band based on weights
             const r = Math.random();
             let threshold = 0;
             let bandIdx = 0;
@@ -2791,23 +2803,11 @@
                 if (r < threshold) { bandIdx = b; break; }
             }
             const bandName = H2H_BAND_NAMES_ORDERED[bandIdx];
+            const pool = getBandPool(bandName);
+            const remaining = pool.filter(p => !used.has(p));
 
-            const bandPlates = ALL_PLATES.filter(plate => {
-                if (used.has(plate)) return false;
-                const d = PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate] ? PLATE_DIFFICULTY[plate].difficulty : null;
-                if (d === null || d === undefined) return false;
-                if (bandName === "very_easy" && d >= 0 && d <= 10) return true;
-                if (bandName === "easy" && d >= 11 && d <= 34) return true;
-                if (bandName === "medium" && d >= 35 && d <= 49) return true;
-                if (bandName === "difficult" && d >= 50 && d <= 79) return true;
-                if (bandName === "hard" && d >= 80 && d <= 88) return true;
-                if (bandName === "very_hard" && d >= 89 && d <= 96) return true;
-                if (bandName === "impossible" && d >= 97 && d <= 100) return true;
-                return false;
-            });
-
-            if (bandPlates.length > 0) {
-                const plate = bandPlates[Math.floor(Math.random() * bandPlates.length)];
+            if (remaining.length > 0) {
+                const plate = remaining[Math.floor(Math.random() * remaining.length)];
                 sequence.push(plate);
                 used.add(plate);
             }
