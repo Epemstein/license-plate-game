@@ -895,7 +895,6 @@
     async function initAudio() {
         if (audioCtx) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // Load SFX into buffers for instant playback
         const files = { correct: 'correct.mp3', wrong: 'wrong.mp3', skip: 'skip.mp3' };
         for (const [name, file] of Object.entries(files)) {
             try {
@@ -904,17 +903,16 @@
                 sfxBuffers[name] = await audioCtx.decodeAudioData(buf);
             } catch (e) { console.warn('Failed to load SFX:', name, e); }
         }
-        // Music uses Audio element (needs looping)
         bgMusic = new Audio('Klezmer.mp3');
         bgMusic.loop = true;
-        bgMusic.volume = 0.3;
+        bgMusic.volume = musicEnabled ? 0.3 : 0;
+        bgMusic.play().catch(()=>{});
     }
 
     function unlockAudio() {
         if (audioUnlocked) return;
         audioUnlocked = true;
         initAudio();
-        // Resume AudioContext (Safari suspends it until user gesture)
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
 
@@ -929,29 +927,12 @@
         gain.connect(audioCtx.destination);
         source.start(0);
     }
-
-    function startMusic() {
-        if (!musicEnabled) return;
-        if (!bgMusic) {
-            bgMusic = new Audio('Klezmer.mp3');
-            bgMusic.loop = true;
-            bgMusic.volume = 0.3;
-        }
-        if (bgMusic.paused) bgMusic.play().catch(()=>{});
-    }
-    function stopMusic() { if (bgMusic) bgMusic.pause(); }
     window.toggleMusic = function() {
-        initAudio();
         musicEnabled = !musicEnabled;
         localStorage.setItem('musicEnabled', musicEnabled);
         const btn = document.getElementById('musicToggleBtn');
-        if (musicEnabled) {
-            btn.textContent = '\u{1F50A}';
-            if (bgMusic) bgMusic.play().catch(()=>{});
-        } else {
-            btn.textContent = '\u{1F507}';
-            if (bgMusic) bgMusic.pause();
-        }
+        btn.textContent = musicEnabled ? '\u{1F50A}' : '\u{1F507}';
+        if (bgMusic) bgMusic.volume = musicEnabled ? 0.3 : 0;
     };
     // Set initial icon
     setTimeout(() => {
@@ -1582,7 +1563,6 @@
 
     async function startOrRestartFromMain() {
         unlockAudio();
-        startMusic();
         document.getElementById('practiceSettings').style.display = 'none';
         document.getElementById('practiceSettingsBtn').style.display = 'none';
         const ready = dictionaryReady && difficultyReady && platesReady;
@@ -1625,7 +1605,6 @@
         gameOver = true;
         gameStarted = false;
         plateLocked = true;
-        stopMusic();
 
         if (!startTime) return;
 
@@ -2808,8 +2787,7 @@
             // Reset game state from any previous game
             if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
             resetGameState();
-            stopMusic();
-            window.onbeforeunload = null;
+                window.onbeforeunload = null;
 
             // Clear UI
             plateEl.textContent = '---';
@@ -3445,7 +3423,6 @@
         if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
         gameStarted = false;
         gameOver = true;
-        stopMusic();
         window.onbeforeunload = null;
         resetGameState();
         switchTab('challenges');
