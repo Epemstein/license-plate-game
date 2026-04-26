@@ -128,7 +128,7 @@
             if (data) {
                 stats.dailies = data.length;
                 if (data.length > 0) {
-                    stats.avgTime = (data.reduce((s, r) => s + r.total_seconds, 0) / data.length).toFixed(1) + 's';
+                    stats.avgTime = (data.reduce((s, r) => s + r.total_seconds, 0) / data.length).toFixed(2) + 's';
                 }
             }
         } catch(e) {}
@@ -182,7 +182,7 @@
 
             for (const run of runs) {
                 const dateDisplay = formatDateForDisplay(run.date);
-                const time = run.total_seconds.toFixed(1);
+                const time = run.total_seconds.toFixed(2);
 
                 // Try to get percentile from cached leaderboard
                 let pctText = '';
@@ -408,7 +408,7 @@
         }
         const played = await checkIfPlayedToday();
         if (played && todaysDailyTime) {
-            btn.textContent = `Daily Challenge: ${todaysDailyTime.toFixed(1)}s`;
+            btn.textContent = `Daily Challenge: ${todaysDailyTime.toFixed(2)}s`;
             btn.style.background = '#e5e7eb';
             btn.style.color = '#9ca3af';
             btn.style.cursor = 'not-allowed';
@@ -643,7 +643,7 @@
                     }
                 });
 
-                const avgTime = count > 0 ? (totalTime / count).toFixed(1) : '\u2014';
+                const avgTime = count > 0 ? (totalTime / count).toFixed(2) : '\u2014';
                 const skipRate = count > 0 ? Math.round((skipCount / count) * 100) : 0;
                 plateStats.push({ avgTime, skipRate });
             }
@@ -665,7 +665,7 @@
                 const bg = idx % 2 === 0 ? '#fff' : '#f9fafb';
 
                 html += `<tr style="background:${bg};">`;
-                html += `<td style="padding:12px;font-weight:bold;position:sticky;left:0;background:${bg};z-index:5;white-space:nowrap;">${player.name}<br><span style="font-size:0.85rem;color:#6b7280;">(${player.time.toFixed(1)}s)</span></td>`;
+                html += `<td style="padding:12px;font-weight:bold;position:sticky;left:0;background:${bg};z-index:5;white-space:nowrap;">${player.name}<br><span style="font-size:0.85rem;color:#6b7280;">(${player.time.toFixed(2)}s)</span></td>`;
 
                 for (let i = 0; i < maxPlates; i++) {
                     if (i < player.history.length) {
@@ -676,14 +676,14 @@
                             ? (entry.thinkingSeconds || 0) + entry.penaltySeconds
                             : entry.thinkingSeconds;
 
-                        const displayTime = `${totalTime.toFixed(1)}s`;
+                        const displayTime = `${totalTime.toFixed(2)}s`;
 
                         const bgColor = entry.skipped ? '#000000' : getTimeColor(totalTime);
                         const textColor = entry.skipped ? '#ffffff' : (totalTime > 15 ? '#fff' : '#000');
 
                         const tooltip = entry.skipped
-                            ? `Skipped\nThinking: ${(entry.thinkingSeconds || 0).toFixed(1)}s\nPenalty: +${entry.penaltySeconds}s\nTotal: ${totalTime.toFixed(1)}s`
-                            : `Word: ${entry.word}\nTime: ${totalTime.toFixed(1)}s`;
+                            ? `Skipped\nThinking: ${(entry.thinkingSeconds || 0).toFixed(2)}s\nPenalty: +${entry.penaltySeconds}s\nTotal: ${totalTime.toFixed(2)}s`
+                            : `Word: ${entry.word}\nTime: ${totalTime.toFixed(2)}s`;
 
                         html += `<td style="padding:8px;text-align:center;background:${bgColor};color:${textColor};border:2px solid #fff;" title="${tooltip}">`;
                         html += `<div style="font-weight:600;font-size:0.9rem;">${word}</div>`;
@@ -754,7 +754,7 @@
                 const myScore = scores.find(s => s.isMe || s.userId === currentUser?.id);
                 if (myScore) {
                     document.getElementById('myRunCard').style.display = 'flex';
-                    document.getElementById('myRunTime').textContent = myScore.totalTime.toFixed(1) + 's';
+                    document.getElementById('myRunTime').textContent = myScore.totalTime.toFixed(2) + 's';
                 }
             }
 
@@ -792,9 +792,9 @@
                 // Time display
                 let timeHtml;
                 if (userHasPlayed || isPastDate) {
-                    timeHtml = `<span class="lb-time">${s.totalTime.toFixed(1)}s</span>`;
+                    timeHtml = `<span class="lb-time">${s.totalTime.toFixed(2)}s</span>`;
                 } else {
-                    timeHtml = `<span class="lb-time blurred-score">${s.totalTime.toFixed(1)}s</span>`;
+                    timeHtml = `<span class="lb-time blurred-score">${s.totalTime.toFixed(2)}s</span>`;
                 }
 
                 // Click handler — store score data for access in viewPlayerRun
@@ -1501,7 +1501,7 @@
         if (gameMode === 'practice' && !practiceTimed) {
             timerDisplayEl.textContent = "UNTIMED";
         } else {
-            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(1) + " s";
+            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(2) + " s";
         }
 
         // H2H timeout removed — handled server-side
@@ -1527,7 +1527,7 @@
         if (gameMode === 'practice' && !practiceTimed) {
             resultEl.textContent = `Finished! ${solvedCount} plates solved.`;
         } else {
-            resultEl.textContent = `Finished! Time: ${totalSec.toFixed(1)} s`;
+            resultEl.textContent = `Finished! Time: ${totalSec.toFixed(2)} s`;
         }
         resultEl.style.color = "green";
         wordInputEl.blur();
@@ -1798,7 +1798,7 @@
         gameModalTitleEl.textContent = "Run complete!";
         gameModalBodyEl.innerHTML = `
             <p>You solved <strong>${solvedCount}</strong> plates in
-            <strong>${finalTimeSec.toFixed(1)} seconds</strong> (including skip penalties).</p>
+            <strong>${finalTimeSec.toFixed(2)} seconds</strong> (including skip penalties).</p>
             <p>You can view a breakdown chart of each plate's time, or close this and inspect the table.</p>
             ${gameMode === 'daily' ? '<p style="margin-top:1rem; color:#92400e; background:#fef3c7; padding:8px; border-radius:4px;"><strong>Daily Challenge Complete!</strong> Come back tomorrow for a new challenge.</p>' : ''}
             ${gameMode === 'h2h_challenge' ? '<p style="margin-top:1rem; color:#92400e; background:#fef3c7; padding:8px; border-radius:4px;"><strong>H2H Challenge Complete!</strong></p>' : ''}
@@ -1947,7 +1947,7 @@
                             label: function(context) {
                                 const label = context.dataset.label || "";
                                 const value = context.parsed.y;
-                                return `${label}: ${value.toFixed(1)}s`;
+                                return `${label}: ${value.toFixed(2)}s`;
                             }
                         }
                     }
@@ -2048,7 +2048,7 @@
         let thinkingSeconds = 0;
         if (plateStartTime != null) {
             thinkingSeconds = (performance.now() - plateStartTime) / 1000;
-            timeLabel = `${thinkingSeconds.toFixed(1)}s`;
+            timeLabel = `${thinkingSeconds.toFixed(2)}s`;
         }
 
         gameHistory.push({
@@ -2101,7 +2101,7 @@
         let thinkingSeconds = 0;
         if (plateStartTime != null) {
             thinkingSeconds = (performance.now() - plateStartTime) / 1000;
-            timeLabel = `${thinkingSeconds.toFixed(1)}s (+${added}s)`;
+            timeLabel = `${thinkingSeconds.toFixed(2)}s (+${added}s)`;
         }
 
         gameHistory.push({
@@ -2211,11 +2211,11 @@
             // Stats card
             let html = '<div style="background:#f9fafb;border-radius:12px;padding:16px;margin-bottom:20px;">';
             html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
-            html += `<span>Total time</span><span style="font-weight:600;color:#16a34a;">${data.totalTime.toFixed(1)}s${percentile ? '  (Top ' + percentile + '%)' : ''}</span>`;
+            html += `<span>Total time</span><span style="font-weight:600;color:#16a34a;">${data.totalTime.toFixed(2)}s${percentile ? '  (Top ' + percentile + '%)' : ''}</span>`;
             html += `</div>`;
             if (median) {
                 html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
-                html += `<span>Median time</span><span style="color:#6b7280;">${parseFloat(median).toFixed(1)}s</span>`;
+                html += `<span>Median time</span><span style="color:#6b7280;">${parseFloat(median).toFixed(2)}s</span>`;
                 html += `</div>`;
             }
             if (rank && totalPlayers) {
@@ -2242,11 +2242,11 @@
 
                 if (entry.skipped) {
                     html += `<span style="flex:1;color:#ef4444;font-weight:500;">skipped</span>`;
-                    html += `<span style="color:#ef4444;font-weight:600;">${entry.thinkingSeconds.toFixed(1)}s</span>`;
+                    html += `<span style="color:#ef4444;font-weight:600;">${entry.thinkingSeconds.toFixed(2)}s</span>`;
                     html += `<span style="color:#ef4444;margin-left:4px;">(+${entry.penaltySeconds}s)</span>`;
                 } else {
                     html += `<span style="flex:1;color:${textColor};font-weight:500;">${entry.word || ''}</span>`;
-                    html += `<span style="color:${textColor};font-weight:600;">${time.toFixed(1)}s</span>`;
+                    html += `<span style="color:${textColor};font-weight:600;">${time.toFixed(2)}s</span>`;
                 }
 
                 html += `<span style="margin-left:8px;color:${entry.skipped ? '#ef4444' : '#9ca3af'};">&#8250;</span>`;
@@ -2395,16 +2395,16 @@
         let headerHtml = '';
         // Show what the current user played
         if (wordsModalMySkipped) {
-            headerHtml += `<span style="color:#6b7280;">You skipped: </span><strong style="color:#ef4444;">${wordsModalMyTime.toFixed(1)}s (+${wordsModalMyPenalty}s)</strong>`;
+            headerHtml += `<span style="color:#6b7280;">You skipped: </span><strong style="color:#ef4444;">${wordsModalMyTime.toFixed(2)}s (+${wordsModalMyPenalty}s)</strong>`;
         } else if (wordsModalMyWord === '__not_played__') {
             headerHtml += `<span style="color:#6b7280;">You finished before this plate</span>`;
         } else if (wordsModalMyWord) {
-            headerHtml += `<span style="color:#6b7280;">You played: </span><strong>${wordsModalMyWord}</strong> <span style="color:#6b7280;">(${wordsModalMyTime.toFixed(1)}s)</span>`;
+            headerHtml += `<span style="color:#6b7280;">You played: </span><strong>${wordsModalMyWord}</strong> <span style="color:#6b7280;">(${wordsModalMyTime.toFixed(2)}s)</span>`;
         }
         if (wordsModalAvgTime > 0) {
             if (headerHtml) headerHtml += '<br>';
             headerHtml += `<span style="color:#6b7280;">Skip: ${wordsModalSkipPct}%</span>`;
-            headerHtml += `<span style="color:#6b7280;margin-left:16px;">Avg: ${wordsModalAvgTime.toFixed(1)}s</span>`;
+            headerHtml += `<span style="color:#6b7280;margin-left:16px;">Avg: ${wordsModalAvgTime.toFixed(2)}s</span>`;
         }
         statusEl.innerHTML = headerHtml;
     }
@@ -2480,9 +2480,9 @@
                     entry.users.sort((a, b) => a.time - b.time).forEach(u => {
                         const isMe = currentUser && u.userId === currentUser.id;
                         const nameStyle = isMe ? 'color:#9370db;font-weight:600;' : 'color:#374151;';
-                        let timeDisplay = u.time.toFixed(1) + 's';
+                        let timeDisplay = u.time.toFixed(2) + 's';
                         if (u.skipped && u.penalty) {
-                            timeDisplay = `${u.time.toFixed(1)}s (+${u.penalty}s)`;
+                            timeDisplay = `${u.time.toFixed(2)}s (+${u.penalty}s)`;
                         }
                         html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.9rem;">`;
                         html += `<span style="${nameStyle}">${u.name}</span>`;
@@ -2935,8 +2935,8 @@
                 const myRun = ch._runs && ch._runs[currentUser.id];
                 const oppId = isChallenger ? ch.opponent_id : ch.challenger_id;
                 const oppRun = ch._runs && ch._runs[oppId];
-                const myScore = myRun ? myRun.totalSeconds.toFixed(1) + 's' : 'Not played';
-                const oppScore = oppRun ? oppRun.totalSeconds.toFixed(1) + 's' : 'TBD';
+                const myScore = myRun ? myRun.totalSeconds.toFixed(2) + 's' : 'Not played';
+                const oppScore = oppRun ? oppRun.totalSeconds.toFixed(2) + 's' : 'TBD';
 
                 const canPlay = !myRun && ch.status === 'accepted';
                 html += `<div class="challenge-row" onclick="${canPlay ? `playH2HChallenge('${ch.id}')` : `viewH2HScorecard('${ch.id}')`}">`;
@@ -2971,8 +2971,8 @@
                 html += `<div class="ch-meta">${diffLabel} &middot; ${dateStr}</div>`;
                 html += `</div>`;
                 html += `<div class="ch-scores" style="font-size:0.85rem;">`;
-                html += `<div>You: <strong>${myTime !== null ? myTime.toFixed(1) + 's' : '--'}</strong></div>`;
-                html += `<div>Them: <strong>${oppTime !== null ? oppTime.toFixed(1) + 's' : '--'}</strong></div>`;
+                html += `<div>You: <strong>${myTime !== null ? myTime.toFixed(2) + 's' : '--'}</strong></div>`;
+                html += `<div>Them: <strong>${oppTime !== null ? oppTime.toFixed(2) + 's' : '--'}</strong></div>`;
                 html += `</div>`;
                 html += `<div class="ch-chevron">&#8250;</div>`;
                 html += `</div>`;
@@ -3402,10 +3402,10 @@
 
             let html = '<div class="scorecard-header">';
             html += `<div class="scorecard-player"><div class="scorecard-player-name">${p1Name}${p1Icon}</div>`;
-            html += `<div class="scorecard-player-time ${p1TimeClass}">${p1Time !== null ? p1Time.toFixed(1) + 's' : '--'}</div></div>`;
+            html += `<div class="scorecard-player-time ${p1TimeClass}">${p1Time !== null ? p1Time.toFixed(2) + 's' : '--'}</div></div>`;
             html += '<div class="scorecard-vs">VS</div>';
             html += `<div class="scorecard-player"><div class="scorecard-player-name">${p2Name}${p2Icon}</div>`;
-            html += `<div class="scorecard-player-time ${p2TimeClass}">${p2Time !== null ? p2Time.toFixed(1) + 's' : '--'}</div></div>`;
+            html += `<div class="scorecard-player-time ${p2TimeClass}">${p2Time !== null ? p2Time.toFixed(2) + 's' : '--'}</div></div>`;
             html += '</div>';
 
             // Table
@@ -3434,12 +3434,12 @@
                     const t = e1.skipped ? (e1.thinking_seconds + e1.penalty_seconds) : e1.thinking_seconds;
                     p1Total += t;
                     if (e1.skipped) {
-                        p1Cell = `<span>&#10060; ${t.toFixed(1)}s</span>`;
+                        p1Cell = `<span>&#10060; ${t.toFixed(2)}s</span>`;
                         p1CellClass = ' class="sc-skip"';
                     } else {
                         const bg = getTimeColor(t);
                         const textC = t > 15 ? '#fff' : '#000';
-                        p1Cell = `<span>${e1.word || ''}</span><br><span style="font-size:0.8rem;">${t.toFixed(1)}s</span>`;
+                        p1Cell = `<span>${e1.word || ''}</span><br><span style="font-size:0.8rem;">${t.toFixed(2)}s</span>`;
                         p1CellClass = ` style="background:${bg};color:${textC};"`;
                     }
                 } else {
@@ -3454,12 +3454,12 @@
                     const t = e2.skipped ? (e2.thinking_seconds + e2.penalty_seconds) : e2.thinking_seconds;
                     p2Total += t;
                     if (e2.skipped) {
-                        p2Cell = `<span>&#10060; ${t.toFixed(1)}s</span>`;
+                        p2Cell = `<span>&#10060; ${t.toFixed(2)}s</span>`;
                         p2CellClass = ' class="sc-skip"';
                     } else {
                         const bg = getTimeColor(t);
                         const textC = t > 15 ? '#fff' : '#000';
-                        p2Cell = `<span>${e2.word || ''}</span><br><span style="font-size:0.8rem;">${t.toFixed(1)}s</span>`;
+                        p2Cell = `<span>${e2.word || ''}</span><br><span style="font-size:0.8rem;">${t.toFixed(2)}s</span>`;
                         p2CellClass = ` style="background:${bg};color:${textC};"`;
                     }
                 } else {
@@ -3476,9 +3476,9 @@
 
             // Total row
             html += `<tr class="sc-total">`;
-            html += `<td>${p1Time !== null ? p1Time.toFixed(1) + 's' : '--'}</td>`;
+            html += `<td>${p1Time !== null ? p1Time.toFixed(2) + 's' : '--'}</td>`;
             html += `<td>Total</td>`;
-            html += `<td>${p2Time !== null ? p2Time.toFixed(1) + 's' : '--'}</td>`;
+            html += `<td>${p2Time !== null ? p2Time.toFixed(2) + 's' : '--'}</td>`;
             html += `</tr>`;
 
             html += '</tbody></table></div>';
