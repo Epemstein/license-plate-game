@@ -887,43 +887,49 @@
     // Sound effects & music
     let sfxEnabled = localStorage.getItem('sfxEnabled') !== 'false';
     let musicEnabled = localStorage.getItem('musicEnabled') !== 'false';
-    let sfxCorrect, sfxWrong, sfxSkip, bgMusic;
+    let bgMusic;
+    let audioCtx;
+    let sfxBuffers = {};
     let audioUnlocked = false;
-    function initAudio() {
-        if (sfxCorrect) return;
-        sfxCorrect = new Audio('correct.mp3');
-        sfxWrong = new Audio('wrong.mp3');
-        sfxSkip = new Audio('skip.mp3');
+
+    async function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Load SFX into buffers for instant playback
+        const files = { correct: 'correct.mp3', wrong: 'wrong.mp3', skip: 'skip.mp3' };
+        for (const [name, file] of Object.entries(files)) {
+            try {
+                const resp = await fetch(file);
+                const buf = await resp.arrayBuffer();
+                sfxBuffers[name] = await audioCtx.decodeAudioData(buf);
+            } catch (e) { console.warn('Failed to load SFX:', name, e); }
+        }
+        // Music uses Audio element (needs looping)
         bgMusic = new Audio('Klezmer.mp3');
         bgMusic.loop = true;
         bgMusic.volume = 0.3;
-        // Pre-buffer SFX for Safari
-        sfxCorrect.load();
-        sfxWrong.load();
-        sfxSkip.load();
-        bgMusic.load();
     }
-    // Safari requires audio to be "unlocked" from a direct user gesture
+
     function unlockAudio() {
         if (audioUnlocked) return;
-        initAudio();
-        // Play and immediately pause to unlock the audio context
-        const unlock = [sfxCorrect, sfxWrong, sfxSkip, bgMusic];
-        unlock.forEach(a => {
-            if (a) {
-                a.volume = 0;
-                a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{});
-            }
-        });
-        setTimeout(() => {
-            if (sfxCorrect) sfxCorrect.volume = 0.5;
-            if (sfxWrong) sfxWrong.volume = 0.5;
-            if (sfxSkip) sfxSkip.volume = 0.5;
-            if (bgMusic) bgMusic.volume = 0.3;
-        }, 100);
         audioUnlocked = true;
+        initAudio();
+        // Resume AudioContext (Safari suspends it until user gesture)
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
-    function playSFX(audio) { if (sfxEnabled && audio) { audio.currentTime = 0; audio.play().catch(()=>{}); } }
+
+    function playSFX(name) {
+        if (!sfxEnabled || !audioCtx || !sfxBuffers[name]) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const source = audioCtx.createBufferSource();
+        source.buffer = sfxBuffers[name];
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.5;
+        source.connect(gain);
+        gain.connect(audioCtx.destination);
+        source.start(0);
+    }
+
     function startMusic() { initAudio(); if (musicEnabled && bgMusic) bgMusic.play().catch(()=>{}); }
     function stopMusic() { if (bgMusic) bgMusic.pause(); }
     window.toggleMusic = function() {
@@ -2106,21 +2112,21 @@
         if (rawWord.length < 4) {
             resultEl.textContent = "Words must be 4 or more letters.";
             resultEl.style.color = "red";
-            playSFX(sfxWrong);
+            playSFX('wrong');
             return;
         }
 
         if (PROFANITY.has(rawWord.toLowerCase())) {
             resultEl.textContent = "Not tolerated in a family game.";
             resultEl.style.color = "red";
-            playSFX(sfxWrong);
+            playSFX('wrong');
             return;
         }
 
         if (!DICTIONARY.has(rawWord.toUpperCase())) {
             resultEl.textContent = `"${rawWord}" is not in the dictionary.`;
             resultEl.style.color = "red";
-            playSFX(sfxWrong);
+            playSFX('wrong');
             return;
         }
 
@@ -2129,7 +2135,7 @@
             const html = explainPlateMismatch(currentPlate, rawWord);
             resultEl.innerHTML = html;
             resultEl.style.color = "red";
-            playSFX(sfxWrong);
+            playSFX('wrong');
             return;
         }
 
@@ -2143,7 +2149,7 @@
 
         resultEl.textContent = `"${rawWord}" matches ${currentPlate}.`;
         resultEl.style.color = "green";
-        playSFX(sfxCorrect);
+        playSFX('correct');
 
         const plate = currentPlate;
         const word = rawWord.toLowerCase();
@@ -2196,7 +2202,7 @@
 
         resultEl.textContent = `Skipped ${currentPlate}. +${added}s penalty.`;
         resultEl.style.color = "orange";
-        playSFX(sfxSkip);
+        playSFX('skip');
 
         const plate = currentPlate;
         const penaltyLabel = '\u274C';
