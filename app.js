@@ -396,17 +396,21 @@
             btn.textContent = 'Sign in to play Daily';
             btn.style.background = '#e5e7eb';
             btn.style.color = '#9ca3af';
-            btn.style.cursor = 'not-allowed';
-            btn.disabled = true;
+            btn.style.cursor = 'pointer';
+            btn.disabled = false;
+            btn.onclick = () => signInWithApple();
             practiceBtn.textContent = 'Sign in to Practice';
             practiceBtn.style.background = '#e5e7eb';
             practiceBtn.style.color = '#9ca3af';
-            practiceBtn.style.cursor = 'not-allowed';
-            practiceBtn.disabled = true;
+            practiceBtn.style.cursor = 'pointer';
+            practiceBtn.disabled = false;
+            practiceBtn.onclick = () => signInWithApple();
             practiceSettingsBtn.style.display = 'none';
             return;
         }
-        // Restore practice button
+        // Restore buttons
+        btn.onclick = null;
+        practiceBtn.onclick = null;
         practiceBtn.textContent = 'Practice Mode';
         practiceBtn.style.background = '#9370db';
         practiceBtn.style.color = '#ffffff';
