@@ -937,7 +937,7 @@
             bgMusic.loop = true;
             bgMusic.volume = 0.3;
         }
-        bgMusic.play().catch(()=>{});
+        if (bgMusic.paused) bgMusic.play().catch(()=>{});
     }
     function stopMusic() { if (bgMusic) bgMusic.pause(); }
     window.toggleMusic = function() {
