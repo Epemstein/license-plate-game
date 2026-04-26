@@ -265,7 +265,7 @@
         }
 
         tr:nth-child(even) td {
-            background-color: #f9fafb;
+            background-color: inherit;
         }
 
         .history-empty {
