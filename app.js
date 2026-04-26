@@ -2190,7 +2190,7 @@
         playSFX(sfxSkip);
 
         const plate = currentPlate;
-        const penaltyLabel = `+${added}s (skipped)`;
+        const penaltyLabel = '\u274C';
         const diffScore = getPlateDifficultyScore(plate);
         const skipRect = skipButtonEl.getBoundingClientRect();
 
