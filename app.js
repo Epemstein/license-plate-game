@@ -1567,6 +1567,7 @@
         if (gameMode === 'practice' && gameHistory.length > 0) {
             submitPracticePlateStats();
         }
+        practiceStatsSubmitted = false;
         unlockAudio();
         document.getElementById('practiceSettings').style.display = 'none';
         document.getElementById('practiceSettingsBtn').style.display = 'none';
@@ -1665,8 +1666,12 @@
         localStorage.setItem('pendingPracticeStats', JSON.stringify(data));
     }
 
+    let practiceStatsSubmitted = false;
+
     async function submitPracticePlateStats() {
-        if (!currentUser || gameHistory.length === 0) return;
+        if (!currentUser || gameHistory.length === 0 || practiceStatsSubmitted) return;
+        practiceStatsSubmitted = true;
+        localStorage.removeItem('pendingPracticeStats');
         try {
             const rows = gameHistory.map(entry => ({
                 user_id: currentUser.id,
@@ -1676,7 +1681,6 @@
             }));
             await sb.from('practice_plate_stats').insert(rows);
             console.log('[Practice] Submitted', rows.length, 'plate stats');
-            localStorage.removeItem('pendingPracticeStats');
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
         }
@@ -3838,7 +3842,7 @@
 
     // Save practice stats on page unload (refresh/close)
     window.addEventListener('beforeunload', () => {
-        if (gameMode === 'practice' && gameStarted && !gameOver && gameHistory.length > 0) {
+        if (gameMode === 'practice' && gameStarted && !gameOver && gameHistory.length > 0 && !practiceStatsSubmitted) {
             savePracticeStatsLocally();
         }
     });
