@@ -3257,7 +3257,7 @@
             const mi = document.getElementById('modeIndicator');
             mi.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;">
-                    <span>H2H vs ${oppName} | Diff ${currentH2HDifficulty}</span>
+                    <span>H2H vs ${oppName} | Difficulty = ${currentH2HDifficulty}</span>
                     <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
                 </div>
             `;
@@ -3265,15 +3265,11 @@
             mi.style.color = '#92400e';
             mi.style.border = '2px solid #fbbf24';
 
+            // Auto-start the game immediately
             const startBtn = document.getElementById('startButton');
-            startBtn.textContent = 'Start Challenge';
-            startBtn.disabled = false;
-            startBtn.style.opacity = '1';
-            startBtn.style.cursor = 'pointer';
-            startBtn.style.display = 'inline-block';
-            startBtn.classList.add('pulse-button');
-
+            startBtn.style.display = 'none';
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => startBtn.click(), 100);
         } catch (e) {
             console.error('Error starting challenge:', e);
             alert('Error starting challenge: ' + e.message);
