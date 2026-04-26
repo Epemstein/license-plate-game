@@ -1149,7 +1149,51 @@
         return remaining[idx];
     }
 
+    // Piecewise linear weight system (ported from iOS PlateDifficulty.swift)
+    // Maps difficulty slider 0-100 to weights across 7 bands
+    const H2H_CONTROL_POINTS = [0, 25, 50, 75, 90, 100];
+    const H2H_BAND_WEIGHTS = [
+        /* very_easy   */          [42,   28,   20,    2,    0,    0],
+        /* easy        */          [28,   24,   16,    2,    0,    0],
+        /* medium      */          [17,   20,   14,    4,    1,    0],
+        /* difficult   */          [ 8,   14,   17,   10,    3,    4],
+        /* hard        */          [ 3,    8,   17,   20,   14,   18],
+        /* very_hard   */          [ 1,    3,   10,   28,   38,   30],
+        /* impossible  */          [ 1,    3,    6,   34,   44,   48],
+    ];
+    const H2H_BAND_NAMES_ORDERED = ["very_easy", "easy", "medium", "difficult", "hard", "very_hard", "impossible"];
+
+    function weightsForDifficulty(difficulty) {
+        const d = Math.min(100, Math.max(0, difficulty));
+        const pts = H2H_CONTROL_POINTS;
+        let i = 0;
+        for (let j = 0; j < pts.length - 1; j++) {
+            if (d >= pts[j]) i = j;
+        }
+        const t = (d - pts[i]) / (pts[i + 1] - pts[i]);
+        const result = [];
+        for (let bandIdx = 0; bandIdx < H2H_BAND_WEIGHTS.length; bandIdx++) {
+            const w = H2H_BAND_WEIGHTS[bandIdx][i] + t * (H2H_BAND_WEIGHTS[bandIdx][i + 1] - H2H_BAND_WEIGHTS[bandIdx][i]);
+            result.push(Math.max(0, w));
+        }
+        const total = result.reduce((a, b) => a + b, 0);
+        if (total > 0) return result.map(w => w / total);
+        return result;
+    }
+
     function choosePrimaryBand() {
+        // Use difficulty-based weights for practice mode
+        if (gameMode === 'practice' && typeof practiceDifficulty === 'number') {
+            const weights = weightsForDifficulty(practiceDifficulty);
+            const r = Math.random();
+            let threshold = 0;
+            for (let b = 0; b < weights.length; b++) {
+                threshold += weights[b];
+                if (r < threshold) return H2H_BAND_NAMES_ORDERED[b];
+            }
+            return H2H_BAND_NAMES_ORDERED[H2H_BAND_NAMES_ORDERED.length - 1];
+        }
+        // Default fixed weights for daily mode
         const r = Math.random();
         let threshold = 0;
         threshold += VERY_EASY_PROB; if (r < threshold) return "very_easy";
@@ -2728,38 +2772,6 @@
     let selectedFriendId = null;
     let friendsListData = [];
 
-    // Piecewise linear weight system (ported from iOS PlateDifficulty.swift)
-    // Maps difficulty slider 0-100 to weights across 7 bands
-    const H2H_CONTROL_POINTS = [0, 25, 50, 75, 90, 100];
-    //                              s=0  s=25  s=50  s=75  s=90  s=100
-    const H2H_BAND_WEIGHTS = [
-        /* very_easy   */          [42,   28,   20,    2,    0,    0],
-        /* easy        */          [28,   24,   16,    2,    0,    0],
-        /* medium      */          [17,   20,   14,    4,    1,    0],
-        /* difficult   */          [ 8,   14,   17,   10,    3,    4],
-        /* hard        */          [ 3,    8,   17,   20,   14,   18],
-        /* very_hard   */          [ 1,    3,   10,   28,   38,   30],
-        /* impossible  */          [ 1,    3,    6,   34,   44,   48],
-    ];
-    const H2H_BAND_NAMES_ORDERED = ["very_easy", "easy", "medium", "difficult", "hard", "very_hard", "impossible"];
-
-    function weightsForDifficulty(difficulty) {
-        const d = Math.min(100, Math.max(0, difficulty));
-        const pts = H2H_CONTROL_POINTS;
-        let i = 0;
-        for (let j = 0; j < pts.length - 1; j++) {
-            if (d >= pts[j]) i = j;
-        }
-        const t = (d - pts[i]) / (pts[i + 1] - pts[i]);
-        const result = [];
-        for (let bandIdx = 0; bandIdx < H2H_BAND_WEIGHTS.length; bandIdx++) {
-            const w = H2H_BAND_WEIGHTS[bandIdx][i] + t * (H2H_BAND_WEIGHTS[bandIdx][i + 1] - H2H_BAND_WEIGHTS[bandIdx][i]);
-            result.push(Math.max(0, w));
-        }
-        const total = result.reduce((a, b) => a + b, 0);
-        if (total > 0) return result.map(w => w / total);
-        return result;
-    }
 
     function generateChallengeSequence(difficulty) {
         if (!platesReady || !ALL_PLATES.length) return [];
