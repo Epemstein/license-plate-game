@@ -1695,11 +1695,14 @@
         }
     }
 
+    let pendingPracticeSubmitted = false;
     async function submitPendingPracticeStats() {
-        console.log('[Practice] submitPendingPracticeStats called', { user: !!currentUser, hasPending: !!localStorage.getItem('pendingPracticeStats') });
-        if (!currentUser) return;
+        console.log('[Practice] submitPendingPracticeStats called', { user: !!currentUser, hasPending: !!localStorage.getItem('pendingPracticeStats'), alreadyDone: pendingPracticeSubmitted });
+        if (!currentUser || pendingPracticeSubmitted) return;
         const saved = localStorage.getItem('pendingPracticeStats');
         if (!saved) { console.log('[Practice] No pending stats'); return; }
+        pendingPracticeSubmitted = true;
+        localStorage.removeItem('pendingPracticeStats');
         try {
             const data = JSON.parse(saved);
             if (!data || data.length === 0) return;
@@ -1711,7 +1714,6 @@
             }));
             await sb.from('practice_plate_stats').insert(rows);
             console.log('[Practice] Submitted', rows.length, 'pending plate stats from previous session');
-            localStorage.removeItem('pendingPracticeStats');
         } catch (e) {
             console.warn('[Practice] Pending stats error:', e);
         }
