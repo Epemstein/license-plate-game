@@ -1662,7 +1662,25 @@
                 saveScore(totalSec, solvedCount, skipCount);
             } else if (gameMode === 'h2h_challenge' && currentH2HRunId) {
                 saveChallengeResult(totalSec, solvedCount, skipCount);
+            } else if (gameMode === 'practice') {
+                submitPracticePlateStats();
             }
+        }
+    }
+
+    async function submitPracticePlateStats() {
+        if (!currentUser || solvedCount < 10 || skipCount >= 10) return;
+        try {
+            const rows = gameHistory.map(entry => ({
+                user_id: currentUser.id,
+                plate: entry.plate,
+                skipped: entry.skipped || false,
+                thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100
+            }));
+            await sb.from('practice_plate_stats').insert(rows);
+            console.log('[Practice] Submitted', rows.length, 'plate stats');
+        } catch (e) {
+            console.warn('[Practice] Stats submit error:', e);
         }
     }
 
