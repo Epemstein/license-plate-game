@@ -1657,7 +1657,11 @@
     }
 
     function savePracticeStatsLocally() {
-        if (gameMode !== 'practice' || gameHistory.length === 0 || practiceStatsSubmitted) return;
+        console.log('[Practice] savePracticeStatsLocally called', { gameMode, histLen: gameHistory.length, submitted: practiceStatsSubmitted });
+        if (gameMode !== 'practice' || gameHistory.length === 0 || practiceStatsSubmitted) {
+            console.log('[Practice] savePracticeStatsLocally SKIPPED');
+            return;
+        }
         const data = gameHistory.map(entry => ({
             plate: entry.plate,
             skipped: entry.skipped || false,
@@ -1669,9 +1673,14 @@
     let practiceStatsSubmitted = false;
 
     async function submitPracticePlateStats() {
-        if (!currentUser || gameHistory.length === 0 || practiceStatsSubmitted) return;
+        console.log('[Practice] submitPracticePlateStats called', { user: !!currentUser, histLen: gameHistory.length, submitted: practiceStatsSubmitted });
+        if (!currentUser || gameHistory.length === 0 || practiceStatsSubmitted) {
+            console.log('[Practice] submitPracticePlateStats SKIPPED');
+            return;
+        }
         practiceStatsSubmitted = true;
         localStorage.removeItem('pendingPracticeStats');
+        console.log('[Practice] SUBMITTING to server...');
         try {
             const rows = gameHistory.map(entry => ({
                 user_id: currentUser.id,
@@ -1687,9 +1696,10 @@
     }
 
     async function submitPendingPracticeStats() {
+        console.log('[Practice] submitPendingPracticeStats called', { user: !!currentUser, hasPending: !!localStorage.getItem('pendingPracticeStats') });
         if (!currentUser) return;
         const saved = localStorage.getItem('pendingPracticeStats');
-        if (!saved) return;
+        if (!saved) { console.log('[Practice] No pending stats'); return; }
         try {
             const data = JSON.parse(saved);
             if (!data || data.length === 0) return;
@@ -3842,6 +3852,7 @@
 
     // On page unload, save practice stats locally (will be submitted on next load)
     window.addEventListener('pagehide', () => {
+        console.log('[Practice] pagehide fired', { gameMode, histLen: gameHistory.length, submitted: practiceStatsSubmitted });
         if (gameMode === 'practice' && gameHistory.length > 0 && !practiceStatsSubmitted) {
             savePracticeStatsLocally();
         }
