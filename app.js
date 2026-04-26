@@ -3242,7 +3242,12 @@
 
             const isChallenger = challenge.challenger_id === currentUser.id;
             const oppId = isChallenger ? challenge.opponent_id : challenge.challenger_id;
-            const oppName = h2hProfilesCache[oppId] || 'Opponent';
+            let oppName = h2hProfilesCache[oppId];
+            if (!oppName) {
+                const { data: prof } = await sb.from('profiles').select('display_name, handle').eq('id', oppId).single();
+                oppName = prof?.display_name || (prof?.handle ? '@' + prof.handle : 'Opponent');
+                h2hProfilesCache[oppId] = oppName;
+            }
 
             // Switch to game tab
             switchTab('game');
