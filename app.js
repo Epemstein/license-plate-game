@@ -3505,7 +3505,7 @@
                     const t = e1.skipped ? (e1.thinking_seconds + e1.penalty_seconds) : e1.thinking_seconds;
                     p1Total += t;
                     if (e1.skipped) {
-                        p1Cell = `<span>&#10060; ${t.toFixed(2)}s</span>`;
+                        p1Cell = `<span>&#10060;</span><br><span style="font-size:0.8rem;">${e1.thinking_seconds.toFixed(2)}s (+${e1.penalty_seconds})</span>`;
                         p1CellClass = ' class="sc-skip"';
                     } else {
                         const bg = getTimeColor(t);
@@ -3525,7 +3525,7 @@
                     const t = e2.skipped ? (e2.thinking_seconds + e2.penalty_seconds) : e2.thinking_seconds;
                     p2Total += t;
                     if (e2.skipped) {
-                        p2Cell = `<span>&#10060; ${t.toFixed(2)}s</span>`;
+                        p2Cell = `<span>&#10060;</span><br><span style="font-size:0.8rem;">${e2.thinking_seconds.toFixed(2)}s (+${e2.penalty_seconds})</span>`;
                         p2CellClass = ' class="sc-skip"';
                     } else {
                         const bg = getTimeColor(t);
