@@ -2699,10 +2699,8 @@
                 return;
             }
 
-            console.log('Generating daily plates...');
             gameMode = 'daily';
-            dailyPlateSequence = generateDailyPlates(getTodayString());
-            console.log('Plates generated:', dailyPlateSequence?.length);
+            dailyPlateSequence = null; // will be fetched from server in beginNewRun
 
             // Update mode indicator
             const mi = document.getElementById('modeIndicator');
