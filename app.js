@@ -3386,6 +3386,13 @@
         challengeStartTime = null;
         gameMode = 'practice';
 
+        // Update banner
+        const mi = document.getElementById('modeIndicator');
+        mi.innerHTML = '<span>H2H Complete!</span>';
+        mi.style.background = '#f0fdf4';
+        mi.style.color = '#16a34a';
+        mi.style.border = '2px solid #86efac';
+
         // Reset buttons
         document.getElementById('practiceBtn').disabled = false;
         document.getElementById('practiceBtn').style.opacity = '1';
