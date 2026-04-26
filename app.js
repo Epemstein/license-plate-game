@@ -3022,20 +3022,30 @@
     }
 
     // === New Challenge Modal ===
+    let preselectedChallengeUserId = null;
+    let preselectedChallengeUserName = null;
+
     function openNewChallengeModal() {
         if (!currentUser) {
             alert('Please sign in to create challenges');
             return;
         }
-        selectedFriendId = null;
-        document.getElementById('sendChallengeBtn').disabled = true;
-        document.getElementById('sendChallengeBtn').style.opacity = '0.5';
+        const preId = preselectedChallengeUserId;
+        const preName = preselectedChallengeUserName;
+        preselectedChallengeUserId = null;
+        preselectedChallengeUserName = null;
+
+        if (!preId) {
+            selectedFriendId = null;
+            document.getElementById('sendChallengeBtn').disabled = true;
+            document.getElementById('sendChallengeBtn').style.opacity = '0.5';
+        }
         document.getElementById('friendSearchInput').value = '';
         document.getElementById('challengeDiffSlider').value = 50;
         document.getElementById('challengeDiffValue').textContent = '50';
         document.getElementById('challengeDiffLabel').textContent = 'Normal plates';
         document.getElementById('newChallengeModalBackdrop').classList.add('show');
-        loadFriendsList();
+        loadFriendsList(preId, preName);
     }
     window.openNewChallengeModal = openNewChallengeModal;
 
@@ -3052,7 +3062,7 @@
     }
     window.updateChallengeDiffLabel = updateChallengeDiffLabel;
 
-    async function loadFriendsList() {
+    async function loadFriendsList(preId, preName) {
         const listEl = document.getElementById('friendsList');
         listEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:12px;">Loading friends...</p>';
 
@@ -3064,22 +3074,29 @@
                 .eq('status', 'accepted');
 
             if (error) throw error;
-            if (!data || data.length === 0) {
-                listEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:12px;">No friends yet. Add friends in the iOS app!</p>';
-                return;
-            }
 
-            const friendIds = data.map(f => f.user_a === currentUser.id ? f.user_b : f.user_a);
-            const { data: profiles } = await sb
-                .from('profiles')
-                .select('id, display_name, handle')
-                .in('id', friendIds);
+            const friendIds = (data || []).map(f => f.user_a === currentUser.id ? f.user_b : f.user_a);
+            const { data: profiles } = friendIds.length > 0
+                ? await sb.from('profiles').select('id, display_name, handle').in('id', friendIds)
+                : { data: [] };
 
             friendsListData = (profiles || []).map(p => ({
                 id: p.id,
                 name: p.display_name || (p.handle ? '@' + p.handle : 'Player'),
                 handle: p.handle || ''
             }));
+
+            // Add preselected non-friend if not already in list
+            if (preId && !friendsListData.find(f => f.id === preId)) {
+                friendsListData.unshift({ id: preId, name: preName || 'Player', handle: '' });
+            }
+
+            // Auto-select preselected user
+            if (preId) {
+                selectedFriendId = preId;
+                document.getElementById('sendChallengeBtn').disabled = false;
+                document.getElementById('sendChallengeBtn').style.opacity = '1';
+            }
 
             renderFriendsList();
         } catch (e) {
@@ -3660,7 +3677,7 @@
             html += '</div>';
 
             if (!isSelf) {
-                html += `<button class="profile-modal-challenge-btn" onclick="closeProfileModal();selectedFriendId='${userId}';openNewChallengeModal();">⚔ Challenge</button>`;
+                html += `<button class="profile-modal-challenge-btn" onclick="closeProfileModal();preselectedChallengeUserId='${userId}';preselectedChallengeUserName='${name.replace(/'/g,"\\'")}';openNewChallengeModal();">⚔ Challenge</button>`;
             }
 
             content.innerHTML = html;
