@@ -888,6 +888,7 @@
     let sfxEnabled = localStorage.getItem('sfxEnabled') !== 'false';
     let musicEnabled = localStorage.getItem('musicEnabled') !== 'false';
     let sfxCorrect, sfxWrong, sfxSkip, bgMusic;
+    let audioUnlocked = false;
     function initAudio() {
         if (sfxCorrect) return;
         sfxCorrect = new Audio('correct.mp3');
@@ -896,6 +897,31 @@
         bgMusic = new Audio('Klezmer.mp3');
         bgMusic.loop = true;
         bgMusic.volume = 0.3;
+        // Pre-buffer SFX for Safari
+        sfxCorrect.load();
+        sfxWrong.load();
+        sfxSkip.load();
+        bgMusic.load();
+    }
+    // Safari requires audio to be "unlocked" from a direct user gesture
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        initAudio();
+        // Play and immediately pause to unlock the audio context
+        const unlock = [sfxCorrect, sfxWrong, sfxSkip, bgMusic];
+        unlock.forEach(a => {
+            if (a) {
+                a.volume = 0;
+                a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{});
+            }
+        });
+        setTimeout(() => {
+            if (sfxCorrect) sfxCorrect.volume = 0.5;
+            if (sfxWrong) sfxWrong.volume = 0.5;
+            if (sfxSkip) sfxSkip.volume = 0.5;
+            if (bgMusic) bgMusic.volume = 0.3;
+        }, 100);
+        audioUnlocked = true;
     }
     function playSFX(audio) { if (sfxEnabled && audio) { audio.currentTime = 0; audio.play().catch(()=>{}); } }
     function startMusic() { initAudio(); if (musicEnabled && bgMusic) bgMusic.play().catch(()=>{}); }
@@ -1542,6 +1568,7 @@
     }
 
     async function startOrRestartFromMain() {
+        unlockAudio();
         const ready = dictionaryReady && difficultyReady && platesReady;
         if (!ready) {
             resultEl.textContent = "Still loading\u2026";
@@ -2680,6 +2707,7 @@
         startBtn.style.cursor = 'pointer';
 
         document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
+            unlockAudio();
             console.log('Daily Challenge clicked!');
             console.log('State:', { platesReady, dictionaryReady, allPlates: ALL_PLATES?.length, currentUser: !!currentUser });
 
