@@ -3484,10 +3484,10 @@
 
             let html = '<div class="scorecard-header">';
             html += `<div class="scorecard-player"><div class="scorecard-player-name">${p1Name}${p1Icon}</div>`;
-            html += `<div class="scorecard-player-time ${p1TimeClass}">${p1Time !== null ? p1Time.toFixed(2) + 's' : '--'}</div></div>`;
+            html += `<div class="scorecard-player-time ${p1TimeClass}">${p1Time !== null ? p1Time.toFixed(2) : '--'}</div></div>`;
             html += '<div class="scorecard-vs">VS</div>';
             html += `<div class="scorecard-player"><div class="scorecard-player-name">${p2Name}${p2Icon}</div>`;
-            html += `<div class="scorecard-player-time ${p2TimeClass}">${p2Time !== null ? p2Time.toFixed(2) + 's' : '--'}</div></div>`;
+            html += `<div class="scorecard-player-time ${p2TimeClass}">${p2Time !== null ? p2Time.toFixed(2) : '--'}</div></div>`;
             html += '</div>';
 
             // Table
@@ -3516,12 +3516,12 @@
                     const t = e1.skipped ? (e1.thinking_seconds + e1.penalty_seconds) : e1.thinking_seconds;
                     p1Total += t;
                     if (e1.skipped) {
-                        p1Cell = `<span>&#10060;</span><br><span style="font-size:0.8rem;">${e1.thinking_seconds.toFixed(2)}s (+${e1.penalty_seconds})</span>`;
+                        p1Cell = `<span>&#10060;</span><br><span style="font-size:0.8rem;">${e1.thinking_seconds.toFixed(2)} (+${e1.penalty_seconds})</span>`;
                         p1CellClass = ' class="sc-skip"';
                     } else {
                         const bg = getTimeColor(t);
                         const textC = t > 15 ? '#fff' : '#000';
-                        p1Cell = `<span>${e1.word || ''}</span><br><span style="font-size:0.8rem;">${t.toFixed(2)}s</span>`;
+                        p1Cell = `<span>${e1.word || ''}</span><br><span style="font-size:0.8rem;">${t.toFixed(2)}</span>`;
                         p1CellClass = ` style="background:${bg};color:${textC};"`;
                     }
                 } else {
@@ -3536,12 +3536,12 @@
                     const t = e2.skipped ? (e2.thinking_seconds + e2.penalty_seconds) : e2.thinking_seconds;
                     p2Total += t;
                     if (e2.skipped) {
-                        p2Cell = `<span>&#10060;</span><br><span style="font-size:0.8rem;">${e2.thinking_seconds.toFixed(2)}s (+${e2.penalty_seconds})</span>`;
+                        p2Cell = `<span>&#10060;</span><br><span style="font-size:0.8rem;">${e2.thinking_seconds.toFixed(2)} (+${e2.penalty_seconds})</span>`;
                         p2CellClass = ' class="sc-skip"';
                     } else {
                         const bg = getTimeColor(t);
                         const textC = t > 15 ? '#fff' : '#000';
-                        p2Cell = `<span>${e2.word || ''}</span><br><span style="font-size:0.8rem;">${t.toFixed(2)}s</span>`;
+                        p2Cell = `<span>${e2.word || ''}</span><br><span style="font-size:0.8rem;">${t.toFixed(2)}</span>`;
                         p2CellClass = ` style="background:${bg};color:${textC};"`;
                     }
                 } else {
@@ -3558,9 +3558,9 @@
 
             // Total row
             html += `<tr class="sc-total">`;
-            html += `<td>${p1Time !== null ? p1Time.toFixed(2) + 's' : '--'}</td>`;
+            html += `<td>${p1Time !== null ? p1Time.toFixed(2) : '--'}</td>`;
             html += `<td>Total</td>`;
-            html += `<td>${p2Time !== null ? p2Time.toFixed(2) + 's' : '--'}</td>`;
+            html += `<td>${p2Time !== null ? p2Time.toFixed(2) : '--'}</td>`;
             html += `</tr>`;
 
             html += '</tbody></table></div>';
