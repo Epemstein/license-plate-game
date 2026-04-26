@@ -1658,7 +1658,7 @@
         plateTd.classList.add("clickable-plate");
         plateTd.title = "Click to see all viable words";
         plateTd.addEventListener("click", () => {
-            showViableWordsForPlate(plate);
+            showViableWordsForPlate(plate, gameStarted && !gameOver);
         });
     }
 
@@ -2389,7 +2389,7 @@
     let wordsModalSkipPct = 0;
     let wordsModalAvgTime = 0;
 
-    function showViableWordsForPlate(plate) {
+    function showViableWordsForPlate(plate, hideUsed) {
         if (!plate || plate === '\u2014') return;
 
         wordsModalPlate = plate.toUpperCase();
@@ -2410,9 +2410,13 @@
 
         document.getElementById('wordsTabCommon').textContent = `Common (${wordsModalCommon.length})`;
         document.getElementById('wordsTabViable').textContent = `Viable (${wordsModalViable.length.toLocaleString()})`;
-        document.getElementById('wordsTabUsed').textContent = 'Used';
+        const usedTab = document.getElementById('wordsTabUsed');
+        usedTab.textContent = 'Used';
+        usedTab.style.display = hideUsed ? 'none' : '';
 
         renderWordsTab('common');
+
+        if (hideUsed) return; // Skip loading used data during gameplay
 
         // Load used words and stats from Supabase (non-blocking)
         sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate })
