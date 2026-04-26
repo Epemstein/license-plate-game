@@ -2855,10 +2855,18 @@
             diffValue.textContent = practiceDifficulty;
             localStorage.setItem('practiceDifficulty', practiceDifficulty);
             updateDiffLabel(practiceDifficulty);
+            if (gameMode === 'practice') {
+                const timedLabel = practiceTimed ? '' : ' | UNTIMED';
+                document.getElementById('modeIndicator').textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
+            }
         });
 
         timedToggle.addEventListener('change', () => {
             practiceTimed = timedToggle.checked;
+            if (gameMode === 'practice') {
+                const timedLabel = practiceTimed ? '' : ' | UNTIMED';
+                document.getElementById('modeIndicator').textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
+            }
             localStorage.setItem('practiceTimed', practiceTimed);
         });
 
