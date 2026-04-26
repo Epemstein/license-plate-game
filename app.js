@@ -3013,6 +3013,7 @@
                 html += `<div>You: <strong>${myTime !== null ? myTime.toFixed(2) + 's' : '--'}</strong></div>`;
                 html += `<div>Them: <strong>${oppTime !== null ? oppTime.toFixed(2) + 's' : '--'}</strong></div>`;
                 html += `</div>`;
+                html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty || 50})" style="padding:6px 12px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;margin-right:6px;">Rematch</button>`;
                 html += `<div class="ch-chevron">&#8250;</div>`;
                 html += `</div>`;
             }
@@ -3684,6 +3685,26 @@
         } catch (e) {
             console.error('Profile modal error:', e);
             content.innerHTML = '<p style="color:#dc2626;">Error loading profile</p>';
+        }
+    };
+
+    window.rematchChallenge = async function(oppId, oppName, difficulty) {
+        if (!currentUser) return;
+        try {
+            const plates = generateChallengeSequence(difficulty);
+            if (plates.length < 100) { alert('Error generating plates'); return; }
+
+            const { data, error } = await sb.rpc('create_h2h_challenge', {
+                p_opponent_id: oppId,
+                p_plates: plates,
+                p_difficulty: difficulty
+            });
+            if (error) throw error;
+
+            await playH2HChallenge(data);
+        } catch (e) {
+            console.error('Rematch error:', e);
+            alert('Error creating rematch: ' + e.message);
         }
     };
 
