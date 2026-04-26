@@ -390,14 +390,29 @@
 
     async function updateDailyBtnState() {
         const btn = document.getElementById('dailyChallengeBtn');
+        const practiceBtn = document.getElementById('practiceBtn');
+        const practiceSettingsBtn = document.getElementById('practiceSettingsBtn');
         if (!currentUser) {
             btn.textContent = 'Sign in to play Daily';
             btn.style.background = '#e5e7eb';
             btn.style.color = '#9ca3af';
             btn.style.cursor = 'not-allowed';
             btn.disabled = true;
+            practiceBtn.textContent = 'Sign in to Practice';
+            practiceBtn.style.background = '#e5e7eb';
+            practiceBtn.style.color = '#9ca3af';
+            practiceBtn.style.cursor = 'not-allowed';
+            practiceBtn.disabled = true;
+            practiceSettingsBtn.style.display = 'none';
             return;
         }
+        // Restore practice button
+        practiceBtn.textContent = 'Practice Mode';
+        practiceBtn.style.background = '#9370db';
+        practiceBtn.style.color = '#ffffff';
+        practiceBtn.style.cursor = 'pointer';
+        practiceBtn.disabled = false;
+        practiceSettingsBtn.style.display = '';
         const played = await checkIfPlayedToday();
         if (played && todaysDailyTime) {
             btn.textContent = `Daily Challenge: ${todaysDailyTime.toFixed(2)}s`;
