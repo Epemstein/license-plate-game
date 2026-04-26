@@ -429,7 +429,7 @@
             return;
         }
         const today = getTodayString();
-        const totalSeconds = Math.floor(time * 10) / 10;
+        const totalSeconds = Math.floor(time * 100) / 100;
 
         await sb
             .from('daily_runs')
@@ -441,7 +441,7 @@
             plate_index: idx,
             plate: entry.plate,
             word: entry.skipped ? null : (entry.word || '').toLowerCase(),
-            thinking_seconds: Math.floor(entry.thinkingSeconds * 10) / 10,
+            thinking_seconds: Math.floor(entry.thinkingSeconds * 100) / 100,
             skipped: entry.skipped || false,
             penalty_seconds: entry.penaltySeconds || 0
         }));
@@ -889,6 +889,19 @@
 
     let practiceDifficulty = parseInt(localStorage.getItem('practiceDifficulty') || '50');
     let practiceTimed = localStorage.getItem('practiceTimed') !== 'false';
+
+    // Sound effects & music
+    let sfxEnabled = localStorage.getItem('sfxEnabled') !== 'false';
+    let musicEnabled = localStorage.getItem('musicEnabled') !== 'false';
+    const sfxCorrect = new Audio('correct.mp3');
+    const sfxWrong = new Audio('wrong.mp3');
+    const sfxSkip = new Audio('skip.mp3');
+    const bgMusic = new Audio('Klezmer.mp3');
+    bgMusic.loop = true;
+    bgMusic.volume = 0.3;
+    function playSFX(audio) { if (sfxEnabled) { audio.currentTime = 0; audio.play().catch(()=>{}); } }
+    function startMusic() { if (musicEnabled) bgMusic.play().catch(()=>{}); }
+    function stopMusic() { bgMusic.pause(); }
 
     let gameStarted = false;
     let gameOver = false;
@@ -1357,6 +1370,7 @@
         resetGameState();
         gameStarted = true;
         gameOver = false;
+        startMusic();
 
         // Scroll to plate on mobile
         if (window.innerWidth <= 768) {
@@ -1498,6 +1512,7 @@
         gameOver = true;
         gameStarted = false;
         plateLocked = true;
+        stopMusic();
 
         if (!startTime) return;
 
@@ -1993,12 +2008,14 @@
         if (PROFANITY.has(rawWord.toLowerCase())) {
             resultEl.textContent = "Not tolerated in a family game.";
             resultEl.style.color = "red";
+            playSFX(sfxWrong);
             return;
         }
 
         if (!DICTIONARY.has(rawWord.toUpperCase())) {
             resultEl.textContent = `"${rawWord}" is not in the dictionary.`;
             resultEl.style.color = "red";
+            playSFX(sfxWrong);
             return;
         }
 
@@ -2007,6 +2024,7 @@
             const html = explainPlateMismatch(currentPlate, rawWord);
             resultEl.innerHTML = html;
             resultEl.style.color = "red";
+            playSFX(sfxWrong);
             return;
         }
 
@@ -2020,6 +2038,7 @@
 
         resultEl.textContent = `"${rawWord}" matches ${currentPlate}.`;
         resultEl.style.color = "green";
+        playSFX(sfxCorrect);
 
         const plate = currentPlate;
         const word = rawWord.toLowerCase();
@@ -2071,6 +2090,7 @@
 
         resultEl.textContent = `Skipped ${currentPlate}. +${added}s penalty.`;
         resultEl.style.color = "orange";
+        playSFX(sfxSkip);
 
         const plate = currentPlate;
         const penaltyLabel = `+${added}s (skipped)`;
@@ -3263,12 +3283,12 @@
     async function saveChallengeResult(time, solved, skipped) {
         if (!currentUser || !currentH2HRunId || gameMode !== 'h2h_challenge') return;
 
-        const totalSeconds = Math.floor(time * 10) / 10;
+        const totalSeconds = Math.floor(time * 100) / 100;
         const entries = gameHistory.map((entry, idx) => ({
             plate_index: idx,
             plate: entry.plate,
             word: entry.skipped ? null : (entry.word || '').toLowerCase(),
-            thinking_seconds: Math.floor(entry.thinkingSeconds * 10) / 10,
+            thinking_seconds: Math.floor(entry.thinkingSeconds * 100) / 100,
             skipped: entry.skipped || false,
             penalty_seconds: entry.penaltySeconds || 0
         }));
