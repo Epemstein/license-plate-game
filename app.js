@@ -383,15 +383,18 @@
     async function checkIfPlayedToday() {
         if (!currentUser) return false;
         const t = getTodayString();
-        const { data } = await sb
-            .from('daily_runs')
-            .select('id, total_seconds')
-            .eq('user_id', currentUser.id)
-            .eq('date', t)
-            .limit(1);
-        if (data && data.length > 0) {
-            todaysDailyTime = data[0].total_seconds;
-            return true;
+        try {
+            const result = await Promise.race([
+                sb.from('daily_runs').select('id, total_seconds').eq('user_id', currentUser.id).eq('date', t).limit(1),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+            ]);
+            const { data } = result;
+            if (data && data.length > 0) {
+                todaysDailyTime = data[0].total_seconds;
+                return true;
+            }
+        } catch (e) {
+            console.warn('checkIfPlayedToday error:', e);
         }
         return false;
     }
