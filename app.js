@@ -1663,7 +1663,7 @@
     }
 
     function addToHistoryWithAnimation(
-        plate, word, matchIndices, fromRectWord, diffScore, timeLabel, onComplete
+        plate, word, matchIndices, fromRectWord, diffScore, timeLabel, onComplete, seconds, isSkip
     ) {
         if (!plate || !word) {
             if (onComplete) onComplete();
@@ -1702,6 +1702,21 @@
         } else {
             timeTd.textContent = timeLabel || "\u2014";
         }
+
+        // Apply background color based on time
+        if (isSkip) {
+            row.style.background = '#1f2937';
+            row.style.color = '#fff';
+            plateTd.style.color = '#ef4444';
+            wordTd.style.color = '#ef4444';
+            timeTd.style.color = '#ef4444';
+        } else if (typeof seconds === 'number') {
+            row.style.background = getTimeColor(seconds);
+            if (seconds > 15) {
+                row.style.color = '#fff';
+            }
+        }
+        row.style.borderRadius = '8px';
 
         row.appendChild(plateTd);
         row.appendChild(wordTd);
@@ -2141,7 +2156,8 @@
             () => {
                 if (solvedCount >= TOTAL_PLATES) endGame();
                 else pickRandomPlate();
-            }
+            },
+            thinkingSeconds, false
         );
     }
 
@@ -2194,7 +2210,8 @@
             () => {
                 updateSkipButtonLabel();
                 pickRandomPlate();
-            }
+            },
+            null, true
         );
     }
 
