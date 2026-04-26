@@ -1657,7 +1657,7 @@
     }
 
     function savePracticeStatsLocally() {
-        if (gameMode !== 'practice' || gameHistory.length === 0) return;
+        if (gameMode !== 'practice' || gameHistory.length === 0 || practiceStatsSubmitted) return;
         const data = gameHistory.map(entry => ({
             plate: entry.plate,
             skipped: entry.skipped || false,
@@ -3840,9 +3840,9 @@
         document.getElementById('profileModalBackdrop').classList.remove('show');
     };
 
-    // Save practice stats on page unload (refresh/close)
-    window.addEventListener('beforeunload', () => {
-        if (gameMode === 'practice' && gameStarted && !gameOver && gameHistory.length > 0 && !practiceStatsSubmitted) {
+    // On page unload, save practice stats locally (will be submitted on next load)
+    window.addEventListener('pagehide', () => {
+        if (gameMode === 'practice' && gameHistory.length > 0 && !practiceStatsSubmitted) {
             savePracticeStatsLocally();
         }
     });
