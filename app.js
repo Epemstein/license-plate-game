@@ -2079,6 +2079,13 @@
         }
         if (plateLocked) return;
 
+        if (rawWord.length < 4) {
+            resultEl.textContent = "Words must be 4 or more letters.";
+            resultEl.style.color = "red";
+            playSFX(sfxWrong);
+            return;
+        }
+
         if (PROFANITY.has(rawWord.toLowerCase())) {
             resultEl.textContent = "Not tolerated in a family game.";
             resultEl.style.color = "red";
