@@ -1681,21 +1681,7 @@
 
         plateTd.textContent = plate;
 
-        if (Array.isArray(matchIndices) && matchIndices.length > 0) {
-            const set = new Set(matchIndices);
-            let html = "";
-            for (let i = 0; i < word.length; i++) {
-                const ch = word[i];
-                if (set.has(i)) {
-                    html += `<span class="plate-letter-highlight">${ch}</span>`;
-                } else {
-                    html += ch;
-                }
-            }
-            wordTd.innerHTML = html;
-        } else {
-            wordTd.textContent = word;
-        }
+        wordTd.textContent = word;
 
         if (gameMode === 'practice' && !practiceTimed) {
             timeTd.textContent = '';
