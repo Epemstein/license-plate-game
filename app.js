@@ -1384,7 +1384,7 @@
         await showCountdown();
 
         startTime = performance.now();
-        timerIntervalId = setInterval(updateTimer, 100);
+        timerIntervalId = setInterval(updateTimer, 10);
         updateProgressDisplay();
 
         if (gameMode === 'daily' || gameMode === 'h2h_challenge') {
