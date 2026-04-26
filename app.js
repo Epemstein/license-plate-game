@@ -2226,7 +2226,6 @@
         gameHistory.push({
             plate, word, skipped: false, thinkingSeconds, penaltySeconds: 0
         });
-        savePracticeStatsLocally();
 
         addToHistoryWithAnimation(
             plate, word, matchIndices, null, diffScore, timeLabel,
@@ -2281,7 +2280,6 @@
         gameHistory.push({
             plate, word: "skipped", skipped: true, thinkingSeconds, penaltySeconds: added
         });
-        savePracticeStatsLocally();
 
         addToHistoryWithAnimation(
             plate, penaltyLabel, null, skipRect, diffScore, timeLabel,
