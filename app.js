@@ -1645,7 +1645,7 @@
         plateTd.classList.add("clickable-plate");
         plateTd.title = "Click to see all viable words";
         plateTd.addEventListener("click", () => {
-            openWordsModal(plate);
+            showViableWordsForPlate(plate);
         });
     }
 
