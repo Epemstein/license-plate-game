@@ -991,5 +991,65 @@
         }
         .music-toggle:hover { opacity: 1; }
 
+        .profile-modal-avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(147, 112, 219, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #9370db;
+        }
+        .profile-modal-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .profile-modal-handle {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        .profile-modal-stats {
+            display: flex;
+            justify-content: space-around;
+            padding: 14px 0;
+            margin: 12px 0;
+            background: #f9fafb;
+            border-radius: 12px;
+        }
+        .profile-modal-stat {
+            text-align: center;
+        }
+        .profile-modal-stat-value {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        .profile-modal-stat-label {
+            font-size: 0.7rem;
+            color: #6b7280;
+        }
+        .profile-modal-challenge-btn {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 24px;
+            background: rgba(147, 112, 219, 0.1);
+            color: #9370db;
+            border: 1px solid rgba(147, 112, 219, 0.25);
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .profile-modal-challenge-btn:hover {
+            background: rgba(147, 112, 219, 0.2);
+        }
+
+        #profileModalBackdrop { z-index: 950; }
         #newChallengeModalBackdrop { z-index: 950; }
         #h2hScorecardModalBackdrop { z-index: 950; }

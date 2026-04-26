@@ -805,7 +805,7 @@
 
                 h += `<div class="lb-row${meClass}" ${clickAttr}>`;
                 h += `<div class="lb-rank">${rankDisplay}</div>`;
-                h += `<div class="lb-name"><span>${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
+                h += `<div class="lb-name"><span onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')" style="cursor:pointer;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
                 h += timeHtml;
                 if (userHasPlayed || isPastDate) {
                     h += `<div class="lb-chevron">&#8250;</div>`;
@@ -3578,6 +3578,94 @@
     }
     window.closeH2HScorecardModal = closeH2HScorecardModal;
     // ========== END HEAD-TO-HEAD FEATURE ==========
+
+    // ========== PROFILE MODAL ==========
+    window.openProfileModal = async function(userId, displayName) {
+        const backdrop = document.getElementById('profileModalBackdrop');
+        const content = document.getElementById('profileModalContent');
+        const title = document.getElementById('profileModalTitle');
+        title.textContent = displayName || 'Profile';
+        content.innerHTML = '<p style="color:#6b7280;">Loading...</p>';
+        backdrop.classList.add('show');
+
+        try {
+            // Fetch profile
+            const { data: profile } = await sb.from('profiles').select('id, display_name, handle').eq('id', userId).single();
+            const name = profile?.display_name || displayName || 'Player';
+            const handle = profile?.handle;
+            const initials = name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+            // Fetch stats
+            const { data: history } = await sb.from('daily_runs').select('date, total_seconds').eq('user_id', userId).not('total_seconds', 'is', null);
+            const dailies = history ? history.length : 0;
+            const avgTime = dailies > 0 ? (history.reduce((s, r) => s + r.total_seconds, 0) / dailies) : 0;
+
+            // Fetch overall stats
+            let beatPct = '--';
+            let overallPct = '--';
+            try {
+                const { data: stats } = await sb.rpc('user_overall_stats', { p_user_id: userId });
+                if (stats && stats.length > 0) {
+                    const s = stats[0];
+                    if (s.ratio != null) beatPct = (s.ratio * 100).toFixed(1) + '%';
+                    if (s.percentile_rank != null) overallPct = 'Top ' + Math.max(1, Math.round(100 - s.percentile_rank)) + '%';
+                }
+            } catch (e) { console.warn('Stats error:', e); }
+
+            // Fetch friend count
+            let friendCount = 0;
+            try {
+                const { data: friends } = await sb.from('friendships').select('id').or(`user_a.eq.${userId},user_b.eq.${userId}`).eq('status', 'accepted');
+                friendCount = friends ? friends.length : 0;
+            } catch (e) {}
+
+            // Fetch streak
+            let streak = 0;
+            if (history && history.length > 0) {
+                const dates = new Set(history.map(r => r.date));
+                const today = new Date();
+                const fmt = d => d.toISOString().split('T')[0];
+                let check = new Date(today);
+                check.setHours(0,0,0,0);
+                if (!dates.has(fmt(check))) {
+                    check.setDate(check.getDate() - 1);
+                }
+                while (dates.has(fmt(check))) {
+                    streak++;
+                    check.setDate(check.getDate() - 1);
+                }
+            }
+
+            const isSelf = currentUser && currentUser.id === userId;
+            const streakHtml = streak >= 3 ? `<span style="margin-left:8px;">🔥 ${streak}</span>` : '';
+
+            let html = '';
+            html += `<div class="profile-modal-avatar">${initials}</div>`;
+            html += `<div class="profile-modal-name">${name}${streakHtml}</div>`;
+            if (handle) html += `<div class="profile-modal-handle">@${handle}</div>`;
+
+            html += '<div class="profile-modal-stats">';
+            html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value" style="color:#d97706;">${dailies}</div><div class="profile-modal-stat-label">dailies</div></div>`;
+            html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value" style="color:#2563eb;">${avgTime > 0 ? avgTime.toFixed(1) : '--'}</div><div class="profile-modal-stat-label">avg time</div></div>`;
+            html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value" style="color:#16a34a;">${beatPct}</div><div class="profile-modal-stat-label">beat</div></div>`;
+            html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value" style="color:#9370db;">${overallPct}</div><div class="profile-modal-stat-label">overall</div></div>`;
+            html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value">${friendCount}</div><div class="profile-modal-stat-label">friends</div></div>`;
+            html += '</div>';
+
+            if (!isSelf) {
+                html += `<button class="profile-modal-challenge-btn" onclick="closeProfileModal();selectedFriendId='${userId}';openNewChallengeModal();">⚔ Challenge</button>`;
+            }
+
+            content.innerHTML = html;
+        } catch (e) {
+            console.error('Profile modal error:', e);
+            content.innerHTML = '<p style="color:#dc2626;">Error loading profile</p>';
+        }
+    };
+
+    window.closeProfileModal = function() {
+        document.getElementById('profileModalBackdrop').classList.remove('show');
+    };
 
     loadDictionary();
     loadDifficulty();
