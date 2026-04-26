@@ -896,25 +896,30 @@
     // Sound effects & music
     let sfxEnabled = localStorage.getItem('sfxEnabled') !== 'false';
     let musicEnabled = localStorage.getItem('musicEnabled') !== 'false';
-    const sfxCorrect = new Audio('correct.mp3');
-    const sfxWrong = new Audio('wrong.mp3');
-    const sfxSkip = new Audio('skip.mp3');
-    const bgMusic = new Audio('Klezmer.mp3');
-    bgMusic.loop = true;
-    bgMusic.volume = 0.3;
-    function playSFX(audio) { if (sfxEnabled) { audio.currentTime = 0; audio.play().catch(()=>{}); } }
-    function startMusic() { if (musicEnabled) bgMusic.play().catch(()=>{}); }
-    function stopMusic() { bgMusic.pause(); }
+    let sfxCorrect, sfxWrong, sfxSkip, bgMusic;
+    function initAudio() {
+        if (sfxCorrect) return;
+        sfxCorrect = new Audio('correct.mp3');
+        sfxWrong = new Audio('wrong.mp3');
+        sfxSkip = new Audio('skip.mp3');
+        bgMusic = new Audio('Klezmer.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.3;
+    }
+    function playSFX(audio) { if (sfxEnabled && audio) { audio.currentTime = 0; audio.play().catch(()=>{}); } }
+    function startMusic() { initAudio(); if (musicEnabled && bgMusic) bgMusic.play().catch(()=>{}); }
+    function stopMusic() { if (bgMusic) bgMusic.pause(); }
     window.toggleMusic = function() {
+        initAudio();
         musicEnabled = !musicEnabled;
         localStorage.setItem('musicEnabled', musicEnabled);
         const btn = document.getElementById('musicToggleBtn');
         if (musicEnabled) {
             btn.textContent = '\u{1F50A}';
-            bgMusic.play().catch(()=>{});
+            if (bgMusic) bgMusic.play().catch(()=>{});
         } else {
             btn.textContent = '\u{1F507}';
-            bgMusic.pause();
+            if (bgMusic) bgMusic.pause();
         }
     };
     // Set initial icon
@@ -1458,7 +1463,7 @@
         await showCountdown();
 
         startTime = performance.now();
-        timerIntervalId = setInterval(updateTimer, 10);
+        timerIntervalId = setInterval(updateTimer, 50);
         updateProgressDisplay();
 
         if (gameMode === 'daily' || gameMode === 'h2h_challenge') {
