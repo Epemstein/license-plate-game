@@ -1651,7 +1651,7 @@
     }
 
     async function submitPracticePlateStats() {
-        if (!currentUser || solvedCount < 10) return;
+        if (!currentUser || gameHistory.length === 0) return;
         try {
             const rows = gameHistory.map(entry => ({
                 user_id: currentUser.id,
