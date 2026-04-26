@@ -2769,6 +2769,25 @@
             gameMode = 'practice';
             dailyPlateSequence = null;
 
+            // Reset game state from any previous game
+            if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+            resetGameState();
+            stopMusic();
+            window.onbeforeunload = null;
+
+            // Clear UI
+            plateEl.textContent = '---';
+            resultEl.textContent = '';
+            while (historyBodyEl.firstChild) historyBodyEl.removeChild(historyBodyEl.firstChild);
+            historyEmptyEl.style.display = 'block';
+            timerDisplayEl.textContent = 'Time: 0.00 s';
+            progressDisplayEl.textContent = 'Solved: 0 / 10';
+            wordInputEl.value = '';
+            wordInputEl.disabled = false;
+            wordInputEl.readOnly = false;
+            checkButtonEl.disabled = false;
+            skipButtonEl.disabled = false;
+
             const mi = document.getElementById('modeIndicator');
             const timedLabel = practiceTimed ? '' : ' | UNTIMED';
             mi.textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
@@ -2779,6 +2798,12 @@
             const startBtn = document.getElementById('startButton');
             startBtn.textContent = 'Start Game';
             startBtn.style.display = 'inline-block';
+            startBtn.disabled = false;
+            startBtn.style.opacity = '1';
+            startBtn.style.cursor = 'pointer';
+
+            document.getElementById('dailyChallengeBtn').disabled = false;
+            document.getElementById('dailyChallengeBtn').style.opacity = '1';
         });
 
         // Practice settings
