@@ -284,6 +284,7 @@
             document.getElementById('userName').textContent = session.user.email || 'Player';
             updateProfileTab();
             updateDailyBtnState();
+            submitPendingPracticeStats();
 
             // Check if there's a challenge ID in the URL
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
@@ -1650,6 +1651,16 @@
         }
     }
 
+    function savePracticeStatsLocally() {
+        if (gameMode !== 'practice' || gameHistory.length === 0) return;
+        const data = gameHistory.map(entry => ({
+            plate: entry.plate,
+            skipped: entry.skipped || false,
+            thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100
+        }));
+        localStorage.setItem('pendingPracticeStats', JSON.stringify(data));
+    }
+
     async function submitPracticePlateStats() {
         if (!currentUser || gameHistory.length === 0) return;
         try {
@@ -1661,8 +1672,30 @@
             }));
             await sb.from('practice_plate_stats').insert(rows);
             console.log('[Practice] Submitted', rows.length, 'plate stats');
+            localStorage.removeItem('pendingPracticeStats');
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
+        }
+    }
+
+    async function submitPendingPracticeStats() {
+        if (!currentUser) return;
+        const saved = localStorage.getItem('pendingPracticeStats');
+        if (!saved) return;
+        try {
+            const data = JSON.parse(saved);
+            if (!data || data.length === 0) return;
+            const rows = data.map(entry => ({
+                user_id: currentUser.id,
+                plate: entry.plate,
+                skipped: entry.skipped,
+                thinking_seconds: entry.thinking_seconds
+            }));
+            await sb.from('practice_plate_stats').insert(rows);
+            console.log('[Practice] Submitted', rows.length, 'pending plate stats from previous session');
+            localStorage.removeItem('pendingPracticeStats');
+        } catch (e) {
+            console.warn('[Practice] Pending stats error:', e);
         }
     }
 
@@ -2173,6 +2206,7 @@
         gameHistory.push({
             plate, word, skipped: false, thinkingSeconds, penaltySeconds: 0
         });
+        savePracticeStatsLocally();
 
         addToHistoryWithAnimation(
             plate, word, matchIndices, null, diffScore, timeLabel,
@@ -2227,6 +2261,7 @@
         gameHistory.push({
             plate, word: "skipped", skipped: true, thinkingSeconds, penaltySeconds: added
         });
+        savePracticeStatsLocally();
 
         addToHistoryWithAnimation(
             plate, penaltyLabel, null, skipRect, diffScore, timeLabel,
@@ -3789,13 +3824,6 @@
     window.closeProfileModal = function() {
         document.getElementById('profileModalBackdrop').classList.remove('show');
     };
-
-    // Submit practice stats when tab is hidden or closed
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden' && gameMode === 'practice' && gameStarted && !gameOver && gameHistory.length > 0) {
-            submitPracticePlateStats();
-        }
-    });
 
     loadDictionary();
     loadDifficulty();
