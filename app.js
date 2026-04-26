@@ -315,40 +315,28 @@
         const rng = seededRandom(seed);
         if (!platesReady || !ALL_PLATES.length) return [];
 
+        // Daily uses difficulty=50 weights (same as iOS)
+        const weights = weightsForDifficulty(50);
         const dailyPlates = [];
-        const usedPlates = new Set();
+        const used = new Set();
 
-        while (dailyPlates.length < 200 && usedPlates.size < ALL_PLATES.length) {
+        while (dailyPlates.length < 200 && used.size < ALL_PLATES.length) {
             const r = rng();
-            let band;
-            if (r < 0.40) band = "very_easy";
-            else if (r < 0.60) band = "easy";
-            else if (r < 0.75) band = "medium";
-            else if (r < 0.90) band = "difficult";
-            else if (r < 0.95) band = "hard";
-            else if (r < 0.98) band = "very_hard";
-            else band = "impossible";
+            let threshold = 0;
+            let bandIdx = 0;
+            for (let b = 0; b < weights.length; b++) {
+                threshold += weights[b];
+                if (r < threshold) { bandIdx = b; break; }
+            }
+            const bandName = H2H_BAND_NAMES_ORDERED[bandIdx];
+            const pool = getBandPool(bandName);
+            const remaining = pool.filter(p => !used.has(p));
 
-            const bandPlates = ALL_PLATES.filter(plate => {
-                if (usedPlates.has(plate)) return false;
-                const diff = PLATE_DIFFICULTY && PLATE_DIFFICULTY[plate] ? PLATE_DIFFICULTY[plate].difficulty : null;
-                if (!diff) return false;
-
-                if (band === "very_easy" && diff >= 0 && diff <= 10) return true;
-                if (band === "easy" && diff >= 11 && diff <= 34) return true;
-                if (band === "medium" && diff >= 35 && diff <= 49) return true;
-                if (band === "difficult" && diff >= 50 && diff <= 79) return true;
-                if (band === "hard" && diff >= 80 && diff <= 88) return true;
-                if (band === "very_hard" && diff >= 89 && diff <= 96) return true;
-                if (band === "impossible" && diff >= 97 && diff <= 100) return true;
-                return false;
-            });
-
-            if (bandPlates.length > 0) {
-                const idx = Math.floor(rng() * bandPlates.length);
-                const chosen = bandPlates[idx];
+            if (remaining.length > 0) {
+                const idx = Math.floor(rng() * remaining.length);
+                const chosen = remaining[idx];
                 dailyPlates.push(chosen);
-                usedPlates.add(chosen);
+                used.add(chosen);
             }
         }
 
