@@ -2690,14 +2690,17 @@
 
         document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
             console.log('Daily Challenge clicked!');
+            console.log('State:', { platesReady, dictionaryReady, allPlates: ALL_PLATES?.length, currentUser: !!currentUser });
 
             if (!platesReady || !dictionaryReady || !ALL_PLATES || ALL_PLATES.length === 0) {
                 alert('Game data is still loading... Please wait a moment and try again.');
+                console.log('Blocked: data not ready');
                 return;
             }
 
-            if (!currentUser && !await signInWithApple()) return;
+            if (!currentUser && !await signInWithApple()) { console.log('Blocked: no user'); return; }
 
+            console.log('Checking if played today...');
             if (await checkIfPlayedToday()) {
                 alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
                 return;
