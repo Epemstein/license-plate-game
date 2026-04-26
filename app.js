@@ -2764,6 +2764,7 @@
     // ========== HEAD-TO-HEAD FEATURE ==========
     let currentChallengeId = null;
     let currentH2HRunId = null;
+    let currentH2HDifficulty = 50;
     let challengeStartTime = null;
     let pendingOpponent = null;
     let h2hChallengesCache = [];
@@ -2883,7 +2884,7 @@
             renderChallengesList();
         } catch (e) {
             console.error('Error loading challenges:', e);
-            contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;padding:20px;">Error loading challenges</p>';
+            contentEl.innerHTML = `<p style="text-align:center;color:#dc2626;padding:20px;">Error loading challenges: ${e.message || e}</p>`;
         }
     }
 
@@ -3251,11 +3252,13 @@
             document.getElementById('dailyChallengeBtn').disabled = true;
             document.getElementById('dailyChallengeBtn').style.opacity = '0.5';
 
+            currentH2HDifficulty = challenge.difficulty || 50;
+
             const mi = document.getElementById('modeIndicator');
             mi.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;">
-                    <span>H2H Challenge vs ${oppName}</span>
-                    <button onclick="cancelPendingChallenge()" style="padding:6px 12px;background:#6b7280;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Back</button>
+                    <span>H2H vs ${oppName} | Diff ${currentH2HDifficulty}</span>
+                    <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
                 </div>
             `;
             mi.style.background = '#fef3c7';
@@ -3277,6 +3280,46 @@
         }
     }
     window.playH2HChallenge = playH2HChallenge;
+
+    window.forfeitH2H = async function() {
+        if (!currentH2HRunId) return;
+        if (!confirm('Are you sure you want to forfeit this challenge?')) return;
+
+        try {
+            const entries = gameHistory.map((entry, idx) => ({
+                plate_index: idx,
+                plate: entry.plate,
+                word: entry.word || null,
+                skipped: entry.skipped || false,
+                thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100,
+                penalty_seconds: entry.penaltySeconds || 0
+            }));
+
+            const totalSeconds = startTime
+                ? Math.floor(((performance.now() - startTime) / 1000 + penaltySeconds) * 100) / 100
+                : 0.01;
+
+            await sb.rpc('submit_h2h_run', {
+                p_run_id: currentH2HRunId,
+                p_total_seconds: totalSeconds,
+                p_entries: entries
+            });
+        } catch (e) {
+            console.error('Forfeit error:', e);
+        }
+
+        currentChallengeId = null;
+        currentH2HRunId = null;
+        gameMode = 'practice';
+        if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+        gameStarted = false;
+        gameOver = true;
+        stopMusic();
+        window.onbeforeunload = null;
+        resetGameState();
+        switchTab('challenges');
+        loadH2HChallenges();
+    };
 
     window.cancelPendingChallenge = function() {
         pendingOpponent = null;
