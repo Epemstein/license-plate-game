@@ -1563,6 +1563,10 @@
     }
 
     async function startOrRestartFromMain() {
+        // Submit practice stats from previous run before restarting
+        if (gameMode === 'practice' && gameHistory.length > 0) {
+            submitPracticePlateStats();
+        }
         unlockAudio();
         document.getElementById('practiceSettings').style.display = 'none';
         document.getElementById('practiceSettingsBtn').style.display = 'none';
