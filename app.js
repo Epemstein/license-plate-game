@@ -2963,8 +2963,8 @@
                 const myRun = ch._runs && ch._runs[currentUser.id];
                 const oppId = isChallenger ? ch.opponent_id : ch.challenger_id;
                 const oppRun = ch._runs && ch._runs[oppId];
-                const myScore = myRun ? myRun.totalSeconds.toFixed(2) + 's' : 'Not played';
-                const oppScore = oppRun ? oppRun.totalSeconds.toFixed(2) + 's' : 'TBD';
+                const myScore = myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(2) + 's' : (myRun ? 'In progress' : 'Not played');
+                const oppScore = oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(2) + 's' : 'TBD';
 
                 const canPlay = !myRun && ch.status === 'accepted';
                 html += `<div class="challenge-row" onclick="${canPlay ? `playH2HChallenge('${ch.id}')` : `viewH2HScorecard('${ch.id}')`}">`;
