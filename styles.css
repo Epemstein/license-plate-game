@@ -976,5 +976,20 @@
             background: #f9fafb;
         }
 
+        .music-toggle {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: none;
+            border: none;
+            font-size: 1.3rem;
+            cursor: pointer;
+            opacity: 0.6;
+            padding: 4px 6px;
+            border-radius: 6px;
+            transition: opacity 0.2s;
+        }
+        .music-toggle:hover { opacity: 1; }
+
         #newChallengeModalBackdrop { z-index: 950; }
         #h2hScorecardModalBackdrop { z-index: 950; }

@@ -902,6 +902,23 @@
     function playSFX(audio) { if (sfxEnabled) { audio.currentTime = 0; audio.play().catch(()=>{}); } }
     function startMusic() { if (musicEnabled) bgMusic.play().catch(()=>{}); }
     function stopMusic() { bgMusic.pause(); }
+    window.toggleMusic = function() {
+        musicEnabled = !musicEnabled;
+        localStorage.setItem('musicEnabled', musicEnabled);
+        const btn = document.getElementById('musicToggleBtn');
+        if (musicEnabled) {
+            btn.textContent = '\u{1F50A}';
+            bgMusic.play().catch(()=>{});
+        } else {
+            btn.textContent = '\u{1F507}';
+            bgMusic.pause();
+        }
+    };
+    // Set initial icon
+    setTimeout(() => {
+        const btn = document.getElementById('musicToggleBtn');
+        if (btn) btn.textContent = musicEnabled ? '\u{1F50A}' : '\u{1F507}';
+    }, 0);
 
     let gameStarted = false;
     let gameOver = false;
