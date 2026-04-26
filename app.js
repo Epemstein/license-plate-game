@@ -930,7 +930,15 @@
         source.start(0);
     }
 
-    function startMusic() { initAudio(); if (musicEnabled && bgMusic) bgMusic.play().catch(()=>{}); }
+    function startMusic() {
+        if (!musicEnabled) return;
+        if (!bgMusic) {
+            bgMusic = new Audio('Klezmer.mp3');
+            bgMusic.loop = true;
+            bgMusic.volume = 0.3;
+        }
+        bgMusic.play().catch(()=>{});
+    }
     function stopMusic() { if (bgMusic) bgMusic.pause(); }
     window.toggleMusic = function() {
         initAudio();
@@ -1472,7 +1480,6 @@
         resetGameState();
         gameStarted = true;
         gameOver = false;
-        startMusic();
 
         // Scroll to plate on mobile
         if (window.innerWidth <= 768) {
@@ -1575,6 +1582,7 @@
 
     async function startOrRestartFromMain() {
         unlockAudio();
+        startMusic();
         const ready = dictionaryReady && difficultyReady && platesReady;
         if (!ready) {
             resultEl.textContent = "Still loading\u2026";
