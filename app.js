@@ -2704,13 +2704,17 @@
             if (!currentUser && !await signInWithApple()) { console.log('Blocked: no user'); return; }
 
             console.log('Checking if played today...');
-            if (await checkIfPlayedToday()) {
+            const alreadyPlayed = await checkIfPlayedToday();
+            console.log('Already played:', alreadyPlayed);
+            if (alreadyPlayed) {
                 alert('You already played today\'s challenge! Come back tomorrow, or try Practice Mode.');
                 return;
             }
 
+            console.log('Generating daily plates...');
             gameMode = 'daily';
             dailyPlateSequence = generateDailyPlates(getTodayString());
+            console.log('Plates generated:', dailyPlateSequence?.length);
 
             // Update mode indicator
             const mi = document.getElementById('modeIndicator');
