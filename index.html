@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v29</title>
-    <link rel="stylesheet" href="styles.css?v=29">
+    <title>License Plate Game v30</title>
+    <link rel="stylesheet" href="styles.css?v=30">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -18,6 +18,7 @@
 <div class="tab-bar">
     <button class="tab-bar-item active" onclick="switchTab('game')">Game</button>
     <button class="tab-bar-item" onclick="switchTab('leaderboard')">Leaderboard</button>
+    <button class="tab-bar-item" onclick="switchTab('challenges')">Challenges</button>
     <button class="tab-bar-item" onclick="switchTab('profile')">Profile</button>
 </div>
 
@@ -167,6 +168,24 @@
     <button id="loadLeaderboardBtn" style="display:none;"></button>
 </div>
 
+<!-- ===== CHALLENGES TAB ===== -->
+<div id="challengesTab" class="tab-content">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h2 style="margin:0;font-size:1.3rem;font-weight:800;">Challenges</h2>
+        <button id="newChallengeBtn" onclick="openNewChallengeModal()" style="padding:10px 20px;background:#9370db;color:white;border:none;border-radius:10px;font-weight:600;font-size:0.95rem;cursor:pointer;">+ New Challenge</button>
+    </div>
+
+    <div class="segmented-control" id="challengeSegmented">
+        <button class="active" id="chTabIncoming" onclick="switchChallengeTab('incoming')">Incoming</button>
+        <button id="chTabPending" onclick="switchChallengeTab('pending')">Pending</button>
+        <button id="chTabResults" onclick="switchChallengeTab('results')">Results</button>
+    </div>
+
+    <div id="challengesContent" style="min-height:120px;">
+        <p style="text-align:center;color:#6b7280;padding:20px;">Sign in to view challenges</p>
+    </div>
+</div>
+
 <!-- ===== PROFILE TAB ===== -->
 <div id="profileTab" class="tab-content">
     <div class="profile-card" id="profileContent">
@@ -304,46 +323,47 @@
     </div>
 </div>
 
-<!-- MODAL: Select Opponent for H2H Challenge (kept for JS compat) -->
-<div id="opponentModalBackdrop" class="modal-backdrop">
+<!-- MODAL: New Challenge -->
+<div id="newChallengeModalBackdrop" class="modal-backdrop" onclick="if(event.target.id==='newChallengeModalBackdrop')closeNewChallengeModal()">
     <div class="modal" style="max-width:500px;">
         <div class="modal-header" style="background:#9370db;">
-            <div class="modal-title">Select Opponent</div>
-            <button class="modal-close-btn" id="opponentModalCloseBtn" aria-label="Close">&times;</button>
+            <div class="modal-title" style="color:#fff;">New Challenge</div>
+            <button class="modal-close-btn" onclick="closeNewChallengeModal()" style="color:#fff;">&times;</button>
         </div>
         <div class="modal-body">
-            <input type="text" id="opponentSearchInput" placeholder="Search by name..." style="width:100%;padding:10px;margin-bottom:16px;border:2px solid #e5e7eb;border-radius:6px;font-size:15px;box-sizing:border-box;" />
-            <div id="opponentList" style="max-height:300px;overflow-y:auto;"></div>
+            <div style="margin-bottom:16px;">
+                <label style="font-weight:600;font-size:0.9rem;margin-bottom:6px;display:block;">Select Friend</label>
+                <input type="text" id="friendSearchInput" placeholder="Search friends..." style="width:100%;padding:10px;border:2px solid #e5e7eb;border-radius:8px;font-size:15px;box-sizing:border-box;margin-bottom:8px;" oninput="filterFriendsList()" />
+                <div id="friendsList" style="max-height:200px;overflow-y:auto;"></div>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="font-weight:600;font-size:0.9rem;margin-bottom:6px;display:block;">Difficulty: <strong id="challengeDiffValue">50</strong></label>
+                <input type="range" id="challengeDiffSlider" min="0" max="100" value="50" class="difficulty-slider" style="width:100%;" oninput="document.getElementById('challengeDiffValue').textContent=this.value;updateChallengeDiffLabel(parseInt(this.value));" />
+                <div id="challengeDiffLabel" class="difficulty-label">Normal plates</div>
+            </div>
+            <button id="sendChallengeBtn" onclick="sendChallenge()" disabled style="width:100%;padding:14px;background:#9370db;color:white;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;opacity:0.5;">Send Challenge</button>
         </div>
     </div>
 </div>
 
-<!-- MODAL: H2H Challenge Comparison (kept for JS compat) -->
-<div id="h2hComparisonModalBackdrop" class="modal-backdrop">
-    <div class="modal" style="max-width:900px;">
+<!-- MODAL: H2H Scorecard -->
+<div id="h2hScorecardModalBackdrop" class="modal-backdrop" onclick="if(event.target.id==='h2hScorecardModalBackdrop')closeH2HScorecardModal()">
+    <div class="modal" style="max-width:700px;">
         <div class="modal-header" style="background:#9370db;">
-            <div class="modal-title" id="h2hComparisonTitle">H2H Challenge</div>
-            <button class="modal-close-btn" id="h2hComparisonCloseBtn" aria-label="Close">&times;</button>
+            <div class="modal-title" style="color:#fff;" id="h2hScorecardTitle">Challenge Scorecard</div>
+            <button class="modal-close-btn" onclick="closeH2HScorecardModal()" style="color:#fff;">&times;</button>
         </div>
-        <div class="modal-body" style="padding:20px;">
-            <div id="h2hComparisonContent"></div>
+        <div class="modal-body" style="padding:16px;">
+            <div id="h2hScorecardContent"></div>
         </div>
     </div>
-</div>
-
-<!-- Hidden H2H elements for JS compat -->
-<div style="display:none;">
-    <div id="h2hNotificationBadge"></div>
-    <div id="incomingChallenges"></div>
-    <div id="outgoingChallenges"></div>
-    <div id="h2hResults"></div>
 </div>
 
 <footer style="text-align:center;padding:20px;margin-top:40px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:0.9rem;">
     &copy; 2026 Ezra Pemstein. All rights reserved.
 </footer>
 
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 
 </body>
 </html>

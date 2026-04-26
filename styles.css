@@ -818,3 +818,163 @@
         .toggle-switch input:checked + .toggle-slider:before {
             transform: translateX(20px);
         }
+
+        /* ===== CHALLENGES TAB ===== */
+        .challenge-row {
+            display: flex;
+            align-items: center;
+            padding: 14px;
+            border-bottom: 1px solid #f3f4f6;
+            border-radius: 10px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .challenge-row:hover { background: #f9fafb; }
+        .challenge-row .ch-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .challenge-row .ch-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #1f2937;
+        }
+        .challenge-row .ch-meta {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+        .challenge-row .ch-scores {
+            text-align: right;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        .challenge-row .ch-chevron {
+            color: #9ca3af;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .challenge-row .ch-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .ch-accept-btn {
+            padding: 8px 16px;
+            background: #16a34a;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .ch-accept-btn:hover { filter: brightness(0.9); }
+        .ch-decline-btn {
+            padding: 8px 16px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .ch-decline-btn:hover { filter: brightness(0.9); }
+        .ch-win { color: #16a34a; font-weight: 700; }
+        .ch-loss { color: #ef4444; font-weight: 700; }
+        .ch-tie { color: #f59e0b; font-weight: 700; }
+        .ch-tbd { color: #6b7280; font-style: italic; }
+
+        /* Friend list items in new challenge modal */
+        .friend-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .friend-item:hover { background: #f3f4f6; }
+        .friend-item.selected {
+            background: #f3e8ff;
+            border: 2px solid #9370db;
+        }
+        .friend-item .friend-name {
+            flex: 1;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .friend-item .friend-handle {
+            font-size: 0.85rem;
+            color: #9370db;
+        }
+
+        /* H2H Scorecard */
+        .scorecard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        .scorecard-player {
+            text-align: center;
+            flex: 1;
+        }
+        .scorecard-player-name {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        .scorecard-player-time {
+            font-size: 1.3rem;
+            font-weight: 800;
+        }
+        .scorecard-vs {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #9ca3af;
+            padding: 0 16px;
+        }
+        .scorecard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .scorecard-table th {
+            background: #f3f4f6;
+            padding: 8px 6px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+        .scorecard-table td {
+            padding: 8px 6px;
+            text-align: center;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .scorecard-table td.sc-skip {
+            background: #1f2937;
+            color: #ffffff;
+        }
+        .scorecard-table td.sc-plate {
+            font-weight: 700;
+            color: #374151;
+            cursor: pointer;
+        }
+        .scorecard-table td.sc-plate:hover {
+            color: #9370db;
+        }
+        .scorecard-table tr.sc-total td {
+            font-weight: 700;
+            border-top: 2px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        #newChallengeModalBackdrop { z-index: 950; }
+        #h2hScorecardModalBackdrop { z-index: 950; }
