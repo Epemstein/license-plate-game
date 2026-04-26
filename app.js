@@ -2835,7 +2835,10 @@
             }
         });
 
-        document.getElementById('practiceBtn').addEventListener('click', () => {
+        document.getElementById('practiceBtn').addEventListener('click', async () => {
+            if (!currentUser) {
+                if (!await signInWithApple()) return;
+            }
             // Submit practice stats from previous run
             if (gameMode === 'practice' && gameHistory.length > 0) {
                 submitPracticePlateStats();
