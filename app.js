@@ -2760,6 +2760,9 @@
         startBtn.style.cursor = 'pointer';
 
         document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
+            if (gameMode === 'practice' && gameHistory.length > 0) {
+                submitPracticePlateStats();
+            }
             unlockAudio();
             console.log('Daily Challenge clicked!');
             console.log('State:', { platesReady, dictionaryReady, allPlates: ALL_PLATES?.length, currentUser: !!currentUser });
@@ -2819,6 +2822,10 @@
         });
 
         document.getElementById('practiceBtn').addEventListener('click', () => {
+            // Submit practice stats from previous run
+            if (gameMode === 'practice' && gameHistory.length > 0) {
+                submitPracticePlateStats();
+            }
             gameMode = 'practice';
             dailyPlateSequence = null;
             document.getElementById('practiceSettingsBtn').style.display = '';
@@ -3828,6 +3835,13 @@
     window.closeProfileModal = function() {
         document.getElementById('profileModalBackdrop').classList.remove('show');
     };
+
+    // Save practice stats on page unload (refresh/close)
+    window.addEventListener('beforeunload', () => {
+        if (gameMode === 'practice' && gameStarted && !gameOver && gameHistory.length > 0) {
+            savePracticeStatsLocally();
+        }
+    });
 
     loadDictionary();
     loadDifficulty();
