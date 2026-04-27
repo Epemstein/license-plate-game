@@ -1684,7 +1684,8 @@
         const data = gameHistory.map(entry => ({
             plate: entry.plate,
             skipped: entry.skipped || false,
-            thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100
+            thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100,
+            word: entry.skipped ? null : (entry.word || null)
         }));
         localStorage.setItem('pendingPracticeStats', JSON.stringify(data));
     }
@@ -1705,7 +1706,8 @@
                 user_id: currentUser.id,
                 plate: entry.plate,
                 skipped: entry.skipped || false,
-                thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100
+                thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100,
+                word: entry.skipped ? null : (entry.word || null)
             }));
             await sb.from('practice_plate_stats').insert(rows);
             console.log('[Practice] Submitted', rows.length, 'plate stats');
@@ -1729,7 +1731,8 @@
                 user_id: currentUser.id,
                 plate: entry.plate,
                 skipped: entry.skipped,
-                thinking_seconds: entry.thinking_seconds
+                thinking_seconds: entry.thinking_seconds,
+                word: entry.word || null
             }));
             await sb.from('practice_plate_stats').insert(rows);
             console.log('[Practice] Submitted', rows.length, 'pending plate stats from previous session');
