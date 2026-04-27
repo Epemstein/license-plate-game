@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v79</title>
-    <link rel="stylesheet" href="styles.css?v=79">
+    <title>License Plate Game v80</title>
+    <link rel="stylesheet" href="styles.css?v=80">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -151,18 +151,9 @@
         <p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>
     </div>
 
-    <!-- Compare Runs Button -->
-    <div id="compareRunsContainer" style="margin-top:16px;text-align:center;display:block;">
-        <button id="compareRunsBtn" onclick="toggleCompareTable()" style="padding:12px 24px;font-size:1rem;background:#9370db;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;">
-            Compare All Runs
-        </button>
-    </div>
-
-    <!-- Comparison Table -->
-    <div id="comparisonTableContainer" style="margin-top:16px;background:white;padding:16px;border-radius:14px;display:none;overflow-x:auto;">
-        <h3 style="margin-top:0;">Run Comparison</h3>
-        <div id="comparisonTable"></div>
-    </div>
+    <!-- Compare Runs (hidden) -->
+    <div id="compareRunsContainer" style="display:none;"></div>
+    <div id="comparisonTableContainer" style="display:none;"><div id="comparisonTable"></div></div>
 
     <!-- Hidden today button for JS compat -->
     <button id="todayLeaderboardBtn" style="display:none;" onclick="loadTodayScores()"></button>
@@ -379,7 +370,7 @@
     &copy; 2026 Ezra Pemstein. All rights reserved.
 </footer>
 
-<script src="app.js?v=79"></script>
+<script src="app.js?v=80"></script>
 
 </body>
 </html>

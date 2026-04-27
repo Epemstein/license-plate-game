@@ -2861,10 +2861,11 @@
             if (!currentUser) {
                 if (!await signInWithApple()) return;
             }
-            // Submit practice stats from previous run
-            if (gameMode === 'practice' && gameHistory.length > 0) {
+            // Submit practice stats from previous run (not H2H)
+            if (gameMode === 'practice' && gameHistory.length > 0 && !practiceStatsSubmitted) {
                 submitPracticePlateStats();
             }
+            practiceStatsSubmitted = false;
             gameMode = 'practice';
             dailyPlateSequence = null;
             document.getElementById('practiceSettingsBtn').style.display = '';
@@ -3388,6 +3389,12 @@
             alert('Please sign in to play challenges');
             return;
         }
+
+        // Reset any previous game state
+        if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+        resetGameState();
+        gameOver = false;
+        gameStarted = false;
 
         try {
             // Fetch challenge data
