@@ -3044,14 +3044,16 @@
             if (challengeIds.length > 0) {
                 const { data: runs } = await sb
                     .from('h2h_runs')
-                    .select('id, challenge_id, user_id, total_seconds')
+                    .select('id, challenge_id, user_id, total_seconds, h2h_run_entries(id, skipped)')
                     .in('challenge_id', challengeIds);
                 if (runs) {
                     runs.forEach(r => {
                         const ch = h2hChallengesCache.find(c => c.id === r.challenge_id);
                         if (ch) {
                             if (!ch._runs) ch._runs = {};
-                            ch._runs[r.user_id] = { runId: r.id, totalSeconds: r.total_seconds };
+                            const solvedCount = (r.h2h_run_entries || []).filter(e => !e.skipped).length;
+                            const forfeited = r.total_seconds !== null && solvedCount < 10;
+                            ch._runs[r.user_id] = { runId: r.id, totalSeconds: r.total_seconds, forfeited };
                         }
                     });
                 }
@@ -3139,8 +3141,8 @@
                 const myRun = ch._runs && ch._runs[currentUser.id];
                 const oppId = isChallenger ? ch.opponent_id : ch.challenger_id;
                 const oppRun = ch._runs && ch._runs[oppId];
-                const myScore = myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(2) + 's' : (myRun ? 'In progress' : 'Not played');
-                const oppScore = oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(2) + 's' : 'TBD';
+                const myScore = myRun && myRun.forfeited ? 'Forfeit' : (myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(2) + 's' : (myRun ? 'In progress' : 'Not played'));
+                const oppScore = oppRun && oppRun.forfeited ? 'Forfeit' : (oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(2) + 's' : 'TBD');
 
                 const canPlay = !myRun && ch.status === 'accepted';
                 html += `<div class="challenge-row" onclick="${canPlay ? `playH2HChallenge('${ch.id}')` : `viewH2HScorecard('${ch.id}')`}">`;
@@ -3160,14 +3162,22 @@
                 const oppRun = ch._runs && ch._runs[oppId];
                 const myTime = myRun ? myRun.totalSeconds : null;
                 const oppTime = oppRun ? oppRun.totalSeconds : null;
+                const myForfeit = myRun && myRun.forfeited;
+                const oppForfeit = oppRun && oppRun.forfeited;
 
                 let resultIcon = '';
                 let resultClass = '';
-                if (myTime !== null && oppTime !== null) {
+                if (myForfeit && oppForfeit) { resultIcon = ''; resultClass = ''; }
+                else if (myForfeit) { resultIcon = '&#10007;'; resultClass = 'ch-loss'; }
+                else if (oppForfeit) { resultIcon = '&#10003;'; resultClass = 'ch-win'; }
+                else if (myTime !== null && oppTime !== null) {
                     if (myTime < oppTime) { resultIcon = '&#10003;'; resultClass = 'ch-win'; }
                     else if (myTime > oppTime) { resultIcon = '&#10007;'; resultClass = 'ch-loss'; }
                     else { resultIcon = '&#8212;'; resultClass = 'ch-tie'; }
                 }
+
+                const myDisplay = myForfeit ? 'Forfeit' : (myTime !== null ? myTime.toFixed(2) + 's' : '--');
+                const oppDisplay = oppForfeit ? 'Forfeit' : (oppTime !== null ? oppTime.toFixed(2) + 's' : '--');
 
                 html += `<div class="challenge-row" onclick="viewH2HScorecard('${ch.id}')">`;
                 html += `<div class="ch-info">`;
@@ -3175,8 +3185,8 @@
                 html += `<div class="ch-meta">${diffLabel} &middot; ${dateStr}</div>`;
                 html += `</div>`;
                 html += `<div class="ch-scores" style="font-size:0.85rem;">`;
-                html += `<div>You: <strong>${myTime !== null ? myTime.toFixed(2) + 's' : '--'}</strong></div>`;
-                html += `<div>Them: <strong>${oppTime !== null ? oppTime.toFixed(2) + 's' : '--'}</strong></div>`;
+                html += `<div>You: <strong>${myDisplay}</strong></div>`;
+                html += `<div>Them: <strong>${oppDisplay}</strong></div>`;
                 html += `</div>`;
                 html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty || 50})" style="padding:6px 12px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;margin-right:6px;">Rematch</button>`;
                 html += `<div class="ch-chevron">&#8250;</div>`;
