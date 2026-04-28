@@ -3512,6 +3512,8 @@
         currentChallengeId = null;
         currentH2HRunId = null;
         gameMode = 'practice';
+        gameHistory = [];
+        localStorage.removeItem('pendingPracticeStats');
         if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
         gameStarted = false;
         gameOver = true;
@@ -3584,6 +3586,8 @@
         currentH2HRunId = null;
         challengeStartTime = null;
         gameMode = 'practice';
+        gameHistory = [];
+        localStorage.removeItem('pendingPracticeStats');
 
         // Update banner
         const mi = document.getElementById('modeIndicator');
