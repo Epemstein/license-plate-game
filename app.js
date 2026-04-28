@@ -769,6 +769,11 @@
                 }
             }
 
+            // Update tab counts
+            const friendCount = scores.filter(s => s.isFriend || s.isMe).length;
+            document.getElementById('lbGlobalBtn').textContent = `Global (${scores.length})`;
+            document.getElementById('lbFriendsBtn').textContent = `Friends (${friendCount})`;
+
             // Filter by friends if needed
             let displayScores = scores;
             if (leaderboardFilter === 'friends') {
@@ -3123,7 +3128,7 @@
         filtered.forEach(ch => {
             const oppName = getOpponentName(ch);
             const isChallenger = ch.challenger_id === currentUser.id;
-            const diffLabel = getDifficultyLabel(ch.difficulty || 50);
+            const diffLabel = getDifficultyLabel(ch.difficulty ?? 50);
             const dateStr = formatRelativeDate(ch.created_at);
 
             if (h2hActiveSubTab === 'incoming') {
@@ -3188,7 +3193,7 @@
                 html += `<div>You: <strong>${myDisplay}</strong></div>`;
                 html += `<div>Them: <strong>${oppDisplay}</strong></div>`;
                 html += `</div>`;
-                html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty || 50})" style="padding:6px 12px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;margin-right:6px;">Rematch</button>`;
+                html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty ?? 50})" style="padding:6px 12px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;margin-right:6px;">Rematch</button>`;
                 html += `<div class="ch-chevron">&#8250;</div>`;
                 html += `</div>`;
             }
@@ -3467,7 +3472,7 @@
             document.getElementById('dailyChallengeBtn').disabled = true;
             document.getElementById('dailyChallengeBtn').style.opacity = '0.5';
 
-            currentH2HDifficulty = challenge.difficulty || 50;
+            currentH2HDifficulty = challenge.difficulty ?? 50;
 
             const mi = document.getElementById('modeIndicator');
             mi.innerHTML = `
