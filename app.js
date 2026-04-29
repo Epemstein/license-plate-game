@@ -3806,7 +3806,19 @@
             html += `</tr>`;
 
             html += '</tbody></table></div>';
+
+            // Chat section
+            html += '<div style="margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px;">';
+            html += '<div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;">Chat</div>';
+            html += `<div id="h2hChatMessages" style="max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>`;
+            html += '<div style="display:flex;gap:8px;">';
+            html += `<input type="text" id="h2hChatInput" placeholder="Message..." style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.9rem;" onkeydown="if(event.key==='Enter')sendH2HChat('${challengeId}')">`;
+            html += `<button onclick="sendH2HChat('${challengeId}')" style="padding:8px 16px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Send</button>`;
+            html += '</div></div>';
+
             contentEl.innerHTML = html;
+            loadH2HChat(challengeId);
+            subscribeH2HChat(challengeId);
 
         } catch (e) {
             console.error('Error loading scorecard:', e);
@@ -3815,7 +3827,82 @@
     }
     window.viewH2HScorecard = viewH2HScorecard;
 
+    let h2hChatSubscription = null;
+
+    async function loadH2HChat(challengeId) {
+        const el = document.getElementById('h2hChatMessages');
+        if (!el) return;
+        try {
+            const { data } = await sb.from('h2h_messages').select('id, user_id, text, created_at').eq('challenge_id', challengeId).order('created_at');
+            if (!data || data.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#9ca3af;font-size:0.85rem;padding:8px;">No messages yet</p>';
+                return;
+            }
+            renderH2HChatMessages(data, el);
+        } catch (e) {
+            console.warn('[Chat] Load error:', e);
+        }
+    }
+
+    function renderH2HChatMessages(messages, el) {
+        const myId = currentUser ? currentUser.id : '';
+        let html = '';
+        messages.forEach(m => {
+            const isMe = m.user_id === myId;
+            const align = isMe ? 'flex-end' : 'flex-start';
+            const bg = isMe ? '#f3e8ff' : '#f3f4f6';
+            const ago = formatRelativeDate(m.created_at);
+            html += `<div style="display:flex;flex-direction:column;align-items:${align};margin-bottom:6px;">`;
+            html += `<div style="background:${bg};padding:6px 12px;border-radius:12px;max-width:75%;font-size:0.9rem;">${m.text}</div>`;
+            html += `<span style="font-size:0.7rem;color:#9ca3af;margin-top:2px;">${ago}</span>`;
+            html += '</div>';
+        });
+        el.innerHTML = html;
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function subscribeH2HChat(challengeId) {
+        if (h2hChatSubscription) {
+            sb.removeChannel(h2hChatSubscription);
+            h2hChatSubscription = null;
+        }
+        h2hChatSubscription = sb.channel('h2h-chat-' + challengeId)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'h2h_messages', filter: 'challenge_id=eq.' + challengeId }, (payload) => {
+                const el = document.getElementById('h2hChatMessages');
+                if (!el) return;
+                const emptyMsg = el.querySelector('p');
+                if (emptyMsg) emptyMsg.remove();
+                const m = payload.new;
+                const isMe = currentUser && m.user_id === currentUser.id;
+                const align = isMe ? 'flex-end' : 'flex-start';
+                const bg = isMe ? '#f3e8ff' : '#f3f4f6';
+                const div = document.createElement('div');
+                div.style.cssText = `display:flex;flex-direction:column;align-items:${align};margin-bottom:6px;`;
+                div.innerHTML = `<div style="background:${bg};padding:6px 12px;border-radius:12px;max-width:75%;font-size:0.9rem;">${m.text}</div><span style="font-size:0.7rem;color:#9ca3af;margin-top:2px;">just now</span>`;
+                el.appendChild(div);
+                el.scrollTop = el.scrollHeight;
+            })
+            .subscribe();
+    }
+
+    window.sendH2HChat = async function(challengeId) {
+        const input = document.getElementById('h2hChatInput');
+        const text = input.value.trim();
+        if (!text || !currentUser) return;
+        input.value = '';
+        try {
+            await sb.from('h2h_messages').insert({ challenge_id: challengeId, user_id: currentUser.id, text });
+        } catch (e) {
+            console.warn('[Chat] Send error:', e);
+            input.value = text;
+        }
+    };
+
     function closeH2HScorecardModal() {
+        if (h2hChatSubscription) {
+            sb.removeChannel(h2hChatSubscription);
+            h2hChatSubscription = null;
+        }
         document.getElementById('h2hScorecardModalBackdrop').classList.remove('show');
     }
     window.closeH2HScorecardModal = closeH2HScorecardModal;
