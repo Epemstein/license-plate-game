@@ -2264,8 +2264,12 @@
         );
     }
 
+    let skipCooldown = false;
     function handleSkip() {
         console.log('=== SKIP CLICKED ===');
+        if (skipCooldown) return;
+        skipCooldown = true;
+        setTimeout(() => { skipCooldown = false; }, 500);
         if (!gameStarted) {
             resultEl.textContent = "Press Start to begin the game.";
             resultEl.style.color = "red";
