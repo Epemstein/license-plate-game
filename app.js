@@ -258,6 +258,10 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTkwNTUsImV4cCI6MjA5MTQ5NTA1NX0.RRQA0fW02H6XKj7xKUTSnR9zrGbWuE2kSmspCeHCfyQ';
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // Capture referral from URL
+    const urlRef = new URLSearchParams(window.location.search).get('ref');
+    if (urlRef) localStorage.setItem('referredBy', urlRef);
+
     // Stub for removed Firebase
     const database = { ref: () => ({ set: async () => {}, once: async () => ({ exists: () => false, val: () => null }), push: () => ({ key: null }), remove: async () => {}, update: async () => {} }) };
     let gameMode = 'practice';
@@ -292,6 +296,26 @@
                 const challengeId = urlParams.get('challenge');
                 if (challengeId) {
                     setTimeout(() => { playH2HChallenge(challengeId); }, 500);
+                }
+
+                // Save referral attribution
+                const ref = localStorage.getItem('referredBy');
+                if (ref && event === 'SIGNED_IN') {
+                    (async () => {
+                        try {
+                            // Look up referrer's user ID by handle
+                            const { data: referrer } = await sb.from('profiles').select('id').eq('handle', ref).single();
+                            if (referrer && referrer.id !== session.user.id) {
+                                // Only set if not already set
+                                const { data: myProfile } = await sb.from('profiles').select('referred_by').eq('id', session.user.id).single();
+                                if (myProfile && !myProfile.referred_by) {
+                                    await sb.from('profiles').update({ referred_by: referrer.id }).eq('id', session.user.id);
+                                    console.log('[Referral] Attributed to', ref);
+                                }
+                            }
+                            localStorage.removeItem('referredBy');
+                        } catch (e) { console.warn('[Referral] Error:', e); }
+                    })();
                 }
             }
         } else {
