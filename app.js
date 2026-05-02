@@ -3177,7 +3177,7 @@
                 const myScore = myRun && myRun.forfeited ? 'Forfeit' : (myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(2) + 's' : (myRun ? 'In progress' : 'Not played'));
                 const oppScore = oppRun && oppRun.forfeited ? 'Forfeit' : (oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(2) + 's' : 'TBD');
 
-                const canPlay = !myRun && ch.status === 'accepted';
+                const canPlay = (!myRun || (myRun && myRun.totalSeconds == null)) && ch.status === 'accepted';
                 html += `<div class="challenge-row" onclick="${canPlay ? `playH2HChallenge('${ch.id}')` : `viewH2HScorecard('${ch.id}')`}">`;
                 html += `<div class="ch-info">`;
                 html += `<div class="ch-name">${oppName}</div>`;
@@ -3517,7 +3517,7 @@
             const startBtn = document.getElementById('startButton');
             startBtn.style.display = 'none';
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            setTimeout(() => startBtn.click(), 100);
+            await beginNewRun();
         } catch (e) {
             console.error('Error starting challenge:', e);
             alert('Error starting challenge: ' + e.message);
