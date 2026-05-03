@@ -72,7 +72,9 @@
     <script>
         const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
         const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTkxOTA1NSwiZXhwIjoyMDkxNDk1MDU1fQ.b_qDqjP-Nadk_M_kACc5mJB_OR_-Cx80vOgOfLYsDLQ';
-        const sb = window.supabase.createClient(SUPABASE_URL, SERVICE_KEY);
+        const sb = window.supabase.createClient(SUPABASE_URL, SERVICE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false }
+        });
 
         let selectedUserId = null;
         let conversations = {};
