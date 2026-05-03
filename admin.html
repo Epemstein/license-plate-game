@@ -45,9 +45,8 @@
     <div id="loginScreen" class="login-screen">
         <div class="login-box">
             <h2>Feedback Admin</h2>
-            <p style="color:#888;margin:8px 0 16px;">Sign in with your admin account</p>
-            <input type="email" id="adminEmail" placeholder="Email">
-            <input type="password" id="adminPassword" placeholder="Password">
+            <p style="color:#888;margin:8px 0 16px;">Enter password to continue</p>
+            <input type="password" id="adminPassword" placeholder="Password" onkeydown="if(event.key==='Enter')adminLogin()">
             <button onclick="adminLogin()">Sign In</button>
             <p id="loginError" style="color:red;margin-top:8px;font-size:13px;"></p>
         </div>
@@ -72,33 +71,23 @@
 
     <script>
         const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
-        const SERVICE_KEY = prompt('Enter service role key:');
+        const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTkxOTA1NSwiZXhwIjoyMDkxNDk1MDU1fQ.b_qDqjP-Nadk_M_kACc5mJB_OR_-Cx80vOgOfLYsDLQ';
         const sb = window.supabase.createClient(SUPABASE_URL, SERVICE_KEY);
 
         let selectedUserId = null;
         let conversations = {};
         let pollInterval = null;
 
-        async function adminLogin() {
-            // Service key doesn't need login — just verify it works
-            try {
-                const { data, error } = await sb.from('profiles').select('id').limit(1);
-                if (error) throw error;
+        function adminLogin() {
+            const pw = document.getElementById('adminPassword').value;
+            if (pw === 'Admin') {
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('mainApp').style.display = 'flex';
                 loadConversations();
                 pollInterval = setInterval(loadConversations, 5000);
-            } catch (e) {
-                document.getElementById('loginError').textContent = 'Invalid key: ' + e.message;
+            } else {
+                document.getElementById('loginError').textContent = 'Wrong password';
             }
-        }
-
-        // Auto-login if service key provided
-        if (SERVICE_KEY) {
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('mainApp').style.display = 'flex';
-            loadConversations();
-            pollInterval = setInterval(loadConversations, 5000);
         }
 
         async function loadConversations() {
