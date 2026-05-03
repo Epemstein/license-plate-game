@@ -99,7 +99,7 @@
         async function loadConversations() {
             const { data: messages, error } = await sb
                 .from('feedback_messages')
-                .select('id, user_id, text, from_admin, created_at')
+                .select('id, user_id, text, from_admin, created_at, image_url')
                 .order('created_at', { ascending: true });
 
             if (error || !messages) return;
@@ -175,7 +175,10 @@
             for (const m of msgs) {
                 const cls = m.from_admin ? 'admin' : 'user';
                 html += `<div class="msg ${cls}">`;
-                html += `<div class="bubble">${escapeHtml(m.text)}</div>`;
+                if (m.image_url) {
+                    html += `<div><img src="${m.image_url}" style="max-width:300px;max-height:400px;border-radius:12px;margin-bottom:4px;cursor:pointer;" onclick="window.open('${m.image_url}','_blank')"></div>`;
+                }
+                if (m.text) html += `<div class="bubble">${escapeHtml(m.text)}</div>`;
                 html += `<div class="time">${timeAgo(m.created_at)}</div>`;
                 html += `</div>`;
             }
