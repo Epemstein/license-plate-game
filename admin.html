@@ -79,15 +79,18 @@
         let pollInterval = null;
 
         function adminLogin() {
-            const pw = document.getElementById('adminPassword').value;
+            const pw = document.getElementById('adminPassword').value.trim();
             if (pw === 'Admin') {
                 document.getElementById('loginScreen').style.display = 'none';
-                document.getElementById('mainApp').style.display = 'flex';
+                const app = document.getElementById('mainApp');
+                app.style.display = 'flex';
                 loadConversations();
                 pollInterval = setInterval(loadConversations, 5000);
             } else {
                 document.getElementById('loginError').textContent = 'Wrong password';
+                document.getElementById('adminPassword').value = '';
             }
+            return false;
         }
 
         async function loadConversations() {
