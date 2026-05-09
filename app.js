@@ -975,7 +975,9 @@
                 statsBtn.disabled = !canView;
                 statsBtn.style.cursor = canView ? 'pointer' : 'not-allowed';
                 statsBtn.style.opacity = canView ? '1' : '0.6';
-                statsBtn.style.background = canView ? '#2563eb' : '#9ca3af';
+                statsBtn.style.background = canView ? 'rgba(37,99,235,0.08)' : '#f3f4f6';
+                statsBtn.style.color = canView ? '#2563eb' : '#9ca3af';
+                statsBtn.style.border = canView ? '1px solid rgba(37,99,235,0.25)' : '1px solid #e5e7eb';
                 statsBtn.textContent = canView ? 'Plate Stats' : '\uD83D\uDD12 Complete Daily';
             }
             // Show row if user played or past date
