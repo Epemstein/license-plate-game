@@ -691,8 +691,11 @@
                     green = 0.25 - f * 0.20;
                     opacity = 0.20 + f * 0.12;
                 }
-                const bgColor = `rgba(${Math.round(red*255)}, ${Math.round(green*255)}, 0, ${opacity.toFixed(2)})`;
-                console.log(`[PlateStats] ${plates[i]} skipPct=${skipPct} t=${t.toFixed(4)} bg=${bgColor}`);
+                // Blend with white background to get solid color
+                const rr = Math.round(255 + (red * 255 - 255) * opacity);
+                const gg = Math.round(255 + (green * 255 - 255) * opacity);
+                const bb = Math.round(255 * (1 - opacity));
+                const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
 
                 html += `<tr style="background:${bgColor};" onclick="showViableWordsForPlate('${plates[i]}')" class="plate-stats-row">`;
                 html += `<td style="padding:6px 10px;color:#9ca3af;">${i + 1}</td>`;
