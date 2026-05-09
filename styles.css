@@ -1143,6 +1143,9 @@
         }
         .stats-back-btn:hover { background: #f3f4f6; }
 
+        .plate-stats-row { cursor: pointer; transition: filter 0.15s; }
+        .plate-stats-row:hover { filter: brightness(0.95); }
+
         #profileModalBackdrop { z-index: 950; }
         #newChallengeModalBackdrop { z-index: 950; }
         #h2hScorecardModalBackdrop { z-index: 950; }

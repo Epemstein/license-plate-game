@@ -592,6 +592,113 @@
     }
     window.toggleCompareTable = toggleCompareTable;
 
+    // Toggle plate stats table
+    function togglePlateStats() {
+        const container = document.getElementById('plateStatsContainer');
+        const btn = document.getElementById('plateStatsBtn');
+        if (btn.disabled) return;
+
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            btn.textContent = 'Hide Plate Stats';
+            buildPlateStats();
+        } else {
+            container.style.display = 'none';
+            btn.textContent = 'Plate Stats';
+        }
+    }
+    window.togglePlateStats = togglePlateStats;
+
+    async function buildPlateStats() {
+        const container = document.getElementById('plateStatsContainer');
+        container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading plate stats...</p>';
+
+        const dateStr = currentViewingDate || getTodayString();
+
+        try {
+            // Fetch plates for this date
+            const { data: dp } = await sb.from('daily_plates').select('plates').eq('date', dateStr).single();
+            if (!dp || !dp.plates) {
+                container.innerHTML = '<p style="text-align:center;color:#6b7280;">No plate data available</p>';
+                return;
+            }
+
+            // Fetch all run entries for this date
+            const { data: entries } = await sb
+                .from('daily_run_entries')
+                .select('plate_index, plate, word, skipped, thinking_seconds, penalty_seconds, run_id')
+                .in('run_id', (await sb.from('daily_runs').select('id').eq('date', dateStr).not('total_seconds', 'is', null)).data?.map(r => r.id) || []);
+
+            if (!entries || entries.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:#6b7280;">No entries yet</p>';
+                return;
+            }
+
+            // Find max plate index used
+            const maxIdx = Math.max(...entries.map(e => e.plate_index)) + 1;
+            const plates = dp.plates.slice(0, maxIdx);
+
+            // Group entries by plate index
+            const byPlate = {};
+            entries.forEach(e => {
+                if (!byPlate[e.plate_index]) byPlate[e.plate_index] = [];
+                byPlate[e.plate_index].push(e);
+            });
+
+            let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:8px;">';
+            html += '<thead><tr style="background:#f3f4f6;">';
+            html += '<th style="padding:8px 10px;text-align:left;">#</th>';
+            html += '<th style="padding:8px 10px;text-align:left;">Plate</th>';
+            html += '<th style="padding:8px 10px;text-align:right;">Skip</th>';
+            html += '<th style="padding:8px 10px;text-align:right;">Think</th>';
+            html += '<th style="padding:8px 10px;text-align:right;">Total</th>';
+            html += '<th style="padding:8px 10px;text-align:right;">Top Word</th>';
+            html += '</tr></thead><tbody>';
+
+            for (let i = 0; i < plates.length; i++) {
+                const pe = byPlate[i] || [];
+                const total = pe.length;
+                const skipped = pe.filter(e => e.skipped).count;
+                const skipCount = pe.filter(e => e.skipped).length;
+                const skipPct = total > 0 ? Math.round(100 * skipCount / total) : 0;
+
+                const validTimes = pe.filter(e => e.thinking_seconds <= 400);
+                const thinkAvg = validTimes.length > 0 ? (validTimes.reduce((s, e) => s + e.thinking_seconds, 0) / validTimes.length).toFixed(1) : '--';
+                const totalAvg = validTimes.length > 0 ? (validTimes.reduce((s, e) => s + e.thinking_seconds + (e.skipped ? e.penalty_seconds : 0), 0) / validTimes.length).toFixed(1) : '--';
+
+                // Top word
+                const wordCounts = {};
+                pe.filter(e => !e.skipped && e.word).forEach(e => {
+                    wordCounts[e.word] = (wordCounts[e.word] || 0) + 1;
+                });
+                const topWord = Object.entries(wordCounts).sort((a, b) => b[1] - a[1])[0];
+                const topWordStr = topWord ? `${topWord[0]} (${Math.round(topWord[1] / total * 100)}%)` : '--';
+
+                // Row color based on skip rate
+                const r = skipPct / 100;
+                let bgColor;
+                if (r < 0.2) bgColor = `rgba(${Math.round(r/0.2*240)}, ${190 + Math.round(r/0.2*25)}, 0, 0.18)`;
+                else if (r < 0.5) bgColor = `rgba(240, ${Math.round(215 - (r-0.2)/0.3*140)}, 0, 0.18)`;
+                else bgColor = `rgba(255, ${Math.round(75 - (r-0.5)/0.5*50)}, 0, 0.22)`;
+
+                html += `<tr style="background:${bgColor};" onclick="showViableWordsForPlate('${plates[i]}')" class="plate-stats-row">`;
+                html += `<td style="padding:6px 10px;color:#9ca3af;">${i + 1}</td>`;
+                html += `<td style="padding:6px 10px;"><strong style="font-family:monospace;">${plates[i]}</strong> <span style="font-size:0.75rem;color:#9ca3af;">${total}</span></td>`;
+                html += `<td style="padding:6px 10px;text-align:right;">${total > 0 ? skipPct + '%' : '--'}</td>`;
+                html += `<td style="padding:6px 10px;text-align:right;">${thinkAvg}</td>`;
+                html += `<td style="padding:6px 10px;text-align:right;font-weight:500;">${totalAvg}</td>`;
+                html += `<td style="padding:6px 10px;text-align:right;">${topWordStr}</td>`;
+                html += '</tr>';
+            }
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        } catch (e) {
+            console.error('Plate stats error:', e);
+            container.innerHTML = '<p style="text-align:center;color:#dc2626;">Error loading plate stats</p>';
+        }
+    }
+
     // Get color based on time (gradient)
     function getTimeColor(seconds) {
         if (seconds <= 1.5) return '#22c55e';
@@ -862,22 +969,28 @@
             document.getElementById('leaderboardContent').innerHTML = '<p style="text-align:center;color:#dc2626;padding:20px;">Error loading</p>';
         }
 
-        // Update Compare button state
+        // Update button states
         try {
             const compareBtn = document.getElementById('compareRunsBtn');
-            if (userHasPlayed || isPastDate) {
-                compareBtn.disabled = false;
-                compareBtn.style.background = '#9370db';
-                compareBtn.style.cursor = 'pointer';
-                compareBtn.style.opacity = '1';
-                compareBtn.textContent = 'Compare All Runs';
-            } else {
-                compareBtn.disabled = true;
-                compareBtn.style.background = '#9ca3af';
-                compareBtn.style.cursor = 'not-allowed';
-                compareBtn.style.opacity = '0.6';
-                compareBtn.textContent = '\uD83D\uDD12 Complete Daily to Compare';
+            const statsBtn = document.getElementById('plateStatsBtn');
+            const canView = userHasPlayed || isPastDate;
+            [compareBtn, statsBtn].forEach(btn => {
+                if (!btn) return;
+                btn.disabled = !canView;
+                btn.style.cursor = canView ? 'pointer' : 'not-allowed';
+                btn.style.opacity = canView ? '1' : '0.6';
+            });
+            if (compareBtn) {
+                compareBtn.style.background = canView ? '#9370db' : '#9ca3af';
+                compareBtn.textContent = canView ? 'Compare All Runs' : '\uD83D\uDD12 Complete Daily';
             }
+            if (statsBtn) {
+                statsBtn.style.background = canView ? '#2563eb' : '#9ca3af';
+                statsBtn.textContent = canView ? 'Plate Stats' : '\uD83D\uDD12 Complete Daily';
+            }
+            // Hide containers when switching dates
+            document.getElementById('plateStatsContainer').style.display = 'none';
+            document.getElementById('comparisonTableContainer').style.display = 'none';
         } catch(btnError) {
             console.error('Button state error:', btnError);
         }
