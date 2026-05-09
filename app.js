@@ -673,11 +673,17 @@
                 const topWordStr = topWord ? `${topWord[0]} (${Math.round(topWord[1] / total * 100)}%)` : '--';
 
                 // Row color based on skip rate
-                const r = skipPct / 100;
-                let bgColor;
-                if (r < 0.2) bgColor = `rgba(${Math.round(r/0.2*240)}, ${190 + Math.round(r/0.2*25)}, 0, 0.18)`;
-                else if (r < 0.5) bgColor = `rgba(240, ${Math.round(215 - (r-0.2)/0.3*140)}, 0, 0.18)`;
-                else bgColor = `rgba(255, ${Math.round(75 - (r-0.5)/0.5*50)}, 0, 0.22)`;
+                const r = Math.min(skipPct / 100, 1);
+                // Green (0%) → Yellow (50%) → Red (100%)
+                let red, green;
+                if (r < 0.5) {
+                    red = Math.round(r * 2 * 255);
+                    green = 200;
+                } else {
+                    red = 255;
+                    green = Math.round((1 - (r - 0.5) * 2) * 200);
+                }
+                const bgColor = `rgba(${red}, ${green}, 0, 0.18)`;
 
                 html += `<tr style="background:${bgColor};" onclick="showViableWordsForPlate('${plates[i]}')" class="plate-stats-row">`;
                 html += `<td style="padding:6px 10px;color:#9ca3af;">${i + 1}</td>`;
