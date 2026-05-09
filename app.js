@@ -3985,6 +3985,8 @@
                 html += `<button class="profile-modal-challenge-btn" onclick="closeProfileModal();preselectedChallengeUserId='${userId}';preselectedChallengeUserName='${name.replace(/'/g,"\\'")}';openNewChallengeModal();">⚔ Challenge</button>`;
             }
 
+            html += `<button class="profile-modal-stats-btn" onclick="openPlayerStats('${userId}','${name.replace(/'/g,"\\'")}')">Stats</button>`;
+
             content.innerHTML = html;
         } catch (e) {
             console.error('Profile modal error:', e);
@@ -4015,6 +4017,163 @@
     window.closeProfileModal = function() {
         document.getElementById('profileModalBackdrop').classList.remove('show');
     };
+
+    // ========== PLAYER STATS ==========
+    window.openPlayerStats = async function(userId, displayName) {
+        const content = document.getElementById('profileModalContent');
+        const title = document.getElementById('profileModalTitle');
+        title.textContent = displayName + ' — Stats';
+        content.innerHTML = '<p style="color:#6b7280;">Loading stats...</p>';
+
+        const isSelf = currentUser && currentUser.id === userId;
+
+        try {
+            const { data: stats, error } = await sb.rpc('player_stats', { p_user_id: userId });
+            if (error) throw error;
+
+            let html = '';
+
+            // Tab buttons
+            const tabs = isSelf ? ['Daily', 'H2H', 'Practice'] : ['Daily'];
+            html += '<div class="stats-tabs">';
+            tabs.forEach((t, i) => {
+                html += `<button class="stats-tab ${i === 0 ? 'active' : ''}" onclick="switchStatsTab('${t.toLowerCase()}', this)">${t}</button>`;
+            });
+            html += '</div>';
+
+            // Tab contents
+            html += buildDailyStats(stats, true);
+            if (isSelf) {
+                html += buildH2HStats(stats);
+                html += buildPracticeStats(stats);
+            }
+
+            html += `<button class="stats-back-btn" onclick="openProfileModal('${userId}','${displayName.replace(/'/g, "\\'")}')">Back to Profile</button>`;
+
+            content.innerHTML = html;
+        } catch (e) {
+            console.error('Stats error:', e);
+            content.innerHTML = '<p style="color:#dc2626;">Error loading stats</p>';
+        }
+    };
+
+    function switchStatsTab(tab, btn) {
+        document.querySelectorAll('.stats-tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.stats-tab').forEach(el => el.classList.remove('active'));
+        btn.classList.add('active');
+        const el = document.getElementById('stats-' + tab);
+        if (el) el.style.display = 'block';
+    }
+    window.switchStatsTab = switchStatsTab;
+
+    function formatStatsDate(iso) {
+        if (!iso) return '';
+        const d = new Date(iso + 'T00:00:00');
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function statsRow(label, value, subtitle) {
+        let html = '<div class="stats-row">';
+        html += `<div class="stats-row-label">${label}</div>`;
+        html += '<div class="stats-row-right">';
+        html += `<div class="stats-row-value">${value}</div>`;
+        if (subtitle) html += `<div class="stats-row-subtitle">${subtitle}</div>`;
+        html += '</div></div>';
+        return html;
+    }
+
+    function skipRateStr(perGame, rate) {
+        if (rate == null) return '--';
+        if (perGame != null) return `${perGame.toFixed(1)} per game (${rate}%)`;
+        return `${rate}%`;
+    }
+
+    function finishStr(rank, total) {
+        if (rank == null || total == null) return '--';
+        const pct = (rank / total) * 100;
+        const pctStr = pct <= 10 ? pct.toFixed(1) + '%' : Math.round(pct) + '%';
+        return `#${rank} of ${total} (Top ${pctStr})`;
+    }
+
+    function buildDailyStats(s, visible) {
+        let html = `<div id="stats-daily" class="stats-tab-content" style="display:${visible ? 'block' : 'none'}">`;
+
+        html += '<div class="stats-section-label">Stats</div>';
+        html += '<div class="stats-section-box">';
+        html += statsRow('Daily Challenges', s.daily_games ?? 0);
+        html += statsRow('Avg Time', s.daily_avg_time != null ? s.daily_avg_time.toFixed(1) + ' seconds' : '--');
+        html += statsRow('Beat', s.daily_beat_pct != null ? (s.daily_beat_pct * 100).toFixed(1) + '%' : '--');
+        html += statsRow('Overall', s.daily_overall_pct != null ? 'Top ' + (100 - s.daily_overall_pct).toFixed(1) + '%' : '--');
+        html += statsRow('Current Streak', s.daily_current_streak ?? 0);
+        html += statsRow('Longest Streak', s.daily_longest_streak ?? 0);
+        html += statsRow('Skip Rate', skipRateStr(s.daily_skips_per_game, s.daily_skip_rate));
+        html += '</div>';
+
+        html += '<div class="stats-section-label">Personal Bests</div>';
+        html += '<div class="stats-section-box">';
+        html += statsRow('Best Finish (Rank)', finishStr(s.daily_best_finish_rank, s.daily_best_finish_total), formatStatsDate(s.daily_best_finish_date));
+        html += statsRow('Best Finish (Percentile)', finishStr(s.daily_best_pct_rank, s.daily_best_pct_total), formatStatsDate(s.daily_best_pct_date));
+        html += statsRow('Best Time', s.daily_best_time != null ? s.daily_best_time.toFixed(1) + ' seconds' : '--', formatStatsDate(s.daily_best_date));
+        const fpD = s.daily_fastest_plate && s.daily_fastest_time != null ? `[${s.daily_fastest_plate}] ${s.daily_fastest_time.toFixed(2)} seconds` : '--';
+        html += statsRow('Fastest Plate', fpD, [s.daily_fastest_word ? s.daily_fastest_word.charAt(0).toUpperCase() + s.daily_fastest_word.slice(1) : '', formatStatsDate(s.daily_fastest_date)].filter(Boolean).join(' — '));
+        const hpD = s.daily_hardest_plate && s.daily_hardest_pct != null ? `[${s.daily_hardest_plate}] ${s.daily_hardest_pct}% skipped` : '--';
+        html += statsRow('Hardest Plate', hpD, [s.daily_hardest_word ? s.daily_hardest_word.charAt(0).toUpperCase() + s.daily_hardest_word.slice(1) : '', formatStatsDate(s.daily_hardest_date)].filter(Boolean).join(' — '));
+        html += '</div>';
+
+        html += '</div>';
+        return html;
+    }
+
+    function buildH2HStats(s) {
+        let html = '<div id="stats-h2h" class="stats-tab-content" style="display:none">';
+
+        html += '<div class="stats-section-label">Stats</div>';
+        html += '<div class="stats-section-box">';
+        html += statsRow('Challenges', s.h2h_games ?? 0);
+        const w = s.h2h_wins ?? 0, l = s.h2h_losses ?? 0, tot = w + l;
+        const record = tot === 0 ? '0-0' : `${w}-${l} (${Math.round(w / tot * 100)}%)`;
+        html += statsRow('Record', record);
+        const opp = s.h2h_common_opp_name ? `${s.h2h_common_opp_name} (${s.h2h_common_opp_count}x)` : '--';
+        html += statsRow('Common Opponent', opp);
+        html += statsRow('Skip Rate', skipRateStr(s.h2h_skips_per_game, s.h2h_skip_rate));
+        html += '</div>';
+
+        html += '<div class="stats-section-label">Personal Bests</div>';
+        html += '<div class="stats-section-box">';
+        html += statsRow('Best Time', s.h2h_best_time != null ? s.h2h_best_time.toFixed(1) + ' seconds' : '--',
+            [formatStatsDate(s.h2h_best_date), s.h2h_best_opponent ? 'vs ' + s.h2h_best_opponent : ''].filter(Boolean).join(' — '));
+        const fpH = s.h2h_fastest_plate && s.h2h_fastest_time != null ? `[${s.h2h_fastest_plate}] ${s.h2h_fastest_time.toFixed(2)} seconds` : '--';
+        html += statsRow('Fastest Plate', fpH,
+            [s.h2h_fastest_word ? s.h2h_fastest_word.charAt(0).toUpperCase() + s.h2h_fastest_word.slice(1) : '', formatStatsDate(s.h2h_fastest_date), s.h2h_fastest_opponent ? 'vs ' + s.h2h_fastest_opponent : ''].filter(Boolean).join(' — '));
+        const closest = s.h2h_closest_margin != null ? `${s.h2h_closest_won ? 'Won' : 'Lost'} by ${s.h2h_closest_margin.toFixed(2)}` : '--';
+        html += statsRow('Closest Game', closest,
+            [formatStatsDate(s.h2h_closest_date), s.h2h_closest_opponent ? 'vs ' + s.h2h_closest_opponent : ''].filter(Boolean).join(' — '));
+        html += '</div>';
+
+        html += '</div>';
+        return html;
+    }
+
+    function buildPracticeStats(s) {
+        let html = '<div id="stats-practice" class="stats-tab-content" style="display:none">';
+
+        html += '<div class="stats-section-label">Stats</div>';
+        html += '<div class="stats-section-box">';
+        html += statsRow('Practices', s.practice_games ?? 0);
+        html += statsRow('Skip Rate', skipRateStr(s.practice_skips_per_game, s.practice_skip_rate));
+        html += '</div>';
+
+        html += '<div class="stats-section-label">Personal Bests</div>';
+        html += '<div class="stats-section-box">';
+        html += statsRow('Fastest Run', s.practice_fastest_run != null ? s.practice_fastest_run.toFixed(1) + ' seconds' : '--');
+        const fpP = s.practice_fastest_plate && s.practice_fastest_time != null ? `[${s.practice_fastest_plate}] ${s.practice_fastest_time.toFixed(2)} seconds` : '--';
+        html += statsRow('Fastest Plate', fpP, s.practice_fastest_word ? s.practice_fastest_word.charAt(0).toUpperCase() + s.practice_fastest_word.slice(1) : '');
+        html += '</div>';
+
+        html += '</div>';
+        return html;
+    }
+    // ========== END PLAYER STATS ==========
 
     // On page unload, save practice stats locally (will be submitted on next load)
     window.addEventListener('pagehide', () => {
