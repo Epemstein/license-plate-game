@@ -673,7 +673,7 @@
                 const topWordStr = topWord ? `${topWord[0]} (${Math.round(topWord[1] / total * 100)}%)` : '--';
 
                 // Row color based on skip rate
-                const r = Math.min(skipPct / 100, 1);
+                const r = Math.min(Math.round(skipPct) / 100, 1);
                 // Green (0%) → Yellow (50%) → Red (100%)
                 let red, green;
                 if (r < 0.5) {
