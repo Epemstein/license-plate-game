@@ -592,25 +592,23 @@
     }
     window.toggleCompareTable = toggleCompareTable;
 
-    // Toggle plate stats table
+    // Toggle plate stats modal
     function togglePlateStats() {
-        const container = document.getElementById('plateStatsContainer');
         const btn = document.getElementById('plateStatsBtn');
         if (btn.disabled) return;
-
-        if (container.style.display === 'none') {
-            container.style.display = 'block';
-            btn.textContent = 'Hide Plate Stats';
-            buildPlateStats();
-        } else {
-            container.style.display = 'none';
-            btn.textContent = 'Plate Stats';
-        }
+        const backdrop = document.getElementById('plateStatsModalBackdrop');
+        backdrop.classList.add('show');
+        document.getElementById('plateStatsModalContent').innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
+        buildPlateStats();
     }
     window.togglePlateStats = togglePlateStats;
 
+    window.closePlateStatsModal = function() {
+        document.getElementById('plateStatsModalBackdrop').classList.remove('show');
+    };
+
     async function buildPlateStats() {
-        const container = document.getElementById('plateStatsContainer');
+        const container = document.getElementById('plateStatsModalContent');
         container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading plate stats...</p>';
 
         const dateStr = currentViewingDate || getTodayString();
@@ -984,8 +982,8 @@
             if (canView) {
                 document.getElementById('myRunRow').style.display = 'flex';
             }
-            // Hide containers when switching dates
-            document.getElementById('plateStatsContainer').style.display = 'none';
+            // Close plate stats modal when switching dates
+            document.getElementById('plateStatsModalBackdrop').classList.remove('show');
         } catch(btnError) {
             console.error('Button state error:', btnError);
         }

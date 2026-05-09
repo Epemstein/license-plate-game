@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v90</title>
+    <title>License Plate Game v91</title>
     <link rel="stylesheet" href="styles.css?v=88">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -153,9 +153,6 @@
     <div id="leaderboardContent" style="min-height:120px;">
         <p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>
     </div>
-
-    <!-- Plate Stats (hidden) -->
-    <div id="plateStatsContainer" style="display:none;"></div>
 
     <!-- Compare Runs (hidden) -->
     <button id="compareRunsBtn" style="display:none;"></button>
@@ -367,6 +364,21 @@
         </div>
         <div class="modal-body" style="padding:20px;">
             <div id="profileModalContent" style="text-align:center;">
+                <p style="color:#6b7280;">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plate Stats Modal -->
+<div id="plateStatsModalBackdrop" class="modal-backdrop" style="z-index:950;" onclick="if(event.target.id==='plateStatsModalBackdrop')closePlateStatsModal()">
+    <div class="modal" style="max-width:520px;">
+        <div class="modal-header">
+            <div class="modal-title">Plate Stats</div>
+            <button class="modal-close-btn" onclick="closePlateStatsModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:12px;max-height:70vh;overflow-y:auto;">
+            <div id="plateStatsModalContent">
                 <p style="color:#6b7280;">Loading...</p>
             </div>
         </div>
