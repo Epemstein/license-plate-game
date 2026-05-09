@@ -875,7 +875,7 @@
         document.getElementById('leaderboardContent').innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
 
         // Hide my run card initially
-        document.getElementById('myRunCard').style.display = 'none';
+        document.getElementById('myRunRow').style.display = 'none';
 
         let userHasPlayed = false;
         let isPastDate = false;
@@ -895,7 +895,7 @@
             if (userHasPlayed) {
                 const myScore = scores.find(s => s.isMe || s.userId === currentUser?.id);
                 if (myScore) {
-                    document.getElementById('myRunCard').style.display = 'flex';
+                    document.getElementById('myRunRow').style.display = 'flex';
                     document.getElementById('myRunTime').textContent = myScore.totalTime.toFixed(2) + 's';
                 }
             }
@@ -969,28 +969,23 @@
             document.getElementById('leaderboardContent').innerHTML = '<p style="text-align:center;color:#dc2626;padding:20px;">Error loading</p>';
         }
 
-        // Update button states
+        // Update Plate Stats button state
         try {
-            const compareBtn = document.getElementById('compareRunsBtn');
             const statsBtn = document.getElementById('plateStatsBtn');
             const canView = userHasPlayed || isPastDate;
-            [compareBtn, statsBtn].forEach(btn => {
-                if (!btn) return;
-                btn.disabled = !canView;
-                btn.style.cursor = canView ? 'pointer' : 'not-allowed';
-                btn.style.opacity = canView ? '1' : '0.6';
-            });
-            if (compareBtn) {
-                compareBtn.style.background = canView ? '#9370db' : '#9ca3af';
-                compareBtn.textContent = canView ? 'Compare All Runs' : '\uD83D\uDD12 Complete Daily';
-            }
             if (statsBtn) {
+                statsBtn.disabled = !canView;
+                statsBtn.style.cursor = canView ? 'pointer' : 'not-allowed';
+                statsBtn.style.opacity = canView ? '1' : '0.6';
                 statsBtn.style.background = canView ? '#2563eb' : '#9ca3af';
                 statsBtn.textContent = canView ? 'Plate Stats' : '\uD83D\uDD12 Complete Daily';
             }
+            // Show row if user played or past date
+            if (canView) {
+                document.getElementById('myRunRow').style.display = 'flex';
+            }
             // Hide containers when switching dates
             document.getElementById('plateStatsContainer').style.display = 'none';
-            document.getElementById('comparisonTableContainer').style.display = 'none';
         } catch(btnError) {
             console.error('Button state error:', btnError);
         }

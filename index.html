@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v89</title>
+    <title>License Plate Game v90</title>
     <link rel="stylesheet" href="styles.css?v=88">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -128,13 +128,16 @@
         <button id="nextDayBtn" onclick="changeDateBy(1)">&#8250;</button>
     </div>
 
-    <!-- My Run card -->
-    <div id="myRunCard" class="my-run-card" style="display:none;" onclick="viewMyRun()">
-        <div>
-            <div class="my-run-label">My Run</div>
-            <div class="my-run-time" id="myRunTime">--</div>
+    <!-- My Run + Plate Stats row -->
+    <div id="myRunRow" style="display:none;display:flex;gap:8px;margin-bottom:12px;">
+        <div id="myRunCard" class="my-run-card" style="flex:1;margin:0;" onclick="viewMyRun()">
+            <div>
+                <div class="my-run-label">My Run</div>
+                <div class="my-run-time" id="myRunTime">--</div>
+            </div>
+            <div class="my-run-chevron">&#8250;</div>
         </div>
-        <div class="my-run-chevron">&#8250;</div>
+        <button id="plateStatsBtn" onclick="togglePlateStats()" style="flex:1;padding:10px;background:#2563eb;color:white;border:none;border-radius:10px;font-weight:600;font-size:0.9rem;cursor:pointer;">Plate Stats</button>
     </div>
 
     <!-- Leaderboard heading -->
@@ -151,16 +154,11 @@
         <p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>
     </div>
 
-    <!-- Action buttons -->
-    <div style="display:flex;gap:8px;margin:12px 0;">
-        <button id="compareRunsBtn" onclick="toggleCompareTable()" style="flex:1;padding:10px;background:#9370db;color:white;border:none;border-radius:10px;font-weight:600;font-size:0.9rem;cursor:pointer;">Compare All Runs</button>
-        <button id="plateStatsBtn" onclick="togglePlateStats()" style="flex:1;padding:10px;background:#2563eb;color:white;border:none;border-radius:10px;font-weight:600;font-size:0.9rem;cursor:pointer;">Plate Stats</button>
-    </div>
-
     <!-- Plate Stats (hidden) -->
     <div id="plateStatsContainer" style="display:none;"></div>
 
     <!-- Compare Runs (hidden) -->
+    <button id="compareRunsBtn" style="display:none;"></button>
     <div id="compareRunsContainer" style="display:none;"></div>
     <div id="comparisonTableContainer" style="display:none;"><div id="comparisonTable"></div></div>
 
