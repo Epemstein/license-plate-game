@@ -692,6 +692,7 @@
                     opacity = 0.20 + f * 0.12;
                 }
                 const bgColor = `rgba(${Math.round(red*255)}, ${Math.round(green*255)}, 0, ${opacity.toFixed(2)})`;
+                console.log(`[PlateStats] ${plates[i]} skipPct=${skipPct} t=${t.toFixed(4)} bg=${bgColor}`);
 
                 html += `<tr style="background:${bgColor};" onclick="showViableWordsForPlate('${plates[i]}')" class="plate-stats-row">`;
                 html += `<td style="padding:6px 10px;color:#9ca3af;">${i + 1}</td>`;
