@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v98</title>
+    <title>License Plate Game v99</title>
     <link rel="stylesheet" href="styles.css?v=88">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -100,7 +100,10 @@
 
         <div class="game-right">
             <div class="solved-card">
-                <h3 style="margin-top:0;">Solved Plates</h3>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <h3 style="margin-top:0;">Solved Plates</h3>
+                    <button id="practiceStatsBtn2" onclick="showPracticePlateStatsModal()" disabled style="padding:4px 12px;background:rgba(37,99,235,0.08);color:#2563eb;border:1px solid rgba(37,99,235,0.25);border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;opacity:0.4;">Plate Stats</button>
+                </div>
                 <table>
                     <thead>
                     <tr>
@@ -364,6 +367,21 @@
         </div>
         <div class="modal-body" style="padding:20px;">
             <div id="profileModalContent" style="text-align:center;">
+                <p style="color:#6b7280;">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Practice Plate Stats Modal -->
+<div id="practiceStatsModalBackdrop" class="modal-backdrop" style="z-index:950;" onclick="if(event.target.id==='practiceStatsModalBackdrop')closePracticeStatsModal()">
+    <div class="modal" style="max-width:520px;">
+        <div class="modal-header">
+            <div class="modal-title">Plate Stats</div>
+            <button class="modal-close-btn" onclick="closePracticeStatsModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:12px;max-height:70vh;overflow-y:auto;">
+            <div id="practiceStatsModalContent">
                 <p style="color:#6b7280;">Loading...</p>
             </div>
         </div>

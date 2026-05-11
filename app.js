@@ -1573,6 +1573,8 @@
         gameStarted = false;
         gameOver = false;
         solvedCount = 0;
+        const psBtn = document.getElementById('practiceStatsBtn2');
+        if (psBtn) { psBtn.disabled = true; psBtn.style.opacity = '0.4'; }
         startTime = null;
         penaltySeconds = 0;
         skipCount = 0;
@@ -1785,6 +1787,13 @@
         gameOver = true;
         gameStarted = false;
         plateLocked = true;
+
+        // Enable practice plate stats button
+        const psBtn = document.getElementById('practiceStatsBtn2');
+        if (psBtn && solvedCount >= 10) {
+            psBtn.disabled = false;
+            psBtn.style.opacity = '1';
+        }
 
         if (!startTime) return;
 
@@ -2699,41 +2708,52 @@
 
         if (hideUsed) return; // Skip loading used data during gameplay
 
-        // Load used words and stats from Supabase (non-blocking)
-        sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate })
-            .then(({ data }) => {
-                if (!data) return;
+        // Load used words from all tables (non-blocking)
+        Promise.all([
+            sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate }),
+            sb.from('practice_plate_stats').select('word, skipped, thinking_seconds, user_id').eq('plate', wordsModalPlate),
+            sb.from('h2h_run_entries').select('word, skipped, thinking_seconds').eq('plate', wordsModalPlate)
+        ]).then(([dailyRes, practiceRes, h2hRes]) => {
+                const dailyData = dailyRes.data || [];
+                const practiceData = (practiceRes.data || []).map(r => ({ ...r, penalty_seconds: 0 }));
+                const h2hData = (h2hRes.data || []).map(r => ({ ...r, penalty_seconds: 0 }));
+
+                // Combine all — daily has user details, others don't
                 const wordGroups = {};
                 let totalPlays = 0;
                 let skipCount = 0;
                 let totalTime = 0;
                 let foundMyEntry = false;
-                data.forEach(row => {
+
+                function processRow(row, hasUserInfo) {
                     totalPlays++;
                     const thinkTime = row.thinking_seconds || 0;
                     const penTime = row.penalty_seconds || 0;
-                    const t = thinkTime + penTime;
-                    totalTime += t;
+                    totalTime += thinkTime + penTime;
                     const key = row.skipped ? '__skipped__' : (row.word || '').toLowerCase();
                     if (row.skipped) skipCount++;
                     if (!wordGroups[key]) wordGroups[key] = { word: key, count: 0, users: [] };
                     wordGroups[key].count++;
-                    wordGroups[key].users.push({
-                        name: row.display_name || (row.handle ? '@' + row.handle : 'Anonymous'),
-                        time: thinkTime,
-                        penalty: penTime,
-                        userId: row.user_id,
-                        skipped: row.skipped
-                    });
-                    // Find current user's entry
-                    if (currentUser && row.user_id === currentUser.id) {
+                    if (hasUserInfo) {
+                        wordGroups[key].users.push({
+                            name: row.display_name || (row.handle ? '@' + row.handle : 'Anonymous'),
+                            time: thinkTime, penalty: penTime,
+                            userId: row.user_id, skipped: row.skipped
+                        });
+                    }
+                    if (hasUserInfo && currentUser && row.user_id === currentUser.id) {
                         foundMyEntry = true;
                         wordsModalMySkipped = row.skipped;
                         wordsModalMyWord = row.skipped ? '' : (row.word || '').toLowerCase();
                         wordsModalMyTime = thinkTime;
                         wordsModalMyPenalty = penTime;
                     }
-                });
+                }
+
+                dailyData.forEach(r => processRow(r, true));
+                practiceData.forEach(r => processRow(r, false));
+                h2hData.forEach(r => processRow(r, false));
+
                 if (!foundMyEntry && currentUser) {
                     wordsModalMyWord = '__not_played__';
                 }
@@ -2742,7 +2762,7 @@
                 wordsModalUsed = Object.values(wordGroups)
                     .map(g => ({ ...g, pct: Math.round(g.count / totalPlays * 100), isSkip: g.word === '__skipped__' }))
                     .sort((a, b) => b.count - a.count);
-                document.getElementById('wordsTabUsed').textContent = `Used`;
+                document.getElementById('wordsTabUsed').textContent = `Used (${totalPlays})`;
                 updateWordsModalHeader();
                 if (wordsModalActiveTab === 'used') renderWordsTab('used');
             })
@@ -4300,6 +4320,104 @@
         return html;
     }
     // ========== END PLAYER STATS ==========
+
+    // ========== PRACTICE PLATE STATS ==========
+    window.showPracticePlateStatsModal = async function() {
+        const backdrop = document.getElementById('practiceStatsModalBackdrop');
+        const content = document.getElementById('practiceStatsModalContent');
+        backdrop.classList.add('show');
+        content.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading plate stats...</p>';
+
+        const plates = gameHistory.map(e => e.plate);
+        if (plates.length === 0) {
+            content.innerHTML = '<p style="text-align:center;color:#6b7280;">No plates played</p>';
+            return;
+        }
+
+        try {
+            let html = '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">';
+            html += '<thead><tr style="background:#f3f4f6;">';
+            html += '<th style="padding:6px 8px;text-align:left;">#</th>';
+            html += '<th style="padding:6px 8px;text-align:left;">Plate</th>';
+            html += '<th style="padding:6px 8px;text-align:right;">Plays</th>';
+            html += '<th style="padding:6px 8px;text-align:right;">Skip</th>';
+            html += '<th style="padding:6px 8px;text-align:right;">Think</th>';
+            html += '<th style="padding:6px 8px;text-align:right;">Top Word</th>';
+            html += '</tr></thead><tbody>';
+
+            for (let i = 0; i < plates.length; i++) {
+                const plate = plates[i];
+
+                // Fetch from all tables
+                const [practiceRes, dailyRes, h2hRes] = await Promise.all([
+                    sb.from('practice_plate_stats').select('word, skipped, thinking_seconds').eq('plate', plate),
+                    sb.from('daily_run_entries').select('word, skipped, thinking_seconds').eq('plate', plate),
+                    sb.from('h2h_run_entries').select('word, skipped, thinking_seconds').eq('plate', plate)
+                ]);
+
+                const allRows = [
+                    ...(practiceRes.data || []),
+                    ...(dailyRes.data || []),
+                    ...(h2hRes.data || [])
+                ];
+
+                // Include current run's entry
+                const myEntry = gameHistory[i];
+                if (myEntry) {
+                    allRows.push({
+                        word: myEntry.word || null,
+                        skipped: myEntry.skipped || false,
+                        thinking_seconds: myEntry.thinkingSeconds || 0
+                    });
+                }
+
+                const total = allRows.length;
+                const skipCount = allRows.filter(r => r.skipped).length;
+                const skipPct = total > 0 ? Math.round(100 * skipCount / total) : 0;
+                const validTimes = allRows.filter(r => r.thinking_seconds <= 400);
+                const avgThink = validTimes.length > 0 ? (validTimes.reduce((s, r) => s + r.thinking_seconds, 0) / validTimes.length).toFixed(1) : '--';
+
+                const wordCounts = {};
+                allRows.filter(r => !r.skipped && r.word).forEach(r => {
+                    const w = r.word.toLowerCase();
+                    wordCounts[w] = (wordCounts[w] || 0) + 1;
+                });
+                const topWord = Object.entries(wordCounts).sort((a, b) => b[1] - a[1])[0];
+                const topWordStr = topWord ? `${topWord[0]} (${Math.round(topWord[1] / total * 100)}%)` : '--';
+
+                // Row color
+                const t = Math.min(Math.max(skipPct, 0), 100) / 100;
+                let red, green, opacity;
+                if (t < 0.20) { const f = t / 0.20; red = f * 0.95; green = 0.75 + f * 0.15; opacity = 0.18 + f * 0.02; }
+                else if (t < 0.50) { const f = (t - 0.20) / 0.30; red = 0.95 + f * 0.05; green = 0.90 - f * 0.65; opacity = 0.15 + f * 0.05; }
+                else { const f = (t - 0.50) / 0.50; red = 1.0; green = 0.25 - f * 0.20; opacity = 0.20 + f * 0.12; }
+                const rr = Math.round(255 + (red * 255 - 255) * opacity);
+                const gg = Math.round(255 + (green * 255 - 255) * opacity);
+                const bb = Math.round(255 * (1 - opacity));
+                const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
+
+                html += `<tr style="background:${bgColor};cursor:pointer;" onclick="closePracticeStatsModal();showViableWordsForPlate('${plate}')">`;
+                html += `<td style="padding:8px;color:#9ca3af;">${i + 1}</td>`;
+                html += `<td style="padding:8px;"><strong style="font-family:monospace;">${plate}</strong></td>`;
+                html += `<td style="padding:8px;text-align:right;color:#9ca3af;">${total}</td>`;
+                html += `<td style="padding:8px;text-align:right;">${total > 0 ? skipPct + '%' : '--'}</td>`;
+                html += `<td style="padding:8px;text-align:right;">${avgThink}</td>`;
+                html += `<td style="padding:8px;text-align:right;">${topWordStr}</td>`;
+                html += '</tr>';
+            }
+
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        } catch (e) {
+            console.error('Practice stats error:', e);
+            content.innerHTML = '<p style="text-align:center;color:#dc2626;">Error loading stats</p>';
+        }
+    };
+
+    window.closePracticeStatsModal = function() {
+        document.getElementById('practiceStatsModalBackdrop').classList.remove('show');
+    };
+    // ========== END PRACTICE PLATE STATS ==========
 
     // On page unload, save practice stats locally (will be submitted on next load)
     window.addEventListener('pagehide', () => {
