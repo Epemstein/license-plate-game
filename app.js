@@ -2763,6 +2763,12 @@
                         thinking_seconds: myEntry.thinkingSeconds || 0,
                         penalty_seconds: myEntry.penaltySeconds || 0
                     }, false);
+                    // Set current user's entry from gameHistory
+                    foundMyEntry = true;
+                    wordsModalMySkipped = myEntry.skipped || false;
+                    wordsModalMyWord = myEntry.skipped ? '' : (myEntry.word || '').toLowerCase();
+                    wordsModalMyTime = myEntry.thinkingSeconds || 0;
+                    wordsModalMyPenalty = myEntry.penaltySeconds || 0;
                 }
 
                 if (!foundMyEntry && currentUser) {
@@ -2858,28 +2864,11 @@
                         ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
                         : highlightWordWithPlate(entry.word, wordsModalPlate);
 
-                    html += `<div>`;
-                    html += `<div onclick="toggleUsedDetail(${idx})" style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6;cursor:pointer;">`;
+                    html += `<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6;">`;
                     html += `<div style="flex:1;">${wordDisplay}${badge}</div>`;
                     html += `<div style="min-width:30px;text-align:right;font-weight:600;color:#374151;">${entry.count}</div>`;
                     html += `<div style="min-width:40px;text-align:right;color:#6b7280;">${entry.pct}%</div>`;
-                    html += `<div id="usedChevron${idx}" style="color:#9ca3af;margin-left:8px;transition:transform 0.2s;">&#8250;</div>`;
                     html += `</div>`;
-                    // Expandable detail
-                    html += `<div id="usedDetail${idx}" style="display:none;padding:4px 0 8px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;">`;
-                    entry.users.sort((a, b) => a.time - b.time).forEach(u => {
-                        const isMe = currentUser && u.userId === currentUser.id;
-                        const nameStyle = isMe ? 'color:#9370db;font-weight:600;' : 'color:#374151;';
-                        let timeDisplay = u.time.toFixed(2) + 's';
-                        if (u.skipped && u.penalty) {
-                            timeDisplay = `${u.time.toFixed(2)}s (+${u.penalty}s)`;
-                        }
-                        html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.9rem;">`;
-                        html += `<span style="${nameStyle}">${u.name}</span>`;
-                        html += `<span style="color:#6b7280;">${timeDisplay}</span>`;
-                        html += `</div>`;
-                    });
-                    html += `</div></div>`;
                 });
             }
         }
