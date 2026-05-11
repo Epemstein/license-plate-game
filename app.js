@@ -2710,11 +2710,11 @@
 
         // Load used words from all tables (non-blocking)
         Promise.all([
-            sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate }),
+            sb.from('daily_run_entries').select('word, skipped, thinking_seconds, penalty_seconds').eq('plate', wordsModalPlate),
             sb.from('practice_plate_stats').select('word, skipped, thinking_seconds, user_id').eq('plate', wordsModalPlate),
             sb.from('h2h_run_entries').select('word, skipped, thinking_seconds').eq('plate', wordsModalPlate)
         ]).then(([dailyRes, practiceRes, h2hRes]) => {
-                const dailyData = dailyRes.data || [];
+                const dailyData = (dailyRes.data || []).map(r => ({ ...r, penalty_seconds: r.penalty_seconds || 0 }));
                 const practiceData = (practiceRes.data || []).map(r => ({ ...r, penalty_seconds: 0 }));
                 const h2hData = (h2hRes.data || []).map(r => ({ ...r, penalty_seconds: 0 }));
 
@@ -2750,7 +2750,7 @@
                     }
                 }
 
-                dailyData.forEach(r => processRow(r, true));
+                dailyData.forEach(r => processRow(r, false));
                 practiceData.forEach(r => processRow(r, false));
                 h2hData.forEach(r => processRow(r, false));
 
