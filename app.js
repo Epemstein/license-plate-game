@@ -2754,6 +2754,17 @@
                 practiceData.forEach(r => processRow(r, false));
                 h2hData.forEach(r => processRow(r, false));
 
+                // Include current run's entry if it exists in gameHistory
+                const myEntry = gameHistory.find(e => (e.plate || '').toUpperCase() === wordsModalPlate);
+                if (myEntry) {
+                    processRow({
+                        word: myEntry.word || null,
+                        skipped: myEntry.skipped || false,
+                        thinking_seconds: myEntry.thinkingSeconds || 0,
+                        penalty_seconds: myEntry.penaltySeconds || 0
+                    }, false);
+                }
+
                 if (!foundMyEntry && currentUser) {
                     wordsModalMyWord = '__not_played__';
                 }
