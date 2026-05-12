@@ -2217,16 +2217,24 @@
             let skips = 0;
             let totalThinking = 0;
             let platesTraversed = 0;
+            const breakdown = [];
 
             for (const plate of plateSequence) {
                 if (solves >= 10) break;
                 const stats = plateStats[plate];
-                if (!stats) continue; // skip plates with no data
+                if (!stats) continue;
 
                 totalThinking += stats.medianThink;
                 solves += (1 - stats.skipRate);
                 skips += stats.skipRate;
                 platesTraversed++;
+                breakdown.push({
+                    plate,
+                    medianThink: stats.medianThink,
+                    skipRate: stats.skipRate,
+                    cumulSolves: solves,
+                    cumulSkips: skips
+                });
             }
 
             // Calculate escalating skip penalty: 5 + 10 + 15 + ...
@@ -2249,8 +2257,28 @@
                 const faster = diff < 0;
                 const color = faster ? '#16a34a' : '#dc2626';
                 const word = faster ? 'faster' : 'slower';
-                el.innerHTML = `The expected time for this practice round was <strong>${expectedTime.toFixed(1)}s</strong>.
-                    <br><span style="color:${color};font-weight:600;">You were ${absDiff}s ${word} than expected.</span>`;
+
+                // Build breakdown table
+                let bkHtml = '<div style="max-height:300px;overflow-y:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
+                bkHtml += '<thead><tr style="background:#f3f4f6;"><th style="padding:4px 6px;text-align:left;">#</th><th style="padding:4px 6px;text-align:left;">Plate</th><th style="padding:4px 6px;text-align:right;">Median</th><th style="padding:4px 6px;text-align:right;">Skip Rate</th><th style="padding:4px 6px;text-align:right;">Solves</th><th style="padding:4px 6px;text-align:right;">Skips</th></tr></thead><tbody>';
+                breakdown.forEach((b, i) => {
+                    bkHtml += `<tr style="border-bottom:1px solid #f0f0f0;">`;
+                    bkHtml += `<td style="padding:4px 6px;color:#9ca3af;">${i + 1}</td>`;
+                    bkHtml += `<td style="padding:4px 6px;font-weight:600;font-family:monospace;">${b.plate}</td>`;
+                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}s</td>`;
+                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${Math.round(b.skipRate * 100)}%</td>`;
+                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSolves.toFixed(1)}</td>`;
+                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSkips.toFixed(1)}</td>`;
+                    bkHtml += `</tr>`;
+                });
+                bkHtml += '</tbody></table>';
+                bkHtml += `<div style="font-size:0.8rem;color:#6b7280;margin-top:6px;padding:6px;background:#f9fafb;border-radius:6px;">`;
+                bkHtml += `Thinking: ${totalThinking.toFixed(1)}s + Penalty: ${penalty.toFixed(1)}s (${skips.toFixed(1)} skips) = <strong>${expectedTime.toFixed(1)}s</strong>`;
+                bkHtml += `</div></div>`;
+
+                el.innerHTML = `The expected time for this practice round was <a href="#" onclick="event.preventDefault();document.getElementById('expectedBreakdown').style.display=document.getElementById('expectedBreakdown').style.display==='none'?'block':'none';" style="font-weight:700;color:#2563eb;text-decoration:underline;">${expectedTime.toFixed(1)}s</a>.
+                    <br><span style="color:${color};font-weight:600;">You were ${absDiff}s ${word} than expected.</span>
+                    <div id="expectedBreakdown" style="display:none;">${bkHtml}</div>`;
             }
         } catch (e) {
             console.error('Expected time error:', e);
