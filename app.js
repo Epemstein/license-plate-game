@@ -2227,16 +2227,15 @@
                 const stats = plateStats[plate];
                 if (!stats) continue;
 
+                const solveContrib = 1 - stats.skipRate;
                 const solvesNeeded = 10 - solves;
-                const plateContrib = 1 - stats.skipRate; // how much this plate contributes to solves
-                const skipContrib = stats.skipRate;
 
-                if (solves + plateContrib + skipContrib > 10 + skips && solvesNeeded < 1) {
-                    // Prorate: only need a fraction of this plate
-                    const fraction = solvesNeeded / plateContrib;
+                if (solveContrib > 0 && solvesNeeded <= solveContrib) {
+                    // This plate gets us to 10 — prorate it
+                    const fraction = solvesNeeded / solveContrib;
                     totalThinking += stats.medianThink * fraction;
-                    solves += plateContrib * fraction;
-                    skips += skipContrib * fraction;
+                    solves += solveContrib * fraction;
+                    skips += stats.skipRate * fraction;
                     platesTraversed++;
                     breakdown.push({
                         plate,
@@ -2249,9 +2248,10 @@
                     break;
                 }
 
+                // Full plate
                 totalThinking += stats.medianThink;
-                solves += plateContrib;
-                skips += skipContrib;
+                solves += solveContrib;
+                skips += stats.skipRate;
                 platesTraversed++;
                 breakdown.push({
                     plate,
@@ -2261,7 +2261,6 @@
                     cumulSolves: solves,
                     cumulSkips: skips
                 });
-                if (solves >= 10) break;
             }
 
             // Calculate escalating skip penalty: 5 + 10 + 15 + ...
