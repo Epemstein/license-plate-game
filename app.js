@@ -2220,7 +2220,6 @@
             const breakdown = [];
 
             for (const plate of plateSequence) {
-                if (solves >= 10) break;
                 const stats = plateStats[plate];
                 if (!stats) continue;
 
@@ -2235,6 +2234,7 @@
                     cumulSolves: solves,
                     cumulSkips: skips
                 });
+                if (solves >= 10) break;
             }
 
             // Calculate escalating skip penalty: 5 + 10 + 15 + ...
