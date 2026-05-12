@@ -2213,12 +2213,11 @@
                 ].filter(r => r.thinking_seconds <= 400);
 
                 if (allRows.length > 0) {
-                    // Median thinking time (all players, including skips)
                     const times = allRows.map(r => r.thinking_seconds).sort((a, b) => a - b);
                     const mid = Math.floor(times.length / 2);
                     const median = times.length % 2 === 0 ? (times[mid - 1] + times[mid]) / 2 : times[mid];
                     const skipRate = allRows.filter(r => r.skipped).length / allRows.length;
-                    plateStats[plate] = { medianThink: median, skipRate };
+                    plateStats[plate] = { medianThink: median, skipRate, plays: allRows.length };
                 }
             }
 
@@ -2237,35 +2236,29 @@
                 const solvesNeeded = 10 - solves;
 
                 if (solveContrib > 0 && solvesNeeded <= solveContrib) {
-                    // This plate gets us to 10 — prorate it
                     const fraction = solvesNeeded / solveContrib;
                     totalThinking += stats.medianThink * fraction;
                     solves += solveContrib * fraction;
                     skips += stats.skipRate * fraction;
                     platesTraversed++;
                     breakdown.push({
-                        plate,
+                        plate, plays: stats.plays || 0,
                         medianThink: stats.medianThink * fraction,
-                        skipRate: stats.skipRate,
-                        fraction,
-                        cumulSolves: solves,
-                        cumulSkips: skips
+                        skipRate: stats.skipRate, fraction,
+                        cumulSolves: solves, cumulSkips: skips
                     });
                     break;
                 }
 
-                // Full plate
                 totalThinking += stats.medianThink;
                 solves += solveContrib;
                 skips += stats.skipRate;
                 platesTraversed++;
                 breakdown.push({
-                    plate,
+                    plate, plays: stats.plays || 0,
                     medianThink: stats.medianThink,
-                    skipRate: stats.skipRate,
-                    fraction: 1,
-                    cumulSolves: solves,
-                    cumulSkips: skips
+                    skipRate: stats.skipRate, fraction: 1,
+                    cumulSolves: solves, cumulSkips: skips
                 });
             }
 
@@ -2295,13 +2288,14 @@
 
                 // Build breakdown table
                 let bkHtml = '<div style="max-height:300px;overflow-y:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
-                bkHtml += '<thead><tr style="background:#f3f4f6;"><th style="padding:4px 6px;text-align:left;">#</th><th style="padding:4px 6px;text-align:left;">Plate</th><th style="padding:4px 6px;text-align:right;">Median</th><th style="padding:4px 6px;text-align:right;">Skip Rate</th><th style="padding:4px 6px;text-align:right;">Solves</th><th style="padding:4px 6px;text-align:right;">Skips</th></tr></thead><tbody>';
+                bkHtml += '<thead><tr style="background:#f3f4f6;"><th style="padding:4px 6px;text-align:left;">#</th><th style="padding:4px 6px;text-align:left;">Plate</th><th style="padding:4px 6px;text-align:right;">Plays</th><th style="padding:4px 6px;text-align:right;">Median</th><th style="padding:4px 6px;text-align:right;">Skip %</th><th style="padding:4px 6px;text-align:right;">Solves</th><th style="padding:4px 6px;text-align:right;">Skips</th></tr></thead><tbody>';
                 breakdown.forEach((b, i) => {
                     const isProrated = b.fraction < 1;
                     const rowStyle = isProrated ? 'border-bottom:1px solid #f0f0f0;background:#f9fafb;font-style:italic;' : 'border-bottom:1px solid #f0f0f0;';
                     bkHtml += `<tr style="${rowStyle}">`;
                     bkHtml += `<td style="padding:4px 6px;color:#9ca3af;">${i + 1}</td>`;
                     bkHtml += `<td style="padding:4px 6px;font-weight:600;font-family:monospace;">${b.plate}${isProrated ? ' <span style="font-size:0.7rem;color:#9ca3af;font-weight:400;">(' + Math.round(b.fraction * 100) + '%)</span>' : ''}</td>`;
+                    bkHtml += `<td style="padding:4px 6px;text-align:right;color:#9ca3af;">${b.plays}</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}s</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;">${Math.round(b.skipRate * 100)}%</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSolves.toFixed(2)}</td>`;
@@ -4628,13 +4622,14 @@
         html += `</div>`;
 
         html += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
-        html += '<thead><tr style="background:#f3f4f6;"><th style="padding:4px 6px;text-align:left;">#</th><th style="padding:4px 6px;text-align:left;">Plate</th><th style="padding:4px 6px;text-align:right;">Median</th><th style="padding:4px 6px;text-align:right;">Skip %</th><th style="padding:4px 6px;text-align:right;">Solves</th><th style="padding:4px 6px;text-align:right;">Skips</th></tr></thead><tbody>';
+        html += '<thead><tr style="background:#f3f4f6;"><th style="padding:4px 6px;text-align:left;">#</th><th style="padding:4px 6px;text-align:left;">Plate</th><th style="padding:4px 6px;text-align:right;">Plays</th><th style="padding:4px 6px;text-align:right;">Median</th><th style="padding:4px 6px;text-align:right;">Skip %</th><th style="padding:4px 6px;text-align:right;">Solves</th><th style="padding:4px 6px;text-align:right;">Skips</th></tr></thead><tbody>';
         d.breakdown.forEach((b, i) => {
             const isProrated = b.fraction < 1;
             const rowStyle = isProrated ? 'border-bottom:1px solid #f0f0f0;background:#f9fafb;font-style:italic;' : 'border-bottom:1px solid #f0f0f0;';
             html += `<tr style="${rowStyle}">`;
             html += `<td style="padding:4px 6px;color:#9ca3af;">${i + 1}</td>`;
             html += `<td style="padding:4px 6px;font-weight:600;font-family:monospace;">${b.plate}${isProrated ? ' <span style="font-size:0.7rem;color:#9ca3af;font-weight:400;">(' + Math.round(b.fraction * 100) + '%)</span>' : ''}</td>`;
+            html += `<td style="padding:4px 6px;text-align:right;color:#9ca3af;">${b.plays}</td>`;
             html += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}s</td>`;
             html += `<td style="padding:4px 6px;text-align:right;">${Math.round(b.skipRate * 100)}%</td>`;
             html += `<td style="padding:4px 6px;text-align:right;">${b.cumulSolves.toFixed(2)}</td>`;
