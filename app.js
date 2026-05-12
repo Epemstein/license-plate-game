@@ -2190,8 +2190,8 @@
             // Fetch stats for all plates we might traverse (fetch more than 10 since skips mean we go further)
             const plateStats = {}; // plate -> { medianThink, skipRate }
 
-            // Batch fetch: get data for first 30 plates (generous buffer)
-            const platesToFetch = plateSequence.slice(0, 30);
+            // Batch fetch: get data for first 50 plates (generous buffer for high skip rates)
+            const platesToFetch = plateSequence.slice(0, 50);
 
             for (const plate of platesToFetch) {
                 const [practiceRes, dailyRes, h2hRes] = await Promise.all([
@@ -2223,9 +2223,12 @@
             let platesTraversed = 0;
             const breakdown = [];
 
+            // Compute a fallback median from all plates that have data
+            const allMedians = Object.values(plateStats).map(s => s.medianThink);
+            const fallbackMedian = allMedians.length > 0 ? allMedians.sort((a, b) => a - b)[Math.floor(allMedians.length / 2)] : 5;
+
             for (const plate of plateSequence) {
-                const stats = plateStats[plate];
-                if (!stats) continue;
+                const stats = plateStats[plate] || { medianThink: fallbackMedian, skipRate: 0 };
 
                 const solveContrib = 1 - stats.skipRate;
                 const solvesNeeded = 10 - solves;
