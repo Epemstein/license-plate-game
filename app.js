@@ -2196,29 +2196,31 @@
             // Fetch stats for all plates we might traverse (fetch more than 10 since skips mean we go further)
             const plateStats = {}; // plate -> { medianThink, skipRate }
 
-            // Batch fetch: get data for first 50 plates (generous buffer for high skip rates)
+            // Batch fetch: 3 queries total instead of 150
             const platesToFetch = plateSequence.slice(0, 50);
 
+            const [practiceRes, dailyRes, h2hRes] = await Promise.all([
+                sb.from('practice_plate_stats').select('plate, thinking_seconds, skipped').in('plate', platesToFetch),
+                sb.from('daily_run_entries').select('plate, thinking_seconds, skipped').in('plate', platesToFetch),
+                sb.from('h2h_run_entries').select('plate, thinking_seconds, skipped').in('plate', platesToFetch)
+            ]);
+
+            // Group all rows by plate
+            const byPlate = {};
+            [...(practiceRes.data || []), ...(dailyRes.data || []), ...(h2hRes.data || [])].forEach(r => {
+                if (r.thinking_seconds > 400) return;
+                if (!byPlate[r.plate]) byPlate[r.plate] = [];
+                byPlate[r.plate].push(r);
+            });
+
             for (const plate of platesToFetch) {
-                const [practiceRes, dailyRes, h2hRes] = await Promise.all([
-                    sb.from('practice_plate_stats').select('thinking_seconds, skipped').eq('plate', plate),
-                    sb.from('daily_run_entries').select('thinking_seconds, skipped').eq('plate', plate),
-                    sb.from('h2h_run_entries').select('thinking_seconds, skipped').eq('plate', plate)
-                ]);
-
-                const allRows = [
-                    ...(practiceRes.data || []),
-                    ...(dailyRes.data || []),
-                    ...(h2hRes.data || [])
-                ].filter(r => r.thinking_seconds <= 400);
-
-                if (allRows.length > 0) {
-                    const times = allRows.map(r => r.thinking_seconds).sort((a, b) => a - b);
-                    const mid = Math.floor(times.length / 2);
-                    const median = times.length % 2 === 0 ? (times[mid - 1] + times[mid]) / 2 : times[mid];
-                    const skipRate = allRows.filter(r => r.skipped).length / allRows.length;
-                    plateStats[plate] = { medianThink: median, skipRate, plays: allRows.length };
-                }
+                const rows = byPlate[plate];
+                if (!rows || rows.length === 0) continue;
+                const times = rows.map(r => r.thinking_seconds).sort((a, b) => a - b);
+                const mid = Math.floor(times.length / 2);
+                const median = times.length % 2 === 0 ? (times[mid - 1] + times[mid]) / 2 : times[mid];
+                const skipRate = rows.filter(r => r.skipped).length / rows.length;
+                plateStats[plate] = { medianThink: median, skipRate, plays: rows.length };
             }
 
             // Walk through sequence until 10 solves
@@ -4517,32 +4519,33 @@
         }
 
         try {
+            // Batch fetch: 3 queries total
+            const [practiceAll, dailyAll, h2hAll] = await Promise.all([
+                sb.from('practice_plate_stats').select('plate, word, skipped, thinking_seconds').in('plate', plates),
+                sb.from('daily_run_entries').select('plate, word, skipped, thinking_seconds').in('plate', plates),
+                sb.from('h2h_run_entries').select('plate, word, skipped, thinking_seconds').in('plate', plates)
+            ]);
+
+            // Group by plate
+            const byPlate = {};
+            [...(practiceAll.data || []), ...(dailyAll.data || []), ...(h2hAll.data || [])].forEach(r => {
+                if (!byPlate[r.plate]) byPlate[r.plate] = [];
+                byPlate[r.plate].push(r);
+            });
+
             let html = '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">';
             html += '<thead><tr style="background:#f3f4f6;">';
             html += '<th style="padding:6px 8px;text-align:left;">#</th>';
             html += '<th style="padding:6px 8px;text-align:left;">Plate</th>';
             html += '<th style="padding:6px 8px;text-align:right;">Plays</th>';
             html += '<th style="padding:6px 8px;text-align:right;">Skip</th>';
-            html += '<th style="padding:6px 8px;text-align:right;">Think</th>';
+            html += '<th style="padding:6px 8px;text-align:right;">Median</th>';
             html += '<th style="padding:6px 8px;text-align:right;">Top Word</th>';
             html += '</tr></thead><tbody>';
 
             for (let i = 0; i < plates.length; i++) {
                 const plate = plates[i];
-
-                // Fetch from all tables
-                const [practiceRes, dailyRes, h2hRes] = await Promise.all([
-                    sb.from('practice_plate_stats').select('word, skipped, thinking_seconds').eq('plate', plate),
-                    sb.from('daily_run_entries').select('word, skipped, thinking_seconds').eq('plate', plate),
-                    sb.from('h2h_run_entries').select('word, skipped, thinking_seconds').eq('plate', plate)
-                ]);
-
-                const allRows = [
-                    ...(practiceRes.data || []),
-                    ...(dailyRes.data || []),
-                    ...(h2hRes.data || [])
-                ];
-
+                const allRows = byPlate[plate] || [];
 
                 const total = allRows.length;
                 const skipCount = allRows.filter(r => r.skipped).length;
