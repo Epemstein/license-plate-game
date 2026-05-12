@@ -2213,6 +2213,20 @@
                 byPlate[r.plate].push(r);
             });
 
+            // Include current run entries for plates not yet in DB
+            gameHistory.forEach(e => {
+                const plate = (e.plate || '').toUpperCase();
+                if (!plate) return;
+                const t = e.thinkingSeconds || 0;
+                if (t > 400) return;
+                const rows = byPlate[plate] || [];
+                const alreadyPresent = rows.some(r => Math.abs(r.thinking_seconds - t) < 0.01 && r.skipped === (e.skipped || false));
+                if (!alreadyPresent) {
+                    if (!byPlate[plate]) byPlate[plate] = [];
+                    byPlate[plate].push({ plate, thinking_seconds: t, skipped: e.skipped || false });
+                }
+            });
+
             for (const plate of platesToFetch) {
                 const rows = byPlate[plate];
                 if (!rows || rows.length === 0) continue;
