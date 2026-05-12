@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v109</title>
+    <title>License Plate Game v110</title>
     <link rel="stylesheet" href="styles.css?v=88">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -102,7 +102,10 @@
             <div class="solved-card">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <h3 style="margin-top:0;">Solved Plates</h3>
-                    <button id="practiceStatsBtn2" onclick="showPracticePlateStatsModal()" disabled style="padding:4px 12px;background:rgba(37,99,235,0.08);color:#2563eb;border:1px solid rgba(37,99,235,0.25);border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;opacity:0.4;">Plate Stats</button>
+                    <div style="display:flex;gap:6px;">
+                        <button id="practiceStatsBtn2" onclick="showPracticePlateStatsModal()" disabled style="padding:4px 10px;background:rgba(37,99,235,0.08);color:#2563eb;border:1px solid rgba(37,99,235,0.25);border-radius:8px;font-weight:600;font-size:0.75rem;cursor:pointer;opacity:0.4;">Plate Stats</button>
+                        <button id="expectedRunBtn" onclick="showExpectedRunModal()" disabled style="padding:4px 10px;background:rgba(22,163,74,0.08);color:#16a34a;border:1px solid rgba(22,163,74,0.25);border-radius:8px;font-weight:600;font-size:0.75rem;cursor:pointer;opacity:0.4;">Expected Run</button>
+                    </div>
                 </div>
                 <table>
                     <thead>

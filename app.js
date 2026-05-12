@@ -1574,7 +1574,10 @@
         gameOver = false;
         solvedCount = 0;
         const psBtn = document.getElementById('practiceStatsBtn2');
+        const erBtn = document.getElementById('expectedRunBtn');
         if (psBtn) { psBtn.disabled = true; psBtn.style.opacity = '0.4'; }
+        if (erBtn) { erBtn.disabled = true; erBtn.style.opacity = '0.4'; }
+        window._lastExpectedData = null;
         startTime = null;
         penaltySeconds = 0;
         skipCount = 0;
@@ -1788,11 +1791,12 @@
         gameStarted = false;
         plateLocked = true;
 
-        // Enable practice plate stats button
-        const psBtn = document.getElementById('practiceStatsBtn2');
-        if (psBtn && solvedCount >= 10) {
-            psBtn.disabled = false;
-            psBtn.style.opacity = '1';
+        // Enable practice buttons
+        if (solvedCount >= 10) {
+            const psBtn = document.getElementById('practiceStatsBtn2');
+            const erBtn = document.getElementById('expectedRunBtn');
+            if (psBtn) { psBtn.disabled = false; psBtn.style.opacity = '1'; }
+            if (erBtn) { erBtn.disabled = false; erBtn.style.opacity = '1'; }
         }
 
         if (!startTime) return;
@@ -2223,14 +2227,37 @@
                 const stats = plateStats[plate];
                 if (!stats) continue;
 
+                const solvesNeeded = 10 - solves;
+                const plateContrib = 1 - stats.skipRate; // how much this plate contributes to solves
+                const skipContrib = stats.skipRate;
+
+                if (solves + plateContrib + skipContrib > 10 + skips && solvesNeeded < 1) {
+                    // Prorate: only need a fraction of this plate
+                    const fraction = solvesNeeded / plateContrib;
+                    totalThinking += stats.medianThink * fraction;
+                    solves += plateContrib * fraction;
+                    skips += skipContrib * fraction;
+                    platesTraversed++;
+                    breakdown.push({
+                        plate,
+                        medianThink: stats.medianThink * fraction,
+                        skipRate: stats.skipRate,
+                        fraction,
+                        cumulSolves: solves,
+                        cumulSkips: skips
+                    });
+                    break;
+                }
+
                 totalThinking += stats.medianThink;
-                solves += (1 - stats.skipRate);
-                skips += stats.skipRate;
+                solves += plateContrib;
+                skips += skipContrib;
                 platesTraversed++;
                 breakdown.push({
                     plate,
                     medianThink: stats.medianThink,
                     skipRate: stats.skipRate,
+                    fraction: 1,
                     cumulSolves: solves,
                     cumulSkips: skips
                 });
@@ -2250,6 +2277,9 @@
 
             const expectedTime = totalThinking + penalty;
 
+            // Store for the Expected Run button
+            window._lastExpectedData = { expectedTime, actualTime, totalThinking, penalty, skips, breakdown, platesTraversed };
+
             const el = document.getElementById('expectedTimeText');
             if (el && platesTraversed > 0) {
                 const diff = actualTime - expectedTime;
@@ -2262,13 +2292,15 @@
                 let bkHtml = '<div style="max-height:300px;overflow-y:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
                 bkHtml += '<thead><tr style="background:#f3f4f6;"><th style="padding:4px 6px;text-align:left;">#</th><th style="padding:4px 6px;text-align:left;">Plate</th><th style="padding:4px 6px;text-align:right;">Median</th><th style="padding:4px 6px;text-align:right;">Skip Rate</th><th style="padding:4px 6px;text-align:right;">Solves</th><th style="padding:4px 6px;text-align:right;">Skips</th></tr></thead><tbody>';
                 breakdown.forEach((b, i) => {
-                    bkHtml += `<tr style="border-bottom:1px solid #f0f0f0;">`;
+                    const isProrated = b.fraction < 1;
+                    const rowStyle = isProrated ? 'border-bottom:1px solid #f0f0f0;background:#f9fafb;font-style:italic;' : 'border-bottom:1px solid #f0f0f0;';
+                    bkHtml += `<tr style="${rowStyle}">`;
                     bkHtml += `<td style="padding:4px 6px;color:#9ca3af;">${i + 1}</td>`;
-                    bkHtml += `<td style="padding:4px 6px;font-weight:600;font-family:monospace;">${b.plate}</td>`;
+                    bkHtml += `<td style="padding:4px 6px;font-weight:600;font-family:monospace;">${b.plate}${isProrated ? ' <span style="font-size:0.7rem;color:#9ca3af;font-weight:400;">(' + Math.round(b.fraction * 100) + '%)</span>' : ''}</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}s</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;">${Math.round(b.skipRate * 100)}%</td>`;
-                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSolves.toFixed(1)}</td>`;
-                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSkips.toFixed(1)}</td>`;
+                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSolves.toFixed(2)}</td>`;
+                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSkips.toFixed(2)}</td>`;
                     bkHtml += `</tr>`;
                 });
                 bkHtml += '</tbody></table>';
@@ -4558,6 +4590,58 @@
 
     window.closePracticeStatsModal = function() {
         document.getElementById('practiceStatsModalBackdrop').classList.remove('show');
+    };
+
+    window.showExpectedRunModal = function() {
+        const d = window._lastExpectedData;
+        if (!d) {
+            // Data not ready yet — compute it
+            const baseElapsed = (performance.now() - startTime) / 1000;
+            const totalSec = baseElapsed + penaltySeconds;
+            computeExpectedTime(totalSec).then(() => {
+                if (window._lastExpectedData) showExpectedRunModal();
+            });
+            return;
+        }
+
+        const backdrop = document.getElementById('practiceStatsModalBackdrop');
+        const content = document.getElementById('practiceStatsModalContent');
+        document.querySelector('#practiceStatsModalBackdrop .modal-title').textContent = 'Expected Run';
+        backdrop.classList.add('show');
+
+        const diff = d.actualTime - d.expectedTime;
+        const absDiff = Math.abs(diff).toFixed(1);
+        const faster = diff < 0;
+        const color = faster ? '#16a34a' : '#dc2626';
+        const word = faster ? 'faster' : 'slower';
+
+        let html = '';
+        html += `<div style="text-align:center;margin-bottom:12px;">`;
+        html += `<div style="font-size:1.1rem;">Your time: <strong>${d.actualTime.toFixed(1)}s</strong></div>`;
+        html += `<div style="font-size:1.1rem;">Expected: <strong>${d.expectedTime.toFixed(1)}s</strong></div>`;
+        html += `<div style="font-size:1rem;color:${color};font-weight:600;margin-top:4px;">${absDiff}s ${word} than expected</div>`;
+        html += `</div>`;
+
+        html += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
+        html += '<thead><tr style="background:#f3f4f6;"><th style="padding:4px 6px;text-align:left;">#</th><th style="padding:4px 6px;text-align:left;">Plate</th><th style="padding:4px 6px;text-align:right;">Median</th><th style="padding:4px 6px;text-align:right;">Skip %</th><th style="padding:4px 6px;text-align:right;">Solves</th><th style="padding:4px 6px;text-align:right;">Skips</th></tr></thead><tbody>';
+        d.breakdown.forEach((b, i) => {
+            const isProrated = b.fraction < 1;
+            const rowStyle = isProrated ? 'border-bottom:1px solid #f0f0f0;background:#f9fafb;font-style:italic;' : 'border-bottom:1px solid #f0f0f0;';
+            html += `<tr style="${rowStyle}">`;
+            html += `<td style="padding:4px 6px;color:#9ca3af;">${i + 1}</td>`;
+            html += `<td style="padding:4px 6px;font-weight:600;font-family:monospace;">${b.plate}${isProrated ? ' <span style="font-size:0.7rem;color:#9ca3af;font-weight:400;">(' + Math.round(b.fraction * 100) + '%)</span>' : ''}</td>`;
+            html += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}s</td>`;
+            html += `<td style="padding:4px 6px;text-align:right;">${Math.round(b.skipRate * 100)}%</td>`;
+            html += `<td style="padding:4px 6px;text-align:right;">${b.cumulSolves.toFixed(2)}</td>`;
+            html += `<td style="padding:4px 6px;text-align:right;">${b.cumulSkips.toFixed(2)}</td>`;
+            html += `</tr>`;
+        });
+        html += '</tbody></table>';
+        html += `<div style="font-size:0.8rem;color:#6b7280;margin-top:8px;padding:6px;background:#f9fafb;border-radius:6px;">`;
+        html += `Thinking: ${d.totalThinking.toFixed(1)}s + Penalty: ${d.penalty.toFixed(1)}s (${d.skips.toFixed(1)} skips) = <strong>${d.expectedTime.toFixed(1)}s</strong>`;
+        html += `</div>`;
+
+        content.innerHTML = html;
     };
     // ========== END PRACTICE PLATE STATS ==========
 
