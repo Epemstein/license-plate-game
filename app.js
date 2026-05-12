@@ -2679,9 +2679,12 @@
     let wordsModalSkipPct = 0;
     let wordsModalAvgTime = 0;
 
-    function showViableWordsForPlate(plate, hideUsed) {
+    let wordsModalSource = 'daily'; // 'daily' or 'practice'
+
+    function showViableWordsForPlate(plate, hideUsed, source) {
         if (!plate || plate === '\u2014') return;
 
+        wordsModalSource = source || 'daily';
         wordsModalPlate = plate.toUpperCase();
         wordsModalDate = currentViewingDate || getTodayString();
         wordsModalMyWord = '';
@@ -2708,82 +2711,96 @@
 
         if (hideUsed) return; // Skip loading used data during gameplay
 
-        // Load used words from all tables (non-blocking)
-        Promise.all([
-            sb.from('daily_run_entries').select('word, skipped, thinking_seconds, penalty_seconds').eq('plate', wordsModalPlate),
-            sb.from('practice_plate_stats').select('word, skipped, thinking_seconds, user_id').eq('plate', wordsModalPlate),
-            sb.from('h2h_run_entries').select('word, skipped, thinking_seconds').eq('plate', wordsModalPlate)
-        ]).then(([dailyRes, practiceRes, h2hRes]) => {
-                const dailyData = (dailyRes.data || []).map(r => ({ ...r, penalty_seconds: r.penalty_seconds || 0 }));
-                const practiceData = (practiceRes.data || []).map(r => ({ ...r, penalty_seconds: 0 }));
-                const h2hData = (h2hRes.data || []).map(r => ({ ...r, penalty_seconds: 0 }));
-
-                // Combine all — daily has user details, others don't
-                const wordGroups = {};
-                let totalPlays = 0;
-                let skipCount = 0;
-                let totalTime = 0;
-                let foundMyEntry = false;
-
-                function processRow(row, hasUserInfo) {
-                    totalPlays++;
-                    const thinkTime = row.thinking_seconds || 0;
-                    const penTime = row.penalty_seconds || 0;
-                    totalTime += thinkTime + penTime;
-                    const key = row.skipped ? '__skipped__' : (row.word || '').toLowerCase();
-                    if (row.skipped) skipCount++;
-                    if (!wordGroups[key]) wordGroups[key] = { word: key, count: 0, users: [] };
-                    wordGroups[key].count++;
-                    if (hasUserInfo) {
+        if (wordsModalSource === 'daily') {
+            // Daily: use RPC with user details, date-scoped, clickable
+            sb.rpc('plate_user_details', { p_plate: wordsModalPlate, p_date: wordsModalDate })
+                .then(({ data }) => {
+                    if (!data) return;
+                    const wordGroups = {};
+                    let totalPlays = 0, skipCount = 0, totalTime = 0, foundMyEntry = false;
+                    data.forEach(row => {
+                        totalPlays++;
+                        const thinkTime = row.thinking_seconds || 0;
+                        const penTime = row.penalty_seconds || 0;
+                        totalTime += thinkTime + penTime;
+                        const key = row.skipped ? '__skipped__' : (row.word || '').toLowerCase();
+                        if (row.skipped) skipCount++;
+                        if (!wordGroups[key]) wordGroups[key] = { word: key, count: 0, users: [] };
+                        wordGroups[key].count++;
                         wordGroups[key].users.push({
                             name: row.display_name || (row.handle ? '@' + row.handle : 'Anonymous'),
-                            time: thinkTime, penalty: penTime,
-                            userId: row.user_id, skipped: row.skipped
+                            time: thinkTime, penalty: penTime, userId: row.user_id, skipped: row.skipped
+                        });
+                        if (currentUser && row.user_id === currentUser.id) {
+                            foundMyEntry = true;
+                            wordsModalMySkipped = row.skipped;
+                            wordsModalMyWord = row.skipped ? '' : (row.word || '').toLowerCase();
+                            wordsModalMyTime = thinkTime;
+                            wordsModalMyPenalty = penTime;
+                        }
+                    });
+                    if (!foundMyEntry && currentUser) wordsModalMyWord = '__not_played__';
+                    wordsModalSkipPct = totalPlays > 0 ? Math.round(skipCount / totalPlays * 100) : 0;
+                    wordsModalAvgTime = totalPlays > 0 ? totalTime / totalPlays : 0;
+                    wordsModalUsed = Object.values(wordGroups)
+                        .map(g => ({ ...g, pct: Math.round(g.count / totalPlays * 100), isSkip: g.word === '__skipped__' }))
+                        .sort((a, b) => b.count - a.count);
+                    document.getElementById('wordsTabUsed').textContent = `Used (${totalPlays})`;
+                    updateWordsModalHeader();
+                    if (wordsModalActiveTab === 'used') renderWordsTab('used');
+                })
+                .catch(e => console.error('Failed to load used words:', e));
+        } else {
+            // Practice: pull from all tables, no user details, not clickable
+            Promise.all([
+                sb.from('daily_run_entries').select('word, skipped, thinking_seconds, penalty_seconds').eq('plate', wordsModalPlate),
+                sb.from('practice_plate_stats').select('word, skipped, thinking_seconds').eq('plate', wordsModalPlate),
+                sb.from('h2h_run_entries').select('word, skipped, thinking_seconds').eq('plate', wordsModalPlate)
+            ]).then(([dailyRes, practiceRes, h2hRes]) => {
+                    const allData = [
+                        ...(dailyRes.data || []).map(r => ({ ...r, penalty_seconds: r.penalty_seconds || 0 })),
+                        ...(practiceRes.data || []).map(r => ({ ...r, penalty_seconds: 0 })),
+                        ...(h2hRes.data || []).map(r => ({ ...r, penalty_seconds: 0 }))
+                    ];
+                    // Include current run's entry
+                    const myEntry = gameHistory.find(e => (e.plate || '').toUpperCase() === wordsModalPlate);
+                    if (myEntry) {
+                        allData.push({
+                            word: myEntry.word || null, skipped: myEntry.skipped || false,
+                            thinking_seconds: myEntry.thinkingSeconds || 0, penalty_seconds: myEntry.penaltySeconds || 0
                         });
                     }
-                    if (hasUserInfo && currentUser && row.user_id === currentUser.id) {
-                        foundMyEntry = true;
-                        wordsModalMySkipped = row.skipped;
-                        wordsModalMyWord = row.skipped ? '' : (row.word || '').toLowerCase();
-                        wordsModalMyTime = thinkTime;
-                        wordsModalMyPenalty = penTime;
+                    const wordGroups = {};
+                    let totalPlays = 0, skipCount = 0, totalTime = 0;
+                    allData.forEach(row => {
+                        totalPlays++;
+                        const thinkTime = row.thinking_seconds || 0;
+                        const penTime = row.penalty_seconds || 0;
+                        totalTime += thinkTime + penTime;
+                        const key = row.skipped ? '__skipped__' : (row.word || '').toLowerCase();
+                        if (row.skipped) skipCount++;
+                        if (!wordGroups[key]) wordGroups[key] = { word: key, count: 0, users: [] };
+                        wordGroups[key].count++;
+                    });
+                    if (myEntry) {
+                        wordsModalMySkipped = myEntry.skipped || false;
+                        wordsModalMyWord = myEntry.skipped ? '' : (myEntry.word || '').toLowerCase();
+                        wordsModalMyTime = myEntry.thinkingSeconds || 0;
+                        wordsModalMyPenalty = myEntry.penaltySeconds || 0;
+                    } else if (currentUser) {
+                        wordsModalMyWord = '__not_played__';
                     }
-                }
-
-                dailyData.forEach(r => processRow(r, false));
-                practiceData.forEach(r => processRow(r, false));
-                h2hData.forEach(r => processRow(r, false));
-
-                // Include current run's entry if it exists in gameHistory
-                const myEntry = gameHistory.find(e => (e.plate || '').toUpperCase() === wordsModalPlate);
-                if (myEntry) {
-                    processRow({
-                        word: myEntry.word || null,
-                        skipped: myEntry.skipped || false,
-                        thinking_seconds: myEntry.thinkingSeconds || 0,
-                        penalty_seconds: myEntry.penaltySeconds || 0
-                    }, false);
-                    // Set current user's entry from gameHistory
-                    foundMyEntry = true;
-                    wordsModalMySkipped = myEntry.skipped || false;
-                    wordsModalMyWord = myEntry.skipped ? '' : (myEntry.word || '').toLowerCase();
-                    wordsModalMyTime = myEntry.thinkingSeconds || 0;
-                    wordsModalMyPenalty = myEntry.penaltySeconds || 0;
-                }
-
-                if (!foundMyEntry && currentUser) {
-                    wordsModalMyWord = '__not_played__';
-                }
-                wordsModalSkipPct = totalPlays > 0 ? Math.round(skipCount / totalPlays * 100) : 0;
-                wordsModalAvgTime = totalPlays > 0 ? totalTime / totalPlays : 0;
-                wordsModalUsed = Object.values(wordGroups)
-                    .map(g => ({ ...g, pct: Math.round(g.count / totalPlays * 100), isSkip: g.word === '__skipped__' }))
-                    .sort((a, b) => b.count - a.count);
-                document.getElementById('wordsTabUsed').textContent = `Used (${totalPlays})`;
-                updateWordsModalHeader();
-                if (wordsModalActiveTab === 'used') renderWordsTab('used');
-            })
-            .catch(e => console.error('Failed to load used words:', e));
+                    wordsModalSkipPct = totalPlays > 0 ? Math.round(skipCount / totalPlays * 100) : 0;
+                    wordsModalAvgTime = totalPlays > 0 ? totalTime / totalPlays : 0;
+                    wordsModalUsed = Object.values(wordGroups)
+                        .map(g => ({ ...g, pct: Math.round(g.count / totalPlays * 100), isSkip: g.word === '__skipped__' }))
+                        .sort((a, b) => b.count - a.count);
+                    document.getElementById('wordsTabUsed').textContent = `Used (${totalPlays})*`;
+                    updateWordsModalHeader();
+                    if (wordsModalActiveTab === 'used') renderWordsTab('used');
+                })
+                .catch(e => console.error('Failed to load used words:', e));
+        }
     }
 
     function updateWordsModalHeader() {
@@ -2851,24 +2868,43 @@
                 html = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
             } else {
                 wordsModalUsed.forEach((entry, idx) => {
-                    // Check if this is the word/skip the current user did
                     let isMyEntry = false;
-                    if (entry.isSkip && wordsModalMySkipped) {
-                        isMyEntry = true;
-                    } else if (!entry.isSkip && wordsModalMyWord && entry.word === wordsModalMyWord) {
-                        isMyEntry = true;
-                    }
+                    if (entry.isSkip && wordsModalMySkipped) isMyEntry = true;
+                    else if (!entry.isSkip && wordsModalMyWord && entry.word === wordsModalMyWord) isMyEntry = true;
                     const badge = isMyEntry ? ' <span class="lb-badge lb-badge-you" style="font-size:0.7rem;">YOU</span>' : '';
-
                     const wordDisplay = entry.isSkip
                         ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
                         : highlightWordWithPlate(entry.word, wordsModalPlate);
 
-                    html += `<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6;">`;
-                    html += `<div style="flex:1;">${wordDisplay}${badge}</div>`;
-                    html += `<div style="min-width:30px;text-align:right;font-weight:600;color:#374151;">${entry.count}</div>`;
-                    html += `<div style="min-width:40px;text-align:right;color:#6b7280;">${entry.pct}%</div>`;
-                    html += `</div>`;
+                    if (wordsModalSource === 'daily' && entry.users && entry.users.length > 0) {
+                        // Daily: clickable with user dropdown
+                        html += `<div>`;
+                        html += `<div onclick="toggleUsedDetail(${idx})" style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6;cursor:pointer;">`;
+                        html += `<div style="flex:1;">${wordDisplay}${badge}</div>`;
+                        html += `<div style="min-width:30px;text-align:right;font-weight:600;color:#374151;">${entry.count}</div>`;
+                        html += `<div style="min-width:40px;text-align:right;color:#6b7280;">${entry.pct}%</div>`;
+                        html += `<div id="usedChevron${idx}" style="color:#9ca3af;margin-left:8px;transition:transform 0.2s;">&#8250;</div>`;
+                        html += `</div>`;
+                        html += `<div id="usedDetail${idx}" style="display:none;padding:4px 0 8px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;">`;
+                        entry.users.sort((a, b) => a.time - b.time).forEach(u => {
+                            const isMe = currentUser && u.userId === currentUser.id;
+                            const nameStyle = isMe ? 'color:#9370db;font-weight:600;' : 'color:#374151;';
+                            let timeDisplay = u.time.toFixed(2) + 's';
+                            if (u.skipped && u.penalty) timeDisplay = `${u.time.toFixed(2)}s (+${u.penalty}s)`;
+                            html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.9rem;">`;
+                            html += `<span style="${nameStyle}">${u.name}</span>`;
+                            html += `<span style="color:#6b7280;">${timeDisplay}</span>`;
+                            html += `</div>`;
+                        });
+                        html += `</div></div>`;
+                    } else {
+                        // Practice: not clickable
+                        html += `<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6;">`;
+                        html += `<div style="flex:1;">${wordDisplay}${badge}</div>`;
+                        html += `<div style="min-width:30px;text-align:right;font-weight:600;color:#374151;">${entry.count}</div>`;
+                        html += `<div style="min-width:40px;text-align:right;color:#6b7280;">${entry.pct}%</div>`;
+                        html += `</div>`;
+                    }
                 });
             }
         }
@@ -4396,7 +4432,7 @@
                 const bb = Math.round(255 * (1 - opacity));
                 const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
 
-                html += `<tr style="background:${bgColor};cursor:pointer;" onclick="closePracticeStatsModal();showViableWordsForPlate('${plate}')">`;
+                html += `<tr style="background:${bgColor};cursor:pointer;" onclick="closePracticeStatsModal();showViableWordsForPlate('${plate}', false, 'practice')">`;
                 html += `<td style="padding:8px;color:#9ca3af;">${i + 1}</td>`;
                 html += `<td style="padding:8px;"><strong style="font-family:monospace;">${plate}</strong></td>`;
                 html += `<td style="padding:8px;text-align:right;color:#9ca3af;">${total}</td>`;
