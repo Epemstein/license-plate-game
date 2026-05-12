@@ -4390,15 +4390,6 @@
                     ...(h2hRes.data || [])
                 ];
 
-                // Include current run's entry
-                const myEntry = gameHistory[i];
-                if (myEntry) {
-                    allRows.push({
-                        word: myEntry.word || null,
-                        skipped: myEntry.skipped || false,
-                        thinking_seconds: myEntry.thinkingSeconds || 0
-                    });
-                }
 
                 const total = allRows.length;
                 const skipCount = allRows.filter(r => r.skipped).length;
