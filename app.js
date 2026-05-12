@@ -4547,8 +4547,13 @@
                 const total = allRows.length;
                 const skipCount = allRows.filter(r => r.skipped).length;
                 const skipPct = total > 0 ? Math.round(100 * skipCount / total) : 0;
-                const validTimes = allRows.filter(r => r.thinking_seconds <= 400);
-                const avgThink = validTimes.length > 0 ? (validTimes.reduce((s, r) => s + r.thinking_seconds, 0) / validTimes.length).toFixed(1) : '--';
+                const validTimes = allRows.filter(r => r.thinking_seconds <= 400).map(r => r.thinking_seconds).sort((a, b) => a - b);
+                let avgThink = '--';
+                if (validTimes.length > 0) {
+                    const mid = Math.floor(validTimes.length / 2);
+                    const median = validTimes.length % 2 === 0 ? (validTimes[mid - 1] + validTimes[mid]) / 2 : validTimes[mid];
+                    avgThink = median.toFixed(1);
+                }
 
                 const wordCounts = {};
                 allRows.filter(r => !r.skipped && r.word).forEach(r => {
