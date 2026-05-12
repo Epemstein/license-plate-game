@@ -2204,24 +2204,14 @@
                     ...(practiceRes.data || []),
                     ...(dailyRes.data || []),
                     ...(h2hRes.data || [])
-                ];
+                ].filter(r => r.thinking_seconds <= 400);
 
-                // Include current run's entry for this plate
-                const myEntry = gameHistory.find(e => (e.plate || '').toUpperCase() === plate.toUpperCase());
-                if (myEntry) {
-                    allRows.push({
-                        thinking_seconds: myEntry.thinkingSeconds || 0,
-                        skipped: myEntry.skipped || false
-                    });
-                }
-
-                const filtered = allRows.filter(r => r.thinking_seconds <= 400);
-                if (filtered.length > 0) {
+                if (allRows.length > 0) {
                     // Median thinking time (all players, including skips)
-                    const times = filtered.map(r => r.thinking_seconds).sort((a, b) => a - b);
+                    const times = allRows.map(r => r.thinking_seconds).sort((a, b) => a - b);
                     const mid = Math.floor(times.length / 2);
                     const median = times.length % 2 === 0 ? (times[mid - 1] + times[mid]) / 2 : times[mid];
-                    const skipRate = filtered.filter(r => r.skipped).length / filtered.length;
+                    const skipRate = allRows.filter(r => r.skipped).length / allRows.length;
                     plateStats[plate] = { medianThink: median, skipRate };
                 }
             }
