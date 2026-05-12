@@ -2762,15 +2762,8 @@
                         ...(practiceRes.data || []).map(r => ({ ...r, penalty_seconds: 0 })),
                         ...(h2hRes.data || []).map(r => ({ ...r, penalty_seconds: 0 }))
                     ];
-                    // Include current run's entry
-                    const myEntry = gameHistory.find(e => (e.plate || '').toUpperCase() === wordsModalPlate);
-                    if (myEntry) {
-                        allData.push({
-                            word: myEntry.word || null, skipped: myEntry.skipped || false,
-                            thinking_seconds: myEntry.thinkingSeconds || 0, penalty_seconds: myEntry.penaltySeconds || 0
-                        });
-                    }
                     const wordGroups = {};
+                    const myEntry = gameHistory.find(e => (e.plate || '').toUpperCase() === wordsModalPlate);
                     let totalPlays = 0, skipCount = 0, totalTime = 0;
                     allData.forEach(row => {
                         totalPlays++;
