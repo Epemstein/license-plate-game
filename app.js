@@ -2313,8 +2313,8 @@
                 bkHtml += `Thinking: ${totalThinking.toFixed(1)}s + Penalty: ${penalty.toFixed(1)}s (${skips.toFixed(1)} skips) = <strong>${expectedTime.toFixed(1)}s</strong>`;
                 bkHtml += `</div></div>`;
 
-                el.innerHTML = `The expected time for this practice round was <a href="#" onclick="event.preventDefault();document.getElementById('expectedBreakdown').style.display=document.getElementById('expectedBreakdown').style.display==='none'?'block':'none';" style="font-weight:700;color:#2563eb;text-decoration:underline;">${expectedTime.toFixed(1)}s</a>.
-                    <br><span style="color:${color};font-weight:600;">You were ${absDiff}s ${word} than expected.</span>
+                el.innerHTML = `The expected time for this practice round was <a href="#" onclick="event.preventDefault();document.getElementById('expectedBreakdown').style.display=document.getElementById('expectedBreakdown').style.display==='none'?'block':'none';" style="font-weight:700;color:#2563eb;text-decoration:underline;">${expectedTime.toFixed(1)} seconds</a>.
+                    <br><span style="color:${color};font-weight:600;">You were ${absDiff} seconds ${word} than expected.</span>
                     <div id="expectedBreakdown" style="display:none;">${bkHtml}</div>`;
             }
         } catch (e) {
@@ -4622,9 +4622,9 @@
 
         let html = '';
         html += `<div style="text-align:center;margin-bottom:12px;">`;
-        html += `<div style="font-size:1.1rem;">Your time: <strong>${d.actualTime.toFixed(1)}s</strong></div>`;
-        html += `<div style="font-size:1.1rem;">Expected: <strong>${d.expectedTime.toFixed(1)}s</strong></div>`;
-        html += `<div style="font-size:1rem;color:${color};font-weight:600;margin-top:4px;">${absDiff}s ${word} than expected</div>`;
+        html += `<div style="font-size:1.1rem;">Your time: <strong>${d.actualTime.toFixed(1)} seconds</strong></div>`;
+        html += `<div style="font-size:1.1rem;">Expected: <strong>${d.expectedTime.toFixed(1)} seconds</strong></div>`;
+        html += `<div style="font-size:1rem;color:${color};font-weight:600;margin-top:4px;">${absDiff} seconds ${word} than expected</div>`;
         html += `</div>`;
 
         html += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
