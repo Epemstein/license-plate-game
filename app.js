@@ -2148,10 +2148,17 @@
     function openEndModal(finalTimeSec) {
         gameModalMode = "end";
         gameModalTitleEl.textContent = "Run complete!";
+
+        let expectedHtml = '';
+        if (gameMode === 'practice') {
+            expectedHtml = '<p id="expectedTimeText" style="color:#6b7280;">Calculating expected time...</p>';
+            computeExpectedTime(finalTimeSec);
+        }
+
         gameModalBodyEl.innerHTML = `
             <p>You solved <strong>${solvedCount}</strong> plates in
             <strong>${finalTimeSec.toFixed(2)} seconds</strong> (including skip penalties).</p>
-            <p>You can view a breakdown chart of each plate's time, or close this and inspect the table.</p>
+            ${expectedHtml}
             ${gameMode === 'daily' ? '<p style="margin-top:1rem; color:#92400e; background:#fef3c7; padding:8px; border-radius:4px;"><strong>Daily Challenge Complete!</strong> Come back tomorrow for a new challenge.</p>' : ''}
             ${gameMode === 'h2h_challenge' ? '<p style="margin-top:1rem; color:#92400e; background:#fef3c7; padding:8px; border-radius:4px;"><strong>H2H Challenge Complete!</strong></p>' : ''}
         `;
@@ -2165,9 +2172,91 @@
         }
 
         gameModalSecondaryBtnEl.style.display = "inline-block";
-        gameModalSecondaryBtnEl.textContent = "View chart";
+        gameModalSecondaryBtnEl.textContent = "Plate Stats";
 
         gameModalBackdropEl.classList.add("show");
+    }
+
+    async function computeExpectedTime(actualTime) {
+        // Use the full plate sequence (up to 200), not just the 10 played
+        const plateSequence = dailyPlateSequence || gameHistory.map(e => e.plate);
+        if (plateSequence.length === 0) return;
+
+        try {
+            // Fetch stats for all plates we might traverse (fetch more than 10 since skips mean we go further)
+            const plateStats = {}; // plate -> { medianThink, skipRate }
+
+            // Batch fetch: get data for first 30 plates (generous buffer)
+            const platesToFetch = plateSequence.slice(0, 30);
+
+            for (const plate of platesToFetch) {
+                const [practiceRes, dailyRes, h2hRes] = await Promise.all([
+                    sb.from('practice_plate_stats').select('thinking_seconds, skipped').eq('plate', plate),
+                    sb.from('daily_run_entries').select('thinking_seconds, skipped').eq('plate', plate),
+                    sb.from('h2h_run_entries').select('thinking_seconds, skipped').eq('plate', plate)
+                ]);
+
+                const allRows = [
+                    ...(practiceRes.data || []),
+                    ...(dailyRes.data || []),
+                    ...(h2hRes.data || [])
+                ].filter(r => r.thinking_seconds <= 400);
+
+                if (allRows.length > 0) {
+                    // Median thinking time (all players, including skips)
+                    const times = allRows.map(r => r.thinking_seconds).sort((a, b) => a - b);
+                    const mid = Math.floor(times.length / 2);
+                    const median = times.length % 2 === 0 ? (times[mid - 1] + times[mid]) / 2 : times[mid];
+                    const skipRate = allRows.filter(r => r.skipped).length / allRows.length;
+                    plateStats[plate] = { medianThink: median, skipRate };
+                }
+            }
+
+            // Walk through sequence until 10 solves
+            let solves = 0;
+            let skips = 0;
+            let totalThinking = 0;
+            let platesTraversed = 0;
+
+            for (const plate of plateSequence) {
+                if (solves >= 10) break;
+                const stats = plateStats[plate];
+                if (!stats) continue; // skip plates with no data
+
+                totalThinking += stats.medianThink;
+                solves += (1 - stats.skipRate);
+                skips += stats.skipRate;
+                platesTraversed++;
+            }
+
+            // Calculate escalating skip penalty: 5 + 10 + 15 + ...
+            let penalty = 0;
+            let remainingSkips = skips;
+            let penaltyLevel = 1;
+            while (remainingSkips > 0) {
+                const thisSkip = Math.min(remainingSkips, 1);
+                penalty += thisSkip * (penaltyLevel * 5);
+                remainingSkips -= thisSkip;
+                penaltyLevel++;
+            }
+
+            const expectedTime = totalThinking + penalty;
+
+            const el = document.getElementById('expectedTimeText');
+            if (el && platesTraversed > 0) {
+                const diff = actualTime - expectedTime;
+                const absDiff = Math.abs(diff).toFixed(1);
+                const faster = diff < 0;
+                const color = faster ? '#16a34a' : '#dc2626';
+                const word = faster ? 'faster' : 'slower';
+                el.innerHTML = `The expected time for this practice round was <strong>${expectedTime.toFixed(1)}s</strong>.
+                    <br><span style="color:${color};font-weight:600;">You were ${absDiff}s ${word} than expected.</span>`;
+            }
+        } catch (e) {
+            console.error('Expected time error:', e);
+            const el = document.getElementById('expectedTimeText');
+            if (el) el.style.display = 'none';
+        }
     }
 
     function closeGameModal() {
@@ -2514,7 +2603,11 @@
 
     gameModalSecondaryBtnEl.addEventListener("click", () => {
         closeGameModal();
-        openChartModal();
+        if (gameMode === 'practice') {
+            showPracticePlateStatsModal();
+        } else {
+            openChartModal();
+        }
     });
 
     gameModalCloseBtnEl.addEventListener("click", () => {
