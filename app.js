@@ -1934,7 +1934,8 @@
         plateTd.classList.add("clickable-plate");
         plateTd.title = "Click to see all viable words";
         plateTd.addEventListener("click", () => {
-            showViableWordsForPlate(plate, gameStarted && !gameOver);
+            const source = (gameMode === 'practice' || gameMode === 'h2h_challenge') ? 'practice' : 'daily';
+            showViableWordsForPlate(plate, gameStarted && !gameOver, source);
         });
     }
 
