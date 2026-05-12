@@ -2204,14 +2204,24 @@
                     ...(practiceRes.data || []),
                     ...(dailyRes.data || []),
                     ...(h2hRes.data || [])
-                ].filter(r => r.thinking_seconds <= 400);
+                ];
 
-                if (allRows.length > 0) {
+                // Include current run's entry for this plate
+                const myEntry = gameHistory.find(e => (e.plate || '').toUpperCase() === plate.toUpperCase());
+                if (myEntry) {
+                    allRows.push({
+                        thinking_seconds: myEntry.thinkingSeconds || 0,
+                        skipped: myEntry.skipped || false
+                    });
+                }
+
+                const filtered = allRows.filter(r => r.thinking_seconds <= 400);
+                if (filtered.length > 0) {
                     // Median thinking time (all players, including skips)
-                    const times = allRows.map(r => r.thinking_seconds).sort((a, b) => a - b);
+                    const times = filtered.map(r => r.thinking_seconds).sort((a, b) => a - b);
                     const mid = Math.floor(times.length / 2);
                     const median = times.length % 2 === 0 ? (times[mid - 1] + times[mid]) / 2 : times[mid];
-                    const skipRate = allRows.filter(r => r.skipped).length / allRows.length;
+                    const skipRate = filtered.filter(r => r.skipped).length / filtered.length;
                     plateStats[plate] = { medianThink: median, skipRate };
                 }
             }
@@ -2223,12 +2233,9 @@
             let platesTraversed = 0;
             const breakdown = [];
 
-            // Compute a fallback median from all plates that have data
-            const allMedians = Object.values(plateStats).map(s => s.medianThink);
-            const fallbackMedian = allMedians.length > 0 ? allMedians.sort((a, b) => a - b)[Math.floor(allMedians.length / 2)] : 5;
-
             for (const plate of plateSequence) {
-                const stats = plateStats[plate] || { medianThink: fallbackMedian, skipRate: 0 };
+                const stats = plateStats[plate];
+                if (!stats) continue; // skip plates with no historical data
 
                 const solveContrib = 1 - stats.skipRate;
                 const solvesNeeded = 10 - solves;
