@@ -1418,7 +1418,7 @@
             resultEl.style.color = "red";
             return;
         }
-        if ((gameMode==='daily' || gameMode==='h2h_challenge') && dailyPlateSequence && dailyPlateSequence.length) {
+        if ((gameMode==='daily' || gameMode==='h2h_challenge' || gameMode==='practice') && dailyPlateSequence && dailyPlateSequence.length) {
             const idx = usedPlates.size;
             console.log('Using sequence mode! Index:', idx, 'Sequence length:', dailyPlateSequence.length);
 
@@ -1666,6 +1666,12 @@
             startButtonEl.disabled = true;
             startButtonEl.style.opacity = '0.5';
             startButtonEl.style.cursor = 'not-allowed';
+        }
+
+        // Precompute 200-plate sequence for practice mode
+        if (gameMode === 'practice') {
+            dailyPlateSequence = generateChallengeSequence(practiceDifficulty);
+            console.log('[Practice] Precomputed', dailyPlateSequence.length, 'plates at difficulty', practiceDifficulty);
         }
 
         if (gameMode==='daily' && currentUser) {
@@ -2225,7 +2231,7 @@
 
             for (const plate of plateSequence) {
                 const stats = plateStats[plate];
-                if (!stats) continue; // skip plates with no historical data
+                if (!stats) continue;
 
                 const solveContrib = 1 - stats.skipRate;
                 const solvesNeeded = 10 - solves;
