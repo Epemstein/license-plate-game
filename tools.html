@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v9</title>
+    <title>Plate Analysis Tools v10</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -131,27 +131,16 @@
             document.getElementById('cacheStatus').textContent = background ? '(refreshing...)' : '';
 
             try {
-                let fetched = [];
-                let offset = 0;
-                while (true) {
-                    if (!background) {
-                        document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading plates... (${fetched.length.toLocaleString()} so far)</div>`;
-                    }
-                    const { data, error } = await sb.rpc('plate_difficulty_analysis').range(offset, offset + 999);
-                    if (error) throw error;
-                    if (!data || data.length === 0) break;
-                    fetched.push(...data);
-                    if (data.length < 1000) break;
-                    offset += 1000;
-                }
-                console.log('Fetched', fetched.length, 'plates from server');
+                const { data: fetched, error } = await sb.rpc('plate_difficulty_analysis').limit(20000);
+                if (error) throw error;
+                console.log('Fetched', (fetched || []).length, 'plates from server');
 
                 // Save to cache
                 try {
                     localStorage.setItem(CACHE_KEY, JSON.stringify({ data: fetched, timestamp: Date.now() }));
                 } catch (e) { console.warn('Cache write error:', e); }
 
-                allData = fetched;
+                allData = fetched || [];
                 document.getElementById('cacheStatus').textContent = '(just refreshed)';
                 renderTable();
             } catch (e) {
