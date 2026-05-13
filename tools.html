@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v12</title>
+    <title>Plate Analysis Tools v13</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -80,7 +80,7 @@
         });
 
         let allData = [];
-        let sortCol = 'skip_pct';
+        let sortCol = 'total_plays';
         let sortDir = 'desc';
 
         function toolsLogin() {
@@ -396,18 +396,34 @@
             document.getElementById('plateUsedBackdrop').style.display = 'none';
         }
 
+        function highlightPlate(word, plate) {
+            const p = plate.toUpperCase();
+            const w = word.toLowerCase();
+            let pi = 0;
+            let result = '';
+            for (let i = 0; i < w.length; i++) {
+                if (pi < p.length && w[i].toUpperCase() === p[pi]) {
+                    result += `<span style="color:#16a34a;font-weight:700;">${w[i]}</span>`;
+                    pi++;
+                } else {
+                    result += w[i];
+                }
+            }
+            return result;
+        }
+
         async function openPlateUsed(plate) {
             const backdrop = document.getElementById('plateUsedBackdrop');
             const content = document.getElementById('plateUsedContent');
-            document.getElementById('plateUsedTitle').textContent = 'Plate: ' + plate;
+            document.getElementById('plateUsedTitle').innerHTML = 'Plate: ' + plate;
             content.innerHTML = '<p style="color:#6b7280;">Loading...</p>';
             backdrop.style.display = 'flex';
 
             try {
                 const [practiceRes, dailyRes, h2hRes] = await Promise.all([
-                    sb.from('practice_plate_stats').select('word, skipped').eq('plate', plate),
-                    sb.from('daily_run_entries').select('word, skipped').eq('plate', plate),
-                    sb.from('h2h_run_entries').select('word, skipped').eq('plate', plate)
+                    sb.from('practice_plate_stats').select('word, skipped, thinking_seconds').eq('plate', plate),
+                    sb.from('daily_run_entries').select('word, skipped, thinking_seconds').eq('plate', plate),
+                    sb.from('h2h_run_entries').select('word, skipped, thinking_seconds').eq('plate', plate)
                 ]);
 
                 const allRows = [
@@ -418,13 +434,25 @@
 
                 const total = allRows.length;
                 const skipCount = allRows.filter(r => r.skipped).length;
+
+                // Median thinking time
+                const times = allRows.map(r => r.thinking_seconds).filter(t => t != null).sort((a, b) => a - b);
+                let medianStr = '--';
+                if (times.length > 0) {
+                    const mid = Math.floor(times.length / 2);
+                    const median = times.length % 2 === 0 ? (times[mid - 1] + times[mid]) / 2 : times[mid];
+                    medianStr = median.toFixed(1) + 's';
+                }
+
+                const skipPct = total > 0 ? Math.round(skipCount / total * 100) : 0;
+                document.getElementById('plateUsedTitle').innerHTML = `Plate: ${plate}<div style="font-size:0.85rem;font-weight:400;color:#6b7280;margin-top:2px;">Skip: ${skipPct}% &nbsp; Median: ${medianStr} &nbsp; Plays: ${total}</div>`;
+
                 const wordCounts = {};
                 allRows.filter(r => !r.skipped && r.word).forEach(r => {
                     const w = r.word.toLowerCase();
                     wordCounts[w] = (wordCounts[w] || 0) + 1;
                 });
 
-                // Build sorted list: words + skipped, sorted by count
                 let items = Object.entries(wordCounts).map(([word, count]) => ({ word, count, isSkip: false }));
                 if (skipCount > 0) items.push({ word: 'skipped', count: skipCount, isSkip: true });
                 items.sort((a, b) => b.count - a.count);
@@ -434,12 +462,17 @@
                     return;
                 }
 
-                let html = '';
+                let html = '<div style="display:flex;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:0.8rem;color:#9ca3af;font-weight:600;">';
+                html += '<div style="flex:1;">Word</div>';
+                html += '<div style="min-width:30px;text-align:right;">Count</div>';
+                html += '<div style="min-width:40px;text-align:right;">%</div>';
+                html += '</div>';
+
                 items.forEach(item => {
                     const pct = Math.round(item.count / total * 100);
                     const wordHtml = item.isSkip
                         ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
-                        : `<span style="font-size:1rem;">${item.word}</span>`;
+                        : `<span style="font-size:1rem;">${highlightPlate(item.word, plate)}</span>`;
                     html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
                     html += `<div style="flex:1;">${wordHtml}</div>`;
                     html += `<div style="min-width:30px;text-align:right;font-weight:600;color:#374151;">${item.count}</div>`;
