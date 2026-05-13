@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v20</title>
+    <title>Plate Analysis Tools v21</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -251,7 +251,7 @@
                 for (const plate in srcData) {
                     if (!combined[plate]) combined[plate] = { plays: 0, skips: 0, times: [], daily: 0, practice: 0, h2h: 0, groups: 0 };
                     const count = srcData[plate].length;
-                    combined[plate][srcKey] = count;
+                    combined[plate][srcKey] = enabled ? count : 0;
                     if (enabled) {
                         combined[plate].plays += count;
                         srcData[plate].forEach(r => {
@@ -291,6 +291,12 @@
         }
 
         function renderTable() {
+            const srcOn = {
+                daily: document.getElementById('srcDaily').checked,
+                practice: document.getElementById('srcPractice').checked,
+                h2h: document.getElementById('srcH2H').checked,
+                groups: document.getElementById('srcGroups').checked
+            };
             const minPlays = parseInt(document.getElementById('minPlaysFilter').value) || 1;
             const search = document.getElementById('searchInput').value.toUpperCase().trim();
 
@@ -383,10 +389,10 @@
                 html += `<td class="num">${r.total_plays}</td>`;
                 html += `<td class="num">${r.skip_pct != null ? r.skip_pct + '%' : '--'}</td>`;
                 html += `<td class="num">${r.median_think != null ? r.median_think + 's' : '--'}</td>`;
-                html += `<td class="num">${r.daily_plays}</td>`;
-                html += `<td class="num">${r.practice_plays}</td>`;
-                html += `<td class="num">${r.h2h_plays}</td>`;
-                html += `<td class="num">${r.group_plays}</td>`;
+                html += `<td class="num"${srcOn.daily ? '' : ' style="color:#ccc;"'}>${r.daily_plays}</td>`;
+                html += `<td class="num"${srcOn.practice ? '' : ' style="color:#ccc;"'}>${r.practice_plays}</td>`;
+                html += `<td class="num"${srcOn.h2h ? '' : ' style="color:#ccc;"'}>${r.h2h_plays}</td>`;
+                html += `<td class="num"${srcOn.groups ? '' : ' style="color:#ccc;"'}>${r.group_plays}</td>`;
                 html += '</tr>';
             });
 
@@ -397,10 +403,10 @@
             html += `<td class="num">${totals.total.toLocaleString()}</td>`;
             html += `<td class="num">${avgSkip}%</td>`;
             html += `<td class="num">--</td>`;
-            html += `<td class="num">${totals.daily.toLocaleString()}</td>`;
-            html += `<td class="num">${totals.practice.toLocaleString()}</td>`;
-            html += `<td class="num">${totals.h2h.toLocaleString()}</td>`;
-            html += `<td class="num">${totals.group.toLocaleString()}</td>`;
+            html += `<td class="num"${srcOn.daily ? '' : ' style="color:#ccc;"'}>${totals.daily.toLocaleString()}</td>`;
+            html += `<td class="num"${srcOn.practice ? '' : ' style="color:#ccc;"'}>${totals.practice.toLocaleString()}</td>`;
+            html += `<td class="num"${srcOn.h2h ? '' : ' style="color:#ccc;"'}>${totals.h2h.toLocaleString()}</td>`;
+            html += `<td class="num"${srcOn.groups ? '' : ' style="color:#ccc;"'}>${totals.group.toLocaleString()}</td>`;
             html += '</tr>';
 
             html += '</tbody></table>';
