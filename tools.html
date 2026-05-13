@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v10</title>
+    <title>Plate Analysis Tools v11</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -131,9 +131,20 @@
             document.getElementById('cacheStatus').textContent = background ? '(refreshing...)' : '';
 
             try {
-                const { data: fetched, error } = await sb.rpc('plate_difficulty_analysis').limit(20000);
-                if (error) throw error;
-                console.log('Fetched', (fetched || []).length, 'plates from server');
+                let fetched = [];
+                let offset = 0;
+                while (true) {
+                    if (!background) {
+                        document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading plates... (${fetched.length.toLocaleString()} so far)</div>`;
+                    }
+                    const { data, error } = await sb.rpc('plate_difficulty_analysis').range(offset, offset + 999);
+                    if (error) throw error;
+                    if (!data || data.length === 0) break;
+                    fetched.push(...data);
+                    if (data.length < 1000) break;
+                    offset += 1000;
+                }
+                console.log('Fetched', fetched.length, 'plates from server');
 
                 // Save to cache
                 try {
@@ -288,7 +299,7 @@
             filtered.forEach(r => {
                 const skipCls = r.skip_pct >= 50 ? 'skip-high' : r.skip_pct >= 20 ? 'skip-med' : 'skip-low';
                 html += '<tr>';
-                html += `<td class="plate">${r.plate}</td>`;
+                html += `<td class="plate" onclick="openPlateUsed('${r.plate}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;">${r.plate}</td>`;
                 html += `<td class="num">${r.total_plays}</td>`;
                 html += `<td class="num ${skipCls}">${r.skip_pct != null ? r.skip_pct + '%' : '--'}</td>`;
                 html += `<td class="num">${r.median_think != null ? r.median_think + 's' : '--'}</td>`;
@@ -370,6 +381,79 @@
         function filterTable() {
             renderTable();
         }
+
+        function closePlateUsed() {
+            document.getElementById('plateUsedBackdrop').style.display = 'none';
+        }
+
+        async function openPlateUsed(plate) {
+            const backdrop = document.getElementById('plateUsedBackdrop');
+            const content = document.getElementById('plateUsedContent');
+            document.getElementById('plateUsedTitle').textContent = 'Plate: ' + plate;
+            content.innerHTML = '<p style="color:#6b7280;">Loading...</p>';
+            backdrop.style.display = 'flex';
+
+            try {
+                const [practiceRes, dailyRes, h2hRes] = await Promise.all([
+                    sb.from('practice_plate_stats').select('word, skipped').eq('plate', plate),
+                    sb.from('daily_run_entries').select('word, skipped').eq('plate', plate),
+                    sb.from('h2h_run_entries').select('word, skipped').eq('plate', plate)
+                ]);
+
+                const allRows = [
+                    ...(practiceRes.data || []),
+                    ...(dailyRes.data || []),
+                    ...(h2hRes.data || [])
+                ];
+
+                const total = allRows.length;
+                const skipCount = allRows.filter(r => r.skipped).length;
+                const wordCounts = {};
+                allRows.filter(r => !r.skipped && r.word).forEach(r => {
+                    const w = r.word.toLowerCase();
+                    wordCounts[w] = (wordCounts[w] || 0) + 1;
+                });
+
+                // Build sorted list: words + skipped, sorted by count
+                let items = Object.entries(wordCounts).map(([word, count]) => ({ word, count, isSkip: false }));
+                if (skipCount > 0) items.push({ word: 'skipped', count: skipCount, isSkip: true });
+                items.sort((a, b) => b.count - a.count);
+
+                if (items.length === 0) {
+                    content.innerHTML = '<p style="color:#6b7280;">No plays recorded.</p>';
+                    return;
+                }
+
+                let html = '';
+                items.forEach(item => {
+                    const pct = Math.round(item.count / total * 100);
+                    const wordHtml = item.isSkip
+                        ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
+                        : `<span style="font-size:1rem;">${item.word}</span>`;
+                    html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
+                    html += `<div style="flex:1;">${wordHtml}</div>`;
+                    html += `<div style="min-width:30px;text-align:right;font-weight:600;color:#374151;">${item.count}</div>`;
+                    html += `<div style="min-width:40px;text-align:right;color:#6b7280;">${pct}%</div>`;
+                    html += `</div>`;
+                });
+
+                content.innerHTML = html;
+            } catch (e) {
+                content.innerHTML = '<p style="color:#dc2626;">Error: ' + e.message + '</p>';
+            }
+        }
     </script>
+<!-- Plate Used Modal -->
+<div id="plateUsedBackdrop" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target.id==='plateUsedBackdrop')closePlateUsed()">
+    <div style="background:white;border-radius:14px;max-width:480px;width:90%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #e5e7eb;">
+            <div style="font-weight:700;font-size:1.1rem;" id="plateUsedTitle">Plate: XXX</div>
+            <button onclick="closePlateUsed()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#6b7280;">&times;</button>
+        </div>
+        <div style="padding:16px 20px;overflow-y:auto;" id="plateUsedContent">
+            <p style="color:#6b7280;">Loading...</p>
+        </div>
+    </div>
+</div>
 </body>
 </html>
