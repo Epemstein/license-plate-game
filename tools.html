@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v21</title>
+    <title>Plate Analysis Tools v22</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -94,6 +94,8 @@
         let computedData = []; // Combined plate data based on selected checkboxes
         let sortCol = 'total_plays';
         let sortDir = 'desc';
+        let currentPage = 0;
+        const PAGE_SIZE = 100;
 
         const CACHE_PREFIX = 'plateRaw_';
         const CACHE_TTL = 30 * 60 * 1000;
@@ -373,7 +375,14 @@
             });
             html += '</tr></thead><tbody>';
 
-            filtered.forEach(r => {
+            // Pagination
+            const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+            if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
+            const pageStart = currentPage * PAGE_SIZE;
+            const pageEnd = Math.min(pageStart + PAGE_SIZE, filtered.length);
+            const pageRows = filtered.slice(pageStart, pageEnd);
+
+            pageRows.forEach(r => {
                 const sp = r.skip_pct || 0;
                 const t = Math.min(Math.max(sp, 0), 100) / 100;
                 let red, green, opacity;
@@ -410,7 +419,23 @@
             html += '</tr>';
 
             html += '</tbody></table>';
+
+            // Pagination controls
+            if (totalPages > 1) {
+                html += '<div style="display:flex;justify-content:center;align-items:center;gap:12px;padding:14px 0;font-size:14px;">';
+                html += `<button onclick="goPage(${currentPage - 1})" ${currentPage === 0 ? 'disabled' : ''} style="padding:6px 14px;background:#f3f4f6;border:1px solid #ddd;border-radius:8px;cursor:pointer;${currentPage === 0 ? 'opacity:0.4;cursor:default;' : ''}">&larr; Prev</button>`;
+                html += `<span style="color:#6b7280;">Page ${currentPage + 1} of ${totalPages} &nbsp;(${pageStart + 1}–${pageEnd} of ${filtered.length})</span>`;
+                html += `<button onclick="goPage(${currentPage + 1})" ${currentPage >= totalPages - 1 ? 'disabled' : ''} style="padding:6px 14px;background:#f3f4f6;border:1px solid #ddd;border-radius:8px;cursor:pointer;${currentPage >= totalPages - 1 ? 'opacity:0.4;cursor:default;' : ''}">Next &rarr;</button>`;
+                html += '</div>';
+            }
+
             document.getElementById('tableContainer').innerHTML = html;
+        }
+
+        function goPage(p) {
+            currentPage = p;
+            renderTable();
+            window.scrollTo(0, 0);
         }
 
         function sortBy(col) {
@@ -420,6 +445,7 @@
                 sortCol = col;
                 sortDir = col === 'plate' ? 'asc' : 'desc';
             }
+            currentPage = 0;
             renderTable();
         }
 
@@ -431,6 +457,7 @@
                 document.getElementById('pos2').value = '';
                 document.getElementById('pos3').value = '';
             }
+            currentPage = 0;
             renderTable();
         }
 
@@ -464,6 +491,7 @@
         }
 
         function filterTable() {
+            currentPage = 0;
             renderTable();
         }
 
