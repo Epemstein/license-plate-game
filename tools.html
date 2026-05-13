@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v18</title>
+    <title>Plate Analysis Tools v19</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -66,12 +66,12 @@
                 <input type="number" id="minSkipFilter" min="0" max="100" value="0" placeholder="min" style="width:65px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
                 <span style="color:#9ca3af;">–</span>
                 <input type="number" id="maxSkipFilter" min="0" max="100" value="100" placeholder="max" style="width:65px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
-                <span style="font-size:13px;color:#374151;display:flex;gap:8px;align-items:center;">
+                <div style="display:flex;flex-direction:column;gap:2px;font-size:13px;color:#374151;">
                     <label><input type="checkbox" id="srcDaily" checked onchange="reloadSources()"> Daily</label>
                     <label><input type="checkbox" id="srcPractice" checked onchange="reloadSources()"> Practice</label>
                     <label><input type="checkbox" id="srcH2H" checked onchange="reloadSources()"> H2H</label>
                     <label><input type="checkbox" id="srcGroups" checked onchange="reloadSources()"> Groups</label>
-                </span>
+                </div>
                 <span class="count" id="rowCount"></span>
                 <button onclick="refreshData()" style="padding:6px 14px;background:#f3f4f6;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;">Refresh Data</button>
                 <span class="count" id="cacheStatus"></span>
@@ -89,9 +89,14 @@
             auth: { persistSession: false, autoRefreshToken: false }
         });
 
-        let allData = [];
+        // Raw data per source: { daily: { "ABC": [{skipped, t}, ...], ... }, practice: {...}, h2h: {...}, groups: {...} }
+        let rawBySource = { daily: {}, practice: {}, h2h: {}, groups: {} };
+        let computedData = []; // Combined plate data based on selected checkboxes
         let sortCol = 'total_plays';
         let sortDir = 'desc';
+
+        const CACHE_PREFIX = 'plateRaw_';
+        const CACHE_TTL = 30 * 60 * 1000;
 
         function toolsLogin() {
             const pw = document.getElementById('toolsPassword').value.trim();
@@ -105,63 +110,116 @@
             }
         }
 
-        const CACHE_KEY = 'plateAnalysisCache';
-        const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-
-        async function loadData(forceRefresh) {
-            // Check cache first
-            if (!forceRefresh) {
-                try {
-                    const cached = localStorage.getItem(CACHE_KEY);
-                    if (cached) {
-                        const { data, timestamp } = JSON.parse(cached);
-                        const age = Date.now() - timestamp;
-                        if (data && data.length > 0) {
-                            allData = data;
-                            const mins = Math.round(age / 60000);
-                            document.getElementById('cacheStatus').textContent = `(cached ${mins}m ago)`;
-                            renderTable();
-                            // If stale, refresh in background
-                            if (age > CACHE_TTL) {
-                                fetchFromServer(true);
-                            }
-                            return;
-                        }
-                    }
-                } catch (e) { console.warn('Cache read error:', e); }
+        // Paginated fetch from a table
+        async function fetchAll(table, cols, label, extraFilter) {
+            let all = [], offset = 0;
+            while (true) {
+                document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading ${label}... (${all.length.toLocaleString()} rows)</div>`;
+                let query = sb.from(table).select(cols).range(offset, offset + 9999);
+                if (extraFilter) query = extraFilter(query);
+                const { data, error } = await query;
+                if (error) { console.error(`Fetch error ${table}:`, error); break; }
+                if (!data || data.length === 0) break;
+                all.push(...data);
+                if (data.length < 10000) break;
+                offset += 10000;
             }
-
-            await fetchFromServer(false);
+            return all;
         }
 
-        async function fetchFromServer(background) {
+        // Group raw rows into { plate -> [{skipped, t}] }
+        function groupByPlate(rows) {
+            const map = {};
+            rows.forEach(r => {
+                if (!map[r.plate]) map[r.plate] = [];
+                map[r.plate].push({ skipped: !!r.skipped, t: r.thinking_seconds });
+            });
+            return map;
+        }
+
+        async function loadData(forceRefresh) {
+            const sources = ['daily', 'practice', 'h2h', 'groups'];
+            let allCached = true;
+            let oldestAge = 0;
+
+            if (!forceRefresh) {
+                // Try loading each source from cache
+                for (const src of sources) {
+                    try {
+                        const cached = localStorage.getItem(CACHE_PREFIX + src);
+                        if (cached) {
+                            const { data, timestamp } = JSON.parse(cached);
+                            const age = Date.now() - timestamp;
+                            if (data) {
+                                rawBySource[src] = data;
+                                oldestAge = Math.max(oldestAge, age);
+                                continue;
+                            }
+                        }
+                    } catch (e) { console.warn('Cache read error for', src, e); }
+                    allCached = false;
+                }
+
+                if (allCached) {
+                    const mins = Math.round(oldestAge / 60000);
+                    document.getElementById('cacheStatus').textContent = `(cached ${mins}m ago)`;
+                    reloadSources();
+                    if (oldestAge > CACHE_TTL) {
+                        fetchAllSources(true);
+                    }
+                    return;
+                }
+            }
+
+            await fetchAllSources(false);
+        }
+
+        async function fetchAllSources(background) {
             if (!background) {
-                document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading plate analysis...</div>';
+                document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading plate data...</div>';
             }
             document.getElementById('cacheStatus').textContent = background ? '(refreshing...)' : '';
 
             try {
-                let fetched = [];
+                const daily = await fetchAll('daily_run_entries', 'plate, skipped, thinking_seconds', 'daily');
+                const practice = await fetchAll('practice_plate_stats', 'plate, skipped, thinking_seconds', 'practice');
+                const h2h = await fetchAll('h2h_run_entries', 'plate, skipped, thinking_seconds', 'h2h');
+
+                // Groups: only custom plate_mode groups
+                document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading groups...</div>`;
+                let groupRows = [];
                 let offset = 0;
                 while (true) {
-                    if (!background) {
-                        document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading plates... (${fetched.length.toLocaleString()} so far)</div>`;
-                    }
-                    const { data, error } = await sb.rpc('plate_difficulty_analysis').range(offset, offset + 999);
-                    if (error) throw error;
+                    const { data, error } = await sb
+                        .from('group_daily_run_entries')
+                        .select('plate, skipped, thinking_seconds, run:group_daily_runs!inner(group:groups!inner(plate_mode))')
+                        .eq('run.group.plate_mode', 'custom')
+                        .range(offset, offset + 9999);
+                    if (error) { console.error('Groups fetch error:', error); break; }
                     if (!data || data.length === 0) break;
-                    fetched.push(...data);
-                    if (data.length < 1000) break;
-                    offset += 1000;
+                    groupRows.push(...data);
+                    if (data.length < 10000) break;
+                    offset += 10000;
                 }
-                console.log('Fetched', fetched.length, 'plates from server');
 
-                // Save to cache
-                try {
-                    localStorage.setItem(CACHE_KEY, JSON.stringify({ data: fetched, timestamp: Date.now() }));
-                } catch (e) { console.warn('Cache write error:', e); }
+                rawBySource.daily = groupByPlate(daily);
+                rawBySource.practice = groupByPlate(practice);
+                rawBySource.h2h = groupByPlate(h2h);
+                rawBySource.groups = groupByPlate(groupRows);
 
-                allData = fetched || [];
+                // Cache each source separately
+                const now = Date.now();
+                for (const src of ['daily', 'practice', 'h2h', 'groups']) {
+                    try {
+                        localStorage.setItem(CACHE_PREFIX + src, JSON.stringify({ data: rawBySource[src], timestamp: now }));
+                    } catch (e) { console.warn('Cache write error for', src, e); }
+                }
+
+                console.log('Fetched raw data:', {
+                    daily: daily.length, practice: practice.length,
+                    h2h: h2h.length, groups: groupRows.length
+                });
+
                 document.getElementById('cacheStatus').textContent = '(just refreshed)';
                 reloadSources();
             } catch (e) {
@@ -173,90 +231,66 @@
         }
 
         function refreshData() {
+            // Clear all cached sources
+            for (const src of ['daily', 'practice', 'h2h', 'groups']) {
+                localStorage.removeItem(CACHE_PREFIX + src);
+            }
             loadData(true);
         }
 
-        async function loadDataFallback() {
-            try {
-                // Fetch from all tables
-                // Fetch all rows (override default 1000 limit)
-                document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading practice stats...</div>';
-                const fetchAll = async (table, cols, label) => {
-                    let all = [], offset = 0, page = 0;
-                    while (true) {
-                        page++;
-                        document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading ${label}... (${all.length.toLocaleString()} rows)</div>`;
-                        const { data, error } = await sb.from(table).select(cols).range(offset, offset + 9999);
-                        if (error) { console.error(`Fetch error ${table}:`, error); break; }
-                        if (!data || data.length === 0) break;
-                        all.push(...data);
-                        if (data.length < 10000) break;
-                        offset += 10000;
-                    }
-                    return all;
-                };
-                const practice = await fetchAll('practice_plate_stats', 'plate, skipped, thinking_seconds', 'practice');
-                const daily = await fetchAll('daily_run_entries', 'plate, skipped, thinking_seconds', 'daily');
-                const h2h = await fetchAll('h2h_run_entries', 'plate, skipped, thinking_seconds', 'h2h');
-                document.getElementById('tableContainer').innerHTML = '<div class="loading">Processing...</div>';
-
-                const byPlate = {};
-                function add(rows, source) {
-                    (rows || []).forEach(r => {
-                        if (!byPlate[r.plate]) byPlate[r.plate] = { plate: r.plate, total: 0, skips: 0, times: [], daily: 0, practice: 0, h2h: 0, group: 0 };
-                        byPlate[r.plate].total++;
-                        byPlate[r.plate][source]++;
-                        if (r.skipped) byPlate[r.plate].skips++;
-                        if (r.thinking_seconds <= 400) byPlate[r.plate].times.push(r.thinking_seconds);
-                    });
-                }
-                add(practice, 'practice');
-                add(daily, 'daily');
-                add(h2h, 'h2h');
-
-                allData = Object.values(byPlate).map(p => {
-                    const sorted = p.times.sort((a, b) => a - b);
-                    const mid = Math.floor(sorted.length / 2);
-                    const median = sorted.length === 0 ? null :
-                        sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-                    return {
-                        plate: p.plate,
-                        total_plays: p.total,
-                        skip_pct: p.total > 0 ? Math.round(1000 * p.skips / p.total) / 10 : 0,
-                        median_think: median ? Math.round(median * 10) / 10 : null,
-                        daily_plays: p.daily,
-                        practice_plays: p.practice,
-                        h2h_plays: p.h2h,
-                        group_plays: p.group
-                    };
-                });
-                renderTable();
-            } catch (e) {
-                document.getElementById('tableContainer').innerHTML = '<div class="loading" style="color:#dc2626;">Error loading data: ' + e.message + '</div>';
-            }
-        }
-
-        // Recalculate data based on selected sources
-        let filteredData = [];
+        // Combine raw data from selected sources, compute skip%, median, plays per plate
         function reloadSources() {
             const useDaily = document.getElementById('srcDaily').checked;
             const usePractice = document.getElementById('srcPractice').checked;
             const useH2H = document.getElementById('srcH2H').checked;
             const useGroups = document.getElementById('srcGroups').checked;
 
-            filteredData = allData.map(r => {
-                const plays = (useDaily ? r.daily_plays : 0) + (usePractice ? r.practice_plays : 0) + (useH2H ? r.h2h_plays : 0) + (useGroups ? r.group_plays : 0);
-                return { ...r, _plays: plays };
-            }).filter(r => r._plays > 0);
+            const combined = {}; // plate -> { plays, skips, times[], daily, practice, h2h, groups }
 
-            // Recalc skip % requires raw data we don't have per-source, so just use total
-            // The skip_pct and median_think stay from the full dataset
+            function addSource(srcData, srcKey, enabled) {
+                for (const plate in srcData) {
+                    if (!combined[plate]) combined[plate] = { plays: 0, skips: 0, times: [], daily: 0, practice: 0, h2h: 0, groups: 0 };
+                    const count = srcData[plate].length;
+                    combined[plate][srcKey] = count;
+                    if (enabled) {
+                        combined[plate].plays += count;
+                        srcData[plate].forEach(r => {
+                            if (r.skipped) combined[plate].skips++;
+                            if (r.t != null) combined[plate].times.push(r.t);
+                        });
+                    }
+                }
+            }
+
+            addSource(rawBySource.daily, 'daily', useDaily);
+            addSource(rawBySource.practice, 'practice', usePractice);
+            addSource(rawBySource.h2h, 'h2h', useH2H);
+            addSource(rawBySource.groups, 'groups', useGroups);
+
+            computedData = [];
+            for (const plate in combined) {
+                const c = combined[plate];
+                if (c.plays === 0) continue;
+                const sorted = c.times.slice().sort((a, b) => a - b);
+                const mid = Math.floor(sorted.length / 2);
+                const median = sorted.length === 0 ? null :
+                    sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+                computedData.push({
+                    plate,
+                    total_plays: c.plays,
+                    skip_pct: c.plays > 0 ? Math.round(1000 * c.skips / c.plays) / 10 : 0,
+                    median_think: median != null ? Math.round(median * 10) / 10 : null,
+                    daily_plays: c.daily,
+                    practice_plays: c.practice,
+                    h2h_plays: c.h2h,
+                    group_plays: c.groups
+                });
+            }
+
             renderTable();
         }
 
         function renderTable() {
-            if (filteredData.length === 0 && allData.length > 0) reloadSources();
-            const useFiltered = filteredData.length > 0;
             const minPlays = parseInt(document.getElementById('minPlaysFilter').value) || 1;
             const search = document.getElementById('searchInput').value.toUpperCase().trim();
 
@@ -269,10 +303,8 @@
             const maxSkip = parseFloat(document.getElementById('maxSkipFilter').value);
             const maxSkipVal = isNaN(maxSkip) ? 100 : maxSkip;
 
-            const sourceData = useFiltered ? filteredData : allData;
-            let filtered = sourceData.filter(r => {
-                const plays = r._plays != null ? r._plays : r.total_plays;
-                return plays >= minPlays && r.plate !== '— TOTAL —' && (r.skip_pct || 0) >= minSkip && (r.skip_pct || 0) <= maxSkipVal;
+            let filtered = computedData.filter(r => {
+                return r.total_plays >= minPlays && (r.skip_pct || 0) >= minSkip && (r.skip_pct || 0) <= maxSkipVal;
             });
 
             if (search) {
@@ -295,8 +327,8 @@
 
             // Sort
             filtered.sort((a, b) => {
-                let av = sortCol === 'total_plays' && a._plays != null ? a._plays : a[sortCol];
-                let bv = sortCol === 'total_plays' && b._plays != null ? b._plays : b[sortCol];
+                let av = a[sortCol];
+                let bv = b[sortCol];
                 if (av == null) av = -Infinity;
                 if (bv == null) bv = -Infinity;
                 if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
@@ -305,7 +337,7 @@
 
             // Totals
             const totals = filtered.reduce((acc, r) => {
-                acc.total += (r._plays != null ? r._plays : r.total_plays);
+                acc.total += r.total_plays;
                 acc.daily += r.daily_plays;
                 acc.practice += r.practice_plays;
                 acc.h2h += r.h2h_plays;
@@ -336,7 +368,6 @@
             html += '</tr></thead><tbody>';
 
             filtered.forEach(r => {
-                // Row color based on skip rate (same as plate stats)
                 const sp = r.skip_pct || 0;
                 const t = Math.min(Math.max(sp, 0), 100) / 100;
                 let red, green, opacity;
@@ -349,7 +380,7 @@
                 const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
                 html += `<tr style="background:${bgColor};">`;
                 html += `<td class="plate" onclick="openPlateUsed('${r.plate}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;">${r.plate}</td>`;
-                html += `<td class="num">${r._plays != null ? r._plays : r.total_plays}</td>`;
+                html += `<td class="num">${r.total_plays}</td>`;
                 html += `<td class="num">${r.skip_pct != null ? r.skip_pct + '%' : '--'}</td>`;
                 html += `<td class="num">${r.median_think != null ? r.median_think + 's' : '--'}</td>`;
                 html += `<td class="num">${r.daily_plays}</td>`;
@@ -420,7 +451,6 @@
                     e.preventDefault();
                     const prev = document.getElementById('pos' + (pos - 1));
                     prev.focus();
-                    // Place cursor at end
                     const len = prev.value.length;
                     prev.setSelectionRange(len, len);
                 }
@@ -474,7 +504,6 @@
                 const total = allRows.length;
                 const skipCount = allRows.filter(r => r.skipped).length;
 
-                // Median thinking time
                 const times = allRows.map(r => r.thinking_seconds).filter(t => t != null).sort((a, b) => a - b);
                 let medianStr = '--';
                 if (times.length > 0) {
