@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v6</title>
+    <title>Plate Analysis Tools v7</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -96,10 +96,19 @@
         async function loadData() {
             document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading plate analysis...</div>';
             try {
-                const { data, error } = await sb.rpc('plate_difficulty_analysis').limit(20000);
-                if (error) throw error;
-                allData = data;
-                console.log('RPC returned', allData.length, 'plates');
+                // Paginate RPC results (Supabase caps at 1000 per request)
+                allData = [];
+                let offset = 0;
+                while (true) {
+                    document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading plates... (${allData.length.toLocaleString()} so far)</div>`;
+                    const { data, error } = await sb.rpc('plate_difficulty_analysis').range(offset, offset + 999);
+                    if (error) throw error;
+                    if (!data || data.length === 0) break;
+                    allData.push(...data);
+                    if (data.length < 1000) break;
+                    offset += 1000;
+                }
+                console.log('RPC returned', allData.length, 'plates total');
                 renderTable();
             } catch (e) {
                 console.error('RPC error, falling back:', e);
