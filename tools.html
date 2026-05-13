@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v19</title>
+    <title>Plate Analysis Tools v20</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -115,14 +115,14 @@
             let all = [], offset = 0;
             while (true) {
                 document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading ${label}... (${all.length.toLocaleString()} rows)</div>`;
-                let query = sb.from(table).select(cols).range(offset, offset + 9999);
+                let query = sb.from(table).select(cols).range(offset, offset + 999);
                 if (extraFilter) query = extraFilter(query);
                 const { data, error } = await query;
                 if (error) { console.error(`Fetch error ${table}:`, error); break; }
                 if (!data || data.length === 0) break;
                 all.push(...data);
-                if (data.length < 10000) break;
-                offset += 10000;
+                if (data.length < 1000) break;
+                offset += 1000;
             }
             return all;
         }
@@ -194,12 +194,12 @@
                         .from('group_daily_run_entries')
                         .select('plate, skipped, thinking_seconds, run:group_daily_runs!inner(group:groups!inner(plate_mode))')
                         .eq('run.group.plate_mode', 'custom')
-                        .range(offset, offset + 9999);
+                        .range(offset, offset + 999);
                     if (error) { console.error('Groups fetch error:', error); break; }
                     if (!data || data.length === 0) break;
                     groupRows.push(...data);
-                    if (data.length < 10000) break;
-                    offset += 10000;
+                    if (data.length < 1000) break;
+                    offset += 1000;
                 }
 
                 rawBySource.daily = groupByPlate(daily);
