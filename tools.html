@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v7</title>
+    <title>Plate Analysis Tools v8</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -55,13 +55,13 @@
                 <div>
                     <input type="text" id="searchInput" placeholder="Search plate..." maxlength="3" oninput="onSearch()" style="text-transform:uppercase;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:200px;">
                     <div style="display:flex;gap:4px;margin-top:6px;">
-                        <input type="text" id="pos1" maxlength="1" oninput="onPositionSearch()" placeholder="1" style="width:36px;text-align:center;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-transform:uppercase;font-weight:600;">
-                        <input type="text" id="pos2" maxlength="1" oninput="onPositionSearch()" placeholder="2" style="width:36px;text-align:center;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-transform:uppercase;font-weight:600;">
-                        <input type="text" id="pos3" maxlength="1" oninput="onPositionSearch()" placeholder="3" style="width:36px;text-align:center;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-transform:uppercase;font-weight:600;">
+                        <input type="text" id="pos1" maxlength="1" oninput="onPosInput(1)" onkeydown="onPosKey(event,1)" placeholder="1" style="width:36px;text-align:center;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-transform:uppercase;font-weight:600;">
+                        <input type="text" id="pos2" maxlength="1" oninput="onPosInput(2)" onkeydown="onPosKey(event,2)" placeholder="2" style="width:36px;text-align:center;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-transform:uppercase;font-weight:600;">
+                        <input type="text" id="pos3" maxlength="1" oninput="onPosInput(3)" onkeydown="onPosKey(event,3)" placeholder="3" style="width:36px;text-align:center;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-transform:uppercase;font-weight:600;">
                     </div>
                 </div>
-                <label style="font-size:14px;color:#374151;">Min plays: <span id="minPlaysLabel">10</span></label>
-                <input type="range" id="minPlaysFilter" min="1" max="100" value="10" style="width:160px;" oninput="document.getElementById('minPlaysLabel').textContent=this.value;filterTable()">
+                <label style="font-size:14px;color:#374151;">Min plays:</label>
+                <input type="number" id="minPlaysFilter" min="1" max="10000" value="10" style="width:70px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
                 <span class="count" id="rowCount"></span>
             </div>
             <div id="tableContainer">
@@ -291,8 +291,6 @@
             const search = document.getElementById('searchInput').value.trim();
             if (search.length > 0) {
                 document.getElementById('minPlaysFilter').value = '1';
-                document.getElementById('minPlaysLabel').textContent = '1';
-                // Clear position inputs
                 document.getElementById('pos1').value = '';
                 document.getElementById('pos2').value = '';
                 document.getElementById('pos3').value = '';
@@ -300,16 +298,34 @@
             renderTable();
         }
 
-        function onPositionSearch() {
-            const p1 = document.getElementById('pos1').value.toUpperCase();
-            const p2 = document.getElementById('pos2').value.toUpperCase();
-            const p3 = document.getElementById('pos3').value.toUpperCase();
+        function onPosInput(pos) {
+            const el = document.getElementById('pos' + pos);
+            el.value = el.value.toUpperCase().replace(/[^A-Z]/g, '');
+            if (el.value.length === 1 && pos < 3) {
+                document.getElementById('pos' + (pos + 1)).focus();
+            }
+            const p1 = document.getElementById('pos1').value;
+            const p2 = document.getElementById('pos2').value;
+            const p3 = document.getElementById('pos3').value;
             if (p1 || p2 || p3) {
                 document.getElementById('searchInput').value = '';
                 document.getElementById('minPlaysFilter').value = '1';
-                document.getElementById('minPlaysLabel').textContent = '1';
             }
             renderTable();
+        }
+
+        function onPosKey(e, pos) {
+            if (e.key === 'Backspace') {
+                const el = document.getElementById('pos' + pos);
+                if (el.value === '' && pos > 1) {
+                    e.preventDefault();
+                    const prev = document.getElementById('pos' + (pos - 1));
+                    prev.focus();
+                    // Place cursor at end
+                    const len = prev.value.length;
+                    prev.setSelectionRange(len, len);
+                }
+            }
         }
 
         function filterTable() {
