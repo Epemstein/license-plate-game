@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v17</title>
+    <title>Plate Analysis Tools v18</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -66,6 +66,12 @@
                 <input type="number" id="minSkipFilter" min="0" max="100" value="0" placeholder="min" style="width:65px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
                 <span style="color:#9ca3af;">–</span>
                 <input type="number" id="maxSkipFilter" min="0" max="100" value="100" placeholder="max" style="width:65px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
+                <span style="font-size:13px;color:#374151;display:flex;gap:8px;align-items:center;">
+                    <label><input type="checkbox" id="srcDaily" checked onchange="reloadSources()"> Daily</label>
+                    <label><input type="checkbox" id="srcPractice" checked onchange="reloadSources()"> Practice</label>
+                    <label><input type="checkbox" id="srcH2H" checked onchange="reloadSources()"> H2H</label>
+                    <label><input type="checkbox" id="srcGroups" checked onchange="reloadSources()"> Groups</label>
+                </span>
                 <span class="count" id="rowCount"></span>
                 <button onclick="refreshData()" style="padding:6px 14px;background:#f3f4f6;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;">Refresh Data</button>
                 <span class="count" id="cacheStatus"></span>
@@ -157,7 +163,7 @@
 
                 allData = fetched || [];
                 document.getElementById('cacheStatus').textContent = '(just refreshed)';
-                renderTable();
+                reloadSources();
             } catch (e) {
                 console.error('Fetch error:', e);
                 if (!background) {
@@ -230,7 +236,27 @@
             }
         }
 
+        // Recalculate data based on selected sources
+        let filteredData = [];
+        function reloadSources() {
+            const useDaily = document.getElementById('srcDaily').checked;
+            const usePractice = document.getElementById('srcPractice').checked;
+            const useH2H = document.getElementById('srcH2H').checked;
+            const useGroups = document.getElementById('srcGroups').checked;
+
+            filteredData = allData.map(r => {
+                const plays = (useDaily ? r.daily_plays : 0) + (usePractice ? r.practice_plays : 0) + (useH2H ? r.h2h_plays : 0) + (useGroups ? r.group_plays : 0);
+                return { ...r, _plays: plays };
+            }).filter(r => r._plays > 0);
+
+            // Recalc skip % requires raw data we don't have per-source, so just use total
+            // The skip_pct and median_think stay from the full dataset
+            renderTable();
+        }
+
         function renderTable() {
+            if (filteredData.length === 0 && allData.length > 0) reloadSources();
+            const useFiltered = filteredData.length > 0;
             const minPlays = parseInt(document.getElementById('minPlaysFilter').value) || 1;
             const search = document.getElementById('searchInput').value.toUpperCase().trim();
 
@@ -243,7 +269,11 @@
             const maxSkip = parseFloat(document.getElementById('maxSkipFilter').value);
             const maxSkipVal = isNaN(maxSkip) ? 100 : maxSkip;
 
-            let filtered = allData.filter(r => r.total_plays >= minPlays && r.plate !== '— TOTAL —' && (r.skip_pct || 0) >= minSkip && (r.skip_pct || 0) <= maxSkipVal);
+            const sourceData = useFiltered ? filteredData : allData;
+            let filtered = sourceData.filter(r => {
+                const plays = r._plays != null ? r._plays : r.total_plays;
+                return plays >= minPlays && r.plate !== '— TOTAL —' && (r.skip_pct || 0) >= minSkip && (r.skip_pct || 0) <= maxSkipVal;
+            });
 
             if (search) {
                 filtered = filtered.filter(r => r.plate.startsWith(search));
@@ -265,7 +295,8 @@
 
             // Sort
             filtered.sort((a, b) => {
-                let av = a[sortCol], bv = b[sortCol];
+                let av = sortCol === 'total_plays' && a._plays != null ? a._plays : a[sortCol];
+                let bv = sortCol === 'total_plays' && b._plays != null ? b._plays : b[sortCol];
                 if (av == null) av = -Infinity;
                 if (bv == null) bv = -Infinity;
                 if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
@@ -274,7 +305,7 @@
 
             // Totals
             const totals = filtered.reduce((acc, r) => {
-                acc.total += r.total_plays;
+                acc.total += (r._plays != null ? r._plays : r.total_plays);
                 acc.daily += r.daily_plays;
                 acc.practice += r.practice_plays;
                 acc.h2h += r.h2h_plays;
@@ -318,7 +349,7 @@
                 const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
                 html += `<tr style="background:${bgColor};">`;
                 html += `<td class="plate" onclick="openPlateUsed('${r.plate}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;">${r.plate}</td>`;
-                html += `<td class="num">${r.total_plays}</td>`;
+                html += `<td class="num">${r._plays != null ? r._plays : r.total_plays}</td>`;
                 html += `<td class="num">${r.skip_pct != null ? r.skip_pct + '%' : '--'}</td>`;
                 html += `<td class="num">${r.median_think != null ? r.median_think + 's' : '--'}</td>`;
                 html += `<td class="num">${r.daily_plays}</td>`;
