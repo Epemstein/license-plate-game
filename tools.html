@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v3</title>
+    <title>Plate Analysis Tools v4</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -87,14 +87,15 @@
         }
 
         async function loadData() {
+            document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading plate analysis...</div>';
             try {
                 const { data, error } = await sb.rpc('plate_difficulty_analysis');
                 if (error) throw error;
                 allData = data;
+                console.log('RPC returned', allData.length, 'plates');
                 renderTable();
             } catch (e) {
-                console.error('Load error:', e);
-                // Fallback: run raw queries
+                console.error('RPC error, falling back:', e);
                 await loadDataFallback();
             }
         }
