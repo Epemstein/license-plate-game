@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v11</title>
+    <title>Plate Analysis Tools v12</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -297,11 +297,21 @@
             html += '</tr></thead><tbody>';
 
             filtered.forEach(r => {
-                const skipCls = r.skip_pct >= 50 ? 'skip-high' : r.skip_pct >= 20 ? 'skip-med' : 'skip-low';
-                html += '<tr>';
+                // Row color based on skip rate (same as plate stats)
+                const sp = r.skip_pct || 0;
+                const t = Math.min(Math.max(sp, 0), 100) / 100;
+                let red, green, opacity;
+                if (t < 0.20) { const f = t / 0.20; red = f * 0.95; green = 0.75 + f * 0.15; opacity = 0.18 + f * 0.02; }
+                else if (t < 0.50) { const f = (t - 0.20) / 0.30; red = 0.95 + f * 0.05; green = 0.90 - f * 0.65; opacity = 0.15 + f * 0.05; }
+                else { const f = (t - 0.50) / 0.50; red = 1.0; green = 0.25 - f * 0.20; opacity = 0.20 + f * 0.12; }
+                const rr = Math.round(255 + (red * 255 - 255) * opacity);
+                const gg = Math.round(255 + (green * 255 - 255) * opacity);
+                const bb = Math.round(255 * (1 - opacity));
+                const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
+                html += `<tr style="background:${bgColor};">`;
                 html += `<td class="plate" onclick="openPlateUsed('${r.plate}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;">${r.plate}</td>`;
                 html += `<td class="num">${r.total_plays}</td>`;
-                html += `<td class="num ${skipCls}">${r.skip_pct != null ? r.skip_pct + '%' : '--'}</td>`;
+                html += `<td class="num">${r.skip_pct != null ? r.skip_pct + '%' : '--'}</td>`;
                 html += `<td class="num">${r.median_think != null ? r.median_think + 's' : '--'}</td>`;
                 html += `<td class="num">${r.daily_plays}</td>`;
                 html += `<td class="num">${r.practice_plays}</td>`;
