@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v15</title>
+    <title>Plate Analysis Tools v16</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -472,8 +472,8 @@
 
                 let html = '<div style="display:flex;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:0.8rem;color:#9ca3af;font-weight:600;">';
                 html += '<div style="flex:1;">Word</div>';
-                html += '<div style="min-width:50px;text-align:right;">Count</div>';
-                html += '<div style="min-width:50px;text-align:right;">%</div>';
+                html += '<div style="width:70px;text-align:right;">Count</div>';
+                html += '<div style="width:70px;text-align:right;">%</div>';
                 html += '</div>';
 
                 items.forEach(item => {
@@ -483,8 +483,8 @@
                         : `<span style="font-size:1rem;">${highlightPlate(item.word, plate)}</span>`;
                     html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
                     html += `<div style="flex:1;">${wordHtml}</div>`;
-                    html += `<div style="min-width:50px;text-align:right;font-weight:600;color:#374151;">${item.count}</div>`;
-                    html += `<div style="min-width:50px;text-align:right;color:#6b7280;">${pct}%</div>`;
+                    html += `<div style="width:70px;text-align:right;font-weight:600;color:#374151;">${item.count}</div>`;
+                    html += `<div style="width:70px;text-align:right;color:#6b7280;">${pct}%</div>`;
                     html += `</div>`;
                 });
 
