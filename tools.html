@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v16</title>
+    <title>Plate Analysis Tools v17</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -63,9 +63,9 @@
                 <label style="font-size:14px;color:#374151;">Min plays:</label>
                 <input type="number" id="minPlaysFilter" min="1" max="10000" value="10" style="width:70px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
                 <label style="font-size:14px;color:#374151;">Skip %:</label>
-                <input type="number" id="minSkipFilter" min="0" max="100" value="0" placeholder="min" style="width:50px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
+                <input type="number" id="minSkipFilter" min="0" max="100" value="0" placeholder="min" style="width:65px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
                 <span style="color:#9ca3af;">–</span>
-                <input type="number" id="maxSkipFilter" min="0" max="100" value="100" placeholder="max" style="width:50px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
+                <input type="number" id="maxSkipFilter" min="0" max="100" value="100" placeholder="max" style="width:65px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="filterTable()">
                 <span class="count" id="rowCount"></span>
                 <button onclick="refreshData()" style="padding:6px 14px;background:#f3f4f6;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;">Refresh Data</button>
                 <span class="count" id="cacheStatus"></span>
@@ -283,10 +283,10 @@
                 return acc;
             }, { total: 0, daily: 0, practice: 0, h2h: 0, group: 0, skipWeighted: 0 });
 
-            document.getElementById('rowCount').textContent = `${filtered.length} plates`;
+            document.getElementById('rowCount').textContent = '';
 
             const cols = [
-                { key: 'plate', label: 'Plate', cls: 'plate' },
+                { key: 'plate', label: `Plate (${filtered.length})`, cls: 'plate' },
                 { key: 'total_plays', label: 'Plays', cls: 'num' },
                 { key: 'skip_pct', label: 'Skip %', cls: 'num' },
                 { key: 'median_think', label: 'Median', cls: 'num' },
