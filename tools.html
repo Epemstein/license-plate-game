@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Analysis Tools v22</title>
+    <title>Platbremetrics</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,7 +40,7 @@
 <body>
     <div id="loginScreen" class="login-screen">
         <div class="login-box">
-            <h2>Plate Analysis Tools</h2>
+            <h2>Platbremetrics</h2>
             <p style="color:#888;margin:8px 0 16px;">Enter password to continue</p>
             <input type="password" id="toolsPassword" placeholder="Password" onkeydown="if(event.key==='Enter')toolsLogin()">
             <button onclick="toolsLogin()">Sign In</button>
@@ -50,7 +50,7 @@
 
     <div id="mainContent" style="display:none;">
         <div class="container">
-            <h1>Plate Difficulty Analysis</h1>
+            <h1>Platbremetrics</h1>
             <div class="controls">
                 <div>
                     <input type="text" id="searchInput" placeholder="Search plate..." maxlength="3" oninput="onSearch()" style="text-transform:uppercase;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:200px;">
@@ -91,11 +91,18 @@
 
         // Raw data per source: { daily: { "ABC": [{skipped, t}, ...], ... }, practice: {...}, h2h: {...}, groups: {...} }
         let rawBySource = { daily: {}, practice: {}, h2h: {}, groups: {} };
+        let plateAnalysis = {}; // plate -> { common, viable }
         let computedData = []; // Combined plate data based on selected checkboxes
         let sortCol = 'total_plays';
         let sortDir = 'desc';
         let currentPage = 0;
         const PAGE_SIZE = 100;
+
+        // Load plate_analysis.json for common/viable word counts
+        fetch('plate_analysis.json?v=2').then(r => r.json()).then(data => {
+            plateAnalysis = data;
+            console.log('Loaded plate_analysis.json:', Object.keys(data).length, 'plates');
+        }).catch(e => console.warn('plate_analysis.json not loaded:', e));
 
         const CACHE_PREFIX = 'plateRaw_';
         const CACHE_TTL = 30 * 60 * 1000;
@@ -277,11 +284,17 @@
                 const mid = Math.floor(sorted.length / 2);
                 const median = sorted.length === 0 ? null :
                     sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+                const nonSkipTimes = c.times.filter((_, i) => true); // all times already collected from non-skip entries? No, times includes all. Filter skipped entries' times out for mean.
+                const mean = sorted.length > 0 ? Math.round(10 * sorted.reduce((a, b) => a + b, 0) / sorted.length) / 10 : null;
+                const pa = plateAnalysis[plate] || plateAnalysis[plate.toUpperCase()] || {};
                 computedData.push({
                     plate,
                     total_plays: c.plays,
                     skip_pct: c.plays > 0 ? Math.round(1000 * c.skips / c.plays) / 10 : 0,
                     median_think: median != null ? Math.round(median * 10) / 10 : null,
+                    mean_think: mean,
+                    common_words: pa.common || 0,
+                    viable_words: pa.viable || 0,
                     daily_plays: c.daily,
                     practice_plays: c.practice,
                     h2h_plays: c.h2h,
@@ -358,8 +371,11 @@
 
             const cols = [
                 { key: 'plate', label: `Plate (${filtered.length})`, cls: 'plate' },
+                { key: 'common_words', label: 'Common', cls: 'num' },
+                { key: 'viable_words', label: 'Viable', cls: 'num' },
                 { key: 'total_plays', label: 'Plays', cls: 'num' },
                 { key: 'skip_pct', label: 'Skip %', cls: 'num' },
+                { key: 'mean_think', label: 'Mean', cls: 'num' },
                 { key: 'median_think', label: 'Median', cls: 'num' },
                 { key: 'daily_plays', label: 'Daily', cls: 'num' },
                 { key: 'practice_plays', label: 'Practice', cls: 'num' },
@@ -395,8 +411,11 @@
                 const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
                 html += `<tr style="background:${bgColor};">`;
                 html += `<td class="plate" onclick="openPlateUsed('${r.plate}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;">${r.plate}</td>`;
+                html += `<td class="num">${r.common_words}</td>`;
+                html += `<td class="num">${r.viable_words.toLocaleString()}</td>`;
                 html += `<td class="num">${r.total_plays}</td>`;
                 html += `<td class="num">${r.skip_pct != null ? r.skip_pct + '%' : '--'}</td>`;
+                html += `<td class="num">${r.mean_think != null ? r.mean_think + 's' : '--'}</td>`;
                 html += `<td class="num">${r.median_think != null ? r.median_think + 's' : '--'}</td>`;
                 html += `<td class="num"${srcOn.daily ? '' : ' style="color:#ccc;"'}>${r.daily_plays}</td>`;
                 html += `<td class="num"${srcOn.practice ? '' : ' style="color:#ccc;"'}>${r.practice_plays}</td>`;
@@ -409,8 +428,11 @@
             const avgSkip = totals.total > 0 ? Math.round(10 * totals.skipWeighted / totals.total) / 10 : 0;
             html += `<tr class="total-row">`;
             html += `<td>TOTAL (${filtered.length})</td>`;
+            html += `<td class="num">--</td>`;
+            html += `<td class="num">--</td>`;
             html += `<td class="num">${totals.total.toLocaleString()}</td>`;
             html += `<td class="num">${avgSkip}%</td>`;
+            html += `<td class="num">--</td>`;
             html += `<td class="num">--</td>`;
             html += `<td class="num"${srcOn.daily ? '' : ' style="color:#ccc;"'}>${totals.daily.toLocaleString()}</td>`;
             html += `<td class="num"${srcOn.practice ? '' : ' style="color:#ccc;"'}>${totals.practice.toLocaleString()}</td>`;
@@ -453,6 +475,8 @@
             const search = document.getElementById('searchInput').value.trim();
             if (search.length > 0) {
                 document.getElementById('minPlaysFilter').value = '1';
+                document.getElementById('minSkipFilter').value = '0';
+                document.getElementById('maxSkipFilter').value = '100';
                 document.getElementById('pos1').value = '';
                 document.getElementById('pos2').value = '';
                 document.getElementById('pos3').value = '';
@@ -473,6 +497,8 @@
             if (p1 || p2 || p3) {
                 document.getElementById('searchInput').value = '';
                 document.getElementById('minPlaysFilter').value = '1';
+                document.getElementById('minSkipFilter').value = '0';
+                document.getElementById('maxSkipFilter').value = '100';
             }
             renderTable();
         }
