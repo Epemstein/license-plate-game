@@ -154,75 +154,159 @@
         if (el('statOverall')) el('statOverall').textContent = stats.overall;
     }
 
+    let histCalMonth = new Date();
+
     async function showHistoricalScores() {
         if (!currentUser) return;
         const container = document.getElementById('profileContent');
-        const origHtml = container.innerHTML;
-
         container.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
 
         try {
+            // Fetch all runs (including incomplete)
             const { data: runs } = await sb
                 .from('daily_runs')
                 .select('date, total_seconds')
                 .eq('user_id', currentUser.id)
-                .not('total_seconds', 'is', null)
                 .order('date', { ascending: false });
 
             if (!runs || !runs.length) {
                 container.innerHTML = `
-                    <button onclick="updateProfileTab()" style="padding:8px 16px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;margin-bottom:16px;">&larr; Back</button>
-                    <p style="text-align:center;color:#6b7280;">No daily scores yet.</p>`;
+                    <button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>
+                    <p style="text-align:center;color:#6b7280;margin-top:20px;">No daily scores yet.</p>`;
                 return;
             }
 
-            let html = '<div style="display:flex;align-items:center;margin-bottom:16px;">';
-            html += '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>';
-            html += '<h3 style="margin:0 0 0 12px;font-size:1.1rem;">Historical Scores</h3>';
-            html += '</div>';
-
-            for (const run of runs) {
-                const dateDisplay = formatDateForDisplay(run.date);
-                const time = run.total_seconds.toFixed(1);
-
-                // Try to get percentile from cached leaderboard
-                let pctText = '';
-                let pctNum = null;
-                const cacheKey = 'lb_' + run.date + '_' + currentUser.id;
-                try {
-                    const cached = JSON.parse(localStorage.getItem(cacheKey));
-                    if (cached) {
-                        const me = cached.find(s => s.isMe);
-                        if (me && me.percentile != null) {
-                            pctNum = Math.round(100 - me.percentile);
-                            pctText = `Top ${pctNum}%`;
-                        }
-                    }
-                } catch(e) {}
-
-                const timeColor = pctNum != null && pctNum <= 20 ? '#16a34a' : '#374151';
-                const pctColor = pctNum != null && pctNum <= 20 ? '#16a34a' : '#6b7280';
-
-                html += `<div onclick="switchTab('leaderboard');setTimeout(()=>{document.getElementById('leaderboardDatePicker').value='${run.date}';displayLeaderboard('${run.date}');},100);viewPlayerRun('${currentUser.id}','${run.date}','My Run',${run.total_seconds},0,0,0,0)" style="display:flex;align-items:center;padding:10px 14px;margin-bottom:6px;background:white;border:1px solid #e5e7eb;border-radius:12px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'">`;
-                html += `<div style="font-size:0.9rem;color:#374151;min-width:120px;">${dateDisplay}</div>`;
-                html += `<div style="flex:1;"></div>`;
-                html += `<div style="text-align:right;margin-right:4px;">`;
-                html += `<span style="font-weight:700;font-size:1rem;color:${timeColor};">${time}s</span>`;
-                if (pctText) html += `<span style="font-size:0.8rem;color:${pctColor};margin-left:8px;">${pctText}</span>`;
-                html += `</div>`;
-                html += `<span style="color:#d1d5db;margin-left:6px;">›</span>`;
-                html += `</div>`;
+            // Batch fetch percentiles for all completed runs
+            const completedDates = runs.filter(r => r.total_seconds != null).map(r => r.date);
+            const pctByDate = {};
+            if (completedDates.length > 0) {
+                const { data: pctData } = await sb.rpc('batch_percentiles', {
+                    p_user_id: currentUser.id,
+                    p_dates: completedDates
+                });
+                if (pctData) pctData.forEach(p => { pctByDate[p.date] = p.percentile; });
             }
 
-            container.innerHTML = html;
+            // Build lookup
+            const runByDate = {};
+            runs.forEach(r => { runByDate[r.date] = r; });
+
+            // Store for rendering
+            window._histRunByDate = runByDate;
+            window._histPctByDate = pctByDate;
+            histCalMonth = new Date();
+            renderHistoricalCalendar(container);
         } catch(e) {
             console.error('Error loading historical scores:', e);
             container.innerHTML = `
-                <button onclick="updateProfileTab()" style="padding:8px 16px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;margin-bottom:16px;">&larr; Back</button>
+                <button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>
                 <p style="text-align:center;color:#dc2626;">Error loading scores</p>`;
         }
     }
     window.showHistoricalScores = showHistoricalScores;
+
+    function renderHistoricalCalendar(container) {
+        if (!container) container = document.getElementById('profileContent');
+        const runByDate = window._histRunByDate || {};
+        const pctByDate = window._histPctByDate || {};
+
+        const year = histCalMonth.getFullYear();
+        const month = histCalMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const startWeekday = firstDay.getDay();
+        const today = new Date();
+        const todayStr = getTodayString();
+
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+        // Can navigate?
+        const canPrev = year > 2026 || (year === 2026 && month > 3);
+        const canNext = year < today.getFullYear() || (year === today.getFullYear() && month < today.getMonth());
+
+        let html = '<div style="display:flex;align-items:center;margin-bottom:16px;">';
+        html += '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>';
+        html += '</div>';
+
+        // Month nav
+        html += '<div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:14px;">';
+        html += `<button onclick="histCalShift(-1)" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:${canPrev ? '#374151' : '#d1d5db'};" ${canPrev ? '' : 'disabled'}>&lsaquo;</button>`;
+        html += `<span style="font-weight:700;font-size:1rem;">${monthNames[month]} ${year}</span>`;
+        html += `<button onclick="histCalShift(1)" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:${canNext ? '#374151' : '#d1d5db'};" ${canNext ? '' : 'disabled'}>&rsaquo;</button>`;
+        html += '</div>';
+
+        // Weekday headers
+        html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px;">';
+        ['S','M','T','W','T','F','S'].forEach(d => {
+            html += `<div style="text-align:center;font-size:0.7rem;font-weight:600;color:#9ca3af;padding:4px 0;">${d}</div>`;
+        });
+        html += '</div>';
+
+        // Calendar grid
+        html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">';
+
+        // Leading blanks
+        for (let i = 0; i < startWeekday; i++) {
+            html += '<div style="height:64px;"></div>';
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const cellDate = new Date(year, month, day);
+            const isFuture = cellDate > today;
+            const isToday = dateStr === todayStr;
+            const run = runByDate[dateStr];
+            const hasTime = run && run.total_seconds != null;
+            const connectionLost = run && run.total_seconds == null;
+            const isMissed = !isFuture && !isToday && !run;
+
+            // Cell color (matches iOS)
+            let bgColor;
+            if (isFuture) { bgColor = '#f5f5f5'; }
+            else if (connectionLost) { bgColor = 'rgba(239,68,68,0.08)'; }
+            else if (isMissed) { bgColor = '#e0e0e0'; }
+            else if (hasTime && pctByDate[dateStr] != null) {
+                const pct = pctByDate[dateStr];
+                const clamped = Math.max(50, Math.min(95, pct));
+                const t = (clamped - 50) / 45;
+                const r = Math.round(255 - t * (255 - 22));
+                const g = Math.round(255 - t * (255 - 163));
+                const b = Math.round(255 - t * (255 - 74));
+                bgColor = `rgb(${r},${g},${b})`;
+            } else { bgColor = 'white'; }
+
+            const border = isToday ? '2px solid #000' : '1px solid rgba(0,0,0,0.1)';
+            const cursor = hasTime ? 'cursor:pointer;' : '';
+            const onclick = hasTime ? `onclick="switchTab('leaderboard');setTimeout(()=>{displayLeaderboard('${dateStr}');},100);"` : '';
+
+            html += `<div ${onclick} style="height:64px;border-radius:8px;background:${bgColor};border:${border};position:relative;${cursor}">`;
+            // Day number
+            html += `<div style="position:absolute;top:3px;left:5px;font-size:0.65rem;font-weight:600;color:${isFuture ? '#d1d5db' : '#9ca3af'};">${day}</div>`;
+            // Content
+            html += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding-top:4px;">';
+            if (hasTime) {
+                const pct = pctByDate[dateStr];
+                const topPct = pct != null ? Math.round(100 - pct) : null;
+                html += `<div style="font-size:0.75rem;font-weight:700;font-family:monospace;">${run.total_seconds.toFixed(1)}</div>`;
+                if (topPct != null) {
+                    html += `<div style="font-size:0.6rem;font-weight:600;color:rgba(0,0,0,0.6);">Top ${topPct}%</div>`;
+                }
+            } else if (connectionLost) {
+                html += '<div style="font-size:0.8rem;color:rgba(239,68,68,0.7);">&#9889;</div>';
+            } else if (isToday && !isFuture && !run) {
+                html += '<div style="font-size:1rem;color:#9ca3af;">&#8987;</div>';
+            }
+            html += '</div></div>';
+        }
+
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    window.histCalShift = function(dir) {
+        histCalMonth.setMonth(histCalMonth.getMonth() + dir);
+        renderHistoricalCalendar();
+    };
 
     function updateProfileTab() {
         console.log('updateProfileTab called, currentUser:', !!currentUser);
