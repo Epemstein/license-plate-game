@@ -176,33 +176,41 @@
                 return;
             }
 
-            // Get percentiles from leaderboard for each date
-            let html = '<button onclick="updateProfileTab()" style="padding:8px 16px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;margin-bottom:16px;">&larr; Back</button>';
-            html += '<h3 style="margin:0 0 12px;">Historical Scores</h3>';
+            let html = '<div style="display:flex;align-items:center;margin-bottom:16px;">';
+            html += '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>';
+            html += '<h3 style="margin:0 0 0 12px;font-size:1.1rem;">Historical Scores</h3>';
+            html += '</div>';
 
             for (const run of runs) {
                 const dateDisplay = formatDateForDisplay(run.date);
-                const time = run.total_seconds.toFixed(2);
+                const time = run.total_seconds.toFixed(1);
 
                 // Try to get percentile from cached leaderboard
                 let pctText = '';
+                let pctNum = null;
                 const cacheKey = 'lb_' + run.date + '_' + currentUser.id;
                 try {
                     const cached = JSON.parse(localStorage.getItem(cacheKey));
                     if (cached) {
                         const me = cached.find(s => s.isMe);
                         if (me && me.percentile != null) {
-                            pctText = `Top ${Math.round(100 - me.percentile)}%`;
+                            pctNum = Math.round(100 - me.percentile);
+                            pctText = `Top ${pctNum}%`;
                         }
                     }
                 } catch(e) {}
 
-                html += `<div onclick="switchTab('leaderboard');setTimeout(()=>{document.getElementById('leaderboardDatePicker').value='${run.date}';displayLeaderboard('${run.date}');},100);viewPlayerRun('${currentUser.id}','${run.date}','My Run',${run.total_seconds},0,0,0,0)" style="display:flex;align-items:center;padding:12px;margin-bottom:4px;background:#f9fafb;border-radius:10px;cursor:pointer;">`;
-                html += `<div style="flex:1;"><div style="font-weight:600;">${dateDisplay}</div></div>`;
-                html += `<div style="text-align:right;"><div style="font-weight:700;color:#16a34a;">${time}s</div>`;
-                if (pctText) html += `<div style="font-size:0.8rem;color:#6b7280;">${pctText}</div>`;
+                const timeColor = pctNum != null && pctNum <= 20 ? '#16a34a' : '#374151';
+                const pctColor = pctNum != null && pctNum <= 20 ? '#16a34a' : '#6b7280';
+
+                html += `<div onclick="switchTab('leaderboard');setTimeout(()=>{document.getElementById('leaderboardDatePicker').value='${run.date}';displayLeaderboard('${run.date}');},100);viewPlayerRun('${currentUser.id}','${run.date}','My Run',${run.total_seconds},0,0,0,0)" style="display:flex;align-items:center;padding:10px 14px;margin-bottom:6px;background:white;border:1px solid #e5e7eb;border-radius:12px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'">`;
+                html += `<div style="font-size:0.9rem;color:#374151;min-width:120px;">${dateDisplay}</div>`;
+                html += `<div style="flex:1;"></div>`;
+                html += `<div style="text-align:right;margin-right:4px;">`;
+                html += `<span style="font-weight:700;font-size:1rem;color:${timeColor};">${time}s</span>`;
+                if (pctText) html += `<span style="font-size:0.8rem;color:${pctColor};margin-left:8px;">${pctText}</span>`;
                 html += `</div>`;
-                html += `<div style="color:#9ca3af;margin-left:8px;">&#8250;</div>`;
+                html += `<span style="color:#d1d5db;margin-left:6px;">›</span>`;
                 html += `</div>`;
             }
 
