@@ -371,9 +371,9 @@
 
             const cols = [
                 { key: 'plate', label: `Plate (${filtered.length})`, cls: 'plate' },
+                { key: 'total_plays', label: 'Plays', cls: 'num' },
                 { key: 'common_words', label: 'Common', cls: 'num' },
                 { key: 'viable_words', label: 'Viable', cls: 'num' },
-                { key: 'total_plays', label: 'Plays', cls: 'num' },
                 { key: 'skip_pct', label: 'Skip %', cls: 'num' },
                 { key: 'mean_think', label: 'Mean', cls: 'num' },
                 { key: 'median_think', label: 'Median', cls: 'num' },
@@ -411,9 +411,9 @@
                 const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
                 html += `<tr style="background:${bgColor};">`;
                 html += `<td class="plate" onclick="openPlateUsed('${r.plate}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;">${r.plate}</td>`;
+                html += `<td class="num">${r.total_plays}</td>`;
                 html += `<td class="num">${r.common_words}</td>`;
                 html += `<td class="num">${r.viable_words.toLocaleString()}</td>`;
-                html += `<td class="num">${r.total_plays}</td>`;
                 html += `<td class="num">${r.skip_pct != null ? r.skip_pct + '%' : '--'}</td>`;
                 html += `<td class="num">${r.mean_think != null ? r.mean_think + 's' : '--'}</td>`;
                 html += `<td class="num">${r.median_think != null ? r.median_think + 's' : '--'}</td>`;
@@ -428,9 +428,9 @@
             const avgSkip = totals.total > 0 ? Math.round(10 * totals.skipWeighted / totals.total) / 10 : 0;
             html += `<tr class="total-row">`;
             html += `<td>TOTAL (${filtered.length})</td>`;
-            html += `<td class="num">--</td>`;
-            html += `<td class="num">--</td>`;
             html += `<td class="num">${totals.total.toLocaleString()}</td>`;
+            html += `<td class="num">--</td>`;
+            html += `<td class="num">--</td>`;
             html += `<td class="num">${avgSkip}%</td>`;
             html += `<td class="num">--</td>`;
             html += `<td class="num">--</td>`;
