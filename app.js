@@ -4003,7 +4003,7 @@
         currentH2HRunId = null;
         challengeStartTime = null;
         gameMode = 'practice';
-        gameHistory = [];
+        // Don't clear gameHistory — Plate Stats button needs it after game over
         localStorage.removeItem('pendingPracticeStats');
 
         // Update banner
