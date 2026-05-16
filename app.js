@@ -533,6 +533,15 @@
     }
 
     function isDateSettled(dateStr) {
+        // Don't cache until 5am next day to account for west coast late players
+        const now = new Date();
+        if (now.getHours() < 5) {
+            // Before 5am: yesterday and today are both unsettled
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+            if (dateStr >= yStr) return false;
+        }
         return dateStr < getTodayString();
     }
 
