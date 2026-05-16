@@ -3551,31 +3551,41 @@
                 const myForfeit = myRun && myRun.forfeited;
                 const oppForfeit = oppRun && oppRun.forfeited;
 
-                let resultIcon = '';
-                let resultClass = '';
-                if (myForfeit && oppForfeit) { resultIcon = ''; resultClass = ''; }
-                else if (myForfeit) { resultIcon = '&#10007;'; resultClass = 'ch-loss'; }
-                else if (oppForfeit) { resultIcon = '&#10003;'; resultClass = 'ch-win'; }
+                let resultLabel = '';
+                let resultBg = '#f9fafb';
+                let resultBorder = '#e5e7eb';
+                if (myForfeit && oppForfeit) { resultLabel = 'Draw'; resultBg = '#fefce8'; resultBorder = '#fde68a'; }
+                else if (myForfeit) { resultLabel = 'Loss'; resultBg = '#fef2f2'; resultBorder = '#fecaca'; }
+                else if (oppForfeit) { resultLabel = 'Win'; resultBg = '#f0fdf4'; resultBorder = '#bbf7d0'; }
                 else if (myTime !== null && oppTime !== null) {
-                    if (myTime < oppTime) { resultIcon = '&#10003;'; resultClass = 'ch-win'; }
-                    else if (myTime > oppTime) { resultIcon = '&#10007;'; resultClass = 'ch-loss'; }
-                    else { resultIcon = '&#8212;'; resultClass = 'ch-tie'; }
+                    if (myTime < oppTime) { resultLabel = 'Win'; resultBg = '#f0fdf4'; resultBorder = '#bbf7d0'; }
+                    else if (myTime > oppTime) { resultLabel = 'Loss'; resultBg = '#fef2f2'; resultBorder = '#fecaca'; }
+                    else { resultLabel = 'Tie'; resultBg = '#fefce8'; resultBorder = '#fde68a'; }
                 }
 
-                const myDisplay = myForfeit ? 'Forfeit' : (myTime !== null ? myTime.toFixed(2) + 's' : '--');
-                const oppDisplay = oppForfeit ? 'Forfeit' : (oppTime !== null ? oppTime.toFixed(2) + 's' : '--');
+                const myDisplay = myForfeit ? 'Forfeit' : (myTime !== null ? myTime.toFixed(1) + 's' : '--');
+                const oppDisplay = oppForfeit ? 'Forfeit' : (oppTime !== null ? oppTime.toFixed(1) + 's' : '--');
+                const myColor = resultLabel === 'Win' ? '#16a34a' : resultLabel === 'Loss' ? '#dc2626' : '#374151';
+                const oppColor = resultLabel === 'Loss' ? '#16a34a' : resultLabel === 'Win' ? '#dc2626' : '#374151';
 
-                html += `<div class="challenge-row" onclick="viewH2HScorecard('${ch.id}')">`;
-                html += `<div class="ch-info">`;
-                html += `<div class="ch-name">${oppName} <span class="${resultClass}" style="margin-left:6px;">${resultIcon}</span></div>`;
-                html += `<div class="ch-meta">${diffLabel} &middot; ${dateStr}</div>`;
+                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${resultBg};border:1px solid ${resultBorder};cursor:pointer;" onclick="viewH2HScorecard('${ch.id}')">`;
+                html += `<div style="flex:1;min-width:0;">`;
+                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">vs ${oppName}</div>`;
+                html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${diffLabel} · ${dateStr}</div>`;
                 html += `</div>`;
-                html += `<div class="ch-scores" style="font-size:0.85rem;">`;
-                html += `<div>You: <strong>${myDisplay}</strong></div>`;
-                html += `<div>Them: <strong>${oppDisplay}</strong></div>`;
+                html += `<div style="display:flex;align-items:center;gap:12px;">`;
+                html += `<div style="text-align:center;min-width:55px;">`;
+                html += `<div style="font-size:0.7rem;color:#9ca3af;font-weight:600;">YOU</div>`;
+                html += `<div style="font-size:0.95rem;font-weight:700;color:${myColor};">${myDisplay}</div>`;
                 html += `</div>`;
-                html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty ?? 50})" style="padding:6px 12px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;margin-right:6px;">Rematch</button>`;
-                html += `<div class="ch-chevron">&#8250;</div>`;
+                html += `<div style="color:#d1d5db;font-size:0.8rem;">vs</div>`;
+                html += `<div style="text-align:center;min-width:55px;">`;
+                html += `<div style="font-size:0.7rem;color:#9ca3af;font-weight:600;">THEM</div>`;
+                html += `<div style="font-size:0.95rem;font-weight:700;color:${oppColor};">${oppDisplay}</div>`;
+                html += `</div>`;
+                html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty ?? 50})" style="padding:5px 10px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.75rem;cursor:pointer;">↻</button>`;
+                html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
+                html += `</div>`;
                 html += `</div>`;
             }
         });
