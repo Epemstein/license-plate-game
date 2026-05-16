@@ -675,7 +675,7 @@
 
                 // Your word from current game
                 const myEntry = gameHistory[i];
-                const yourWordStr = myEntry ? (myEntry.skipped ? `skipped (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
+                const yourWordStr = myEntry ? (myEntry.skipped ? `✕ (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
 
                 // Row color based on skip rate
                 const t = Math.min(Math.max(skipPct, 0), 100) / 100;
@@ -4579,7 +4579,7 @@
 
                 // Your word from current game
                 const myEntry = gameHistory[i];
-                const yourWordStr = myEntry ? (myEntry.skipped ? `skipped (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
+                const yourWordStr = myEntry ? (myEntry.skipped ? `✕ (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
 
                 // Row color
                 const t = Math.min(Math.max(skipPct, 0), 100) / 100;
