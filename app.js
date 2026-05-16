@@ -675,7 +675,7 @@
 
                 // Your word from current game
                 const myEntry = gameHistory[i];
-                const yourWordStr = myEntry ? (myEntry.skipped ? `✕ (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
+                const yourWordStr = myEntry ? (myEntry.skipped ? `❌ (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
 
                 // Row color based on skip rate
                 const t = Math.min(Math.max(skipPct, 0), 100) / 100;
@@ -4579,7 +4579,7 @@
 
                 // Your word from current game
                 const myEntry = gameHistory[i];
-                const yourWordStr = myEntry ? (myEntry.skipped ? `✕ (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
+                const yourWordStr = myEntry ? (myEntry.skipped ? `❌ (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
 
                 // Row color
                 const t = Math.min(Math.max(skipPct, 0), 100) / 100;
@@ -4592,7 +4592,7 @@
                 const bb = Math.round(255 * (1 - opacity));
                 const bgColor = `rgb(${rr}, ${gg}, ${bb})`;
 
-                html += `<tr style="background:${bgColor};cursor:pointer;" onclick="closePracticeStatsModal();showViableWordsForPlate('${plate}', false, 'practice')">`;
+                html += `<tr style="background:${bgColor};cursor:pointer;" onclick="showViableWordsForPlate('${plate}', false, 'practice')">`;
                 html += `<td style="padding:8px;color:#9ca3af;">${i + 1}</td>`;
                 html += `<td style="padding:8px;"><strong style="font-family:monospace;">${plate}</strong></td>`;
                 html += `<td style="padding:8px;text-align:right;color:#9ca3af;">${total}</td>`;
