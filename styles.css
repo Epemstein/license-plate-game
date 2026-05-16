@@ -1033,40 +1033,38 @@
             font-size: 0.7rem;
             color: #6b7280;
         }
-        .profile-modal-challenge-btn {
-            display: inline-block;
-            margin-top: 12px;
+        .profile-modal-challenge-btn,
+        .profile-modal-stats-btn,
+        .profile-modal-history-btn {
+            display: block;
+            width: 100%;
+            margin-top: 8px;
             padding: 10px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: center;
+        }
+        .profile-modal-challenge-btn {
             background: rgba(147, 112, 219, 0.1);
             color: #9370db;
             border: 1px solid rgba(147, 112, 219, 0.25);
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: background 0.2s;
         }
-        .profile-modal-challenge-btn:hover {
-            background: rgba(147, 112, 219, 0.2);
-        }
-
+        .profile-modal-challenge-btn:hover { background: rgba(147, 112, 219, 0.2); }
         .profile-modal-stats-btn {
-            display: inline-block;
-            margin-top: 8px;
-            padding: 10px 24px;
             background: rgba(37, 99, 235, 0.08);
             color: #2563eb;
             border: 1px solid rgba(37, 99, 235, 0.2);
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: background 0.2s;
-            width: 100%;
         }
-        .profile-modal-stats-btn:hover {
-            background: rgba(37, 99, 235, 0.15);
+        .profile-modal-stats-btn:hover { background: rgba(37, 99, 235, 0.15); }
+        .profile-modal-history-btn {
+            background: rgba(234, 179, 8, 0.1);
+            color: #b45309;
+            border: 1px solid rgba(234, 179, 8, 0.3);
         }
+        .profile-modal-history-btn:hover { background: rgba(234, 179, 8, 0.2); }
         .stats-tabs {
             display: flex;
             gap: 0;

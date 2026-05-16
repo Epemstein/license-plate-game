@@ -281,7 +281,7 @@
 
             html += `<div ${onclick} style="height:64px;border-radius:8px;background:${bgColor};border:${border};position:relative;${cursor}">`;
             // Day number
-            html += `<div style="position:absolute;top:3px;left:5px;font-size:0.65rem;font-weight:600;color:${isFuture ? '#d1d5db' : '#9ca3af'};">${day}</div>`;
+            html += `<div style="position:absolute;top:3px;left:5px;font-size:0.65rem;font-weight:600;color:${isFuture ? '#d1d5db' : '#374151'};">${day}</div>`;
             // Content
             html += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding-top:4px;">';
             if (hasTime) {
@@ -306,6 +306,44 @@
     window.histCalShift = function(dir) {
         histCalMonth.setMonth(histCalMonth.getMonth() + dir);
         renderHistoricalCalendar();
+    };
+
+    window.showUserHistoricalScores = async function(userId, displayName) {
+        // Show calendar for another user in a modal
+        const backdrop = document.getElementById('practiceStatsModalBackdrop');
+        const content = document.getElementById('practiceStatsModalContent');
+        document.querySelector('#practiceStatsModalBackdrop .modal-title').textContent = displayName + ' — Calendar';
+        backdrop.classList.add('show');
+        content.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
+
+        try {
+            const { data: runs } = await sb
+                .from('daily_runs')
+                .select('date, total_seconds')
+                .eq('user_id', userId)
+                .order('date', { ascending: false });
+
+            const completedDates = (runs || []).filter(r => r.total_seconds != null).map(r => r.date);
+            const pctByDate = {};
+            if (completedDates.length > 0) {
+                const { data: pctData } = await sb.rpc('batch_percentiles', {
+                    p_user_id: userId,
+                    p_dates: completedDates
+                });
+                if (pctData) pctData.forEach(p => { pctByDate[p.date] = p.percentile; });
+            }
+
+            const runByDate = {};
+            (runs || []).forEach(r => { runByDate[r.date] = r; });
+
+            window._histRunByDate = runByDate;
+            window._histPctByDate = pctByDate;
+            histCalMonth = new Date();
+            renderHistoricalCalendar(content);
+        } catch (e) {
+            console.error('Error loading user history:', e);
+            content.innerHTML = '<p style="color:#dc2626;">Error loading scores</p>';
+        }
     };
 
     function updateProfileTab() {
@@ -4452,6 +4490,7 @@
             }
 
             html += `<button class="profile-modal-stats-btn" onclick="openPlayerStats('${userId}','${name.replace(/'/g,"\\'")}')">Stats</button>`;
+            html += `<button class="profile-modal-history-btn" onclick="closeProfileModal();showUserHistoricalScores('${userId}','${name.replace(/'/g,"\\'")}')">Historical Scores</button>`;
 
             content.innerHTML = html;
         } catch (e) {
