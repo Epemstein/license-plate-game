@@ -17302,6 +17302,7 @@ apoplex
 apoplexies
 apoplexious
 apoplexy
+apoptosis
 apopyle
 apoquinamine
 apoquinine
@@ -25241,6 +25242,7 @@ azeotrope
 azeotropic
 azeotropism
 azeotropy
+azerbaijan
 azerbaijanese
 azerbaijani
 azerbaijanian
@@ -39614,7 +39616,6 @@ brainwasher
 brainwashers
 brainwashes
 brainwashing
-brainwashjng
 brainwater
 brainwave
 brainwood
@@ -138471,6 +138472,8 @@ highwaymen
 highways
 higra
 higuero
+hijab
+hijabs
 hijack
 hijacked
 hijacker
@@ -169043,8 +169046,10 @@ leglet
 leglike
 legman
 legmen
+lego
 legoa
 legong
+legos
 legpiece
 legpull
 legpuller
@@ -188777,6 +188782,8 @@ mixoploidy
 mixosaurus
 mixotrophic
 mixt
+mixtape
+mixtapes
 mixtec
 mixtecan
 mixtiform
@@ -198684,18 +198691,6 @@ niggardly
 niggardness
 niggards
 nigged
-niggerdom
-niggered
-niggerfish
-niggerfishes
-niggergoose
-niggerhead
-niggerish
-niggerism
-niggerling
-niggertoe
-niggerweed
-niggery
 nigget
 nigging
 niggle
@@ -198708,7 +198703,6 @@ nigglingly
 nigglings
 niggly
 niggot
-niggra
 niggun
 nigh
 nighed
@@ -231311,6 +231305,7 @@ petrescence
 petrescency
 petrescent
 petri
+petrichor
 petricola
 petricolidae
 petricolous
@@ -235293,6 +235288,7 @@ pilastrade
 pilastraded
 pilastric
 pilate
+pilates
 pilatian
 pilau
 pilaued
@@ -274792,6 +274788,8 @@ rutylene
 ruvid
 rux
 rvulsant
+rwanda
+rwandan
 rwd
 rwound
 rwy
@@ -282392,6 +282390,8 @@ selfheals
 selfhood
 selfhoods
 selfhypnotization
+selfie
+selfies
 selfing
 selfish
 selfishly
@@ -299167,6 +299167,7 @@ spyproof
 spyros
 spyship
 spytower
+spyware
 sq
 sqd
 sqq
@@ -351049,6 +351050,7 @@ unsubordinative
 unsuborned
 unsubpoenaed
 unsubrogated
+unsubscribe
 unsubscribed
 unsubscribing
 unsubscripted
@@ -361964,6 +361966,8 @@ watergate
 waterglass
 waterhead
 waterheap
+waterhole
+waterholes
 waterhorse
 waterie
 waterier
@@ -362037,6 +362041,8 @@ watersider
 waterskier
 waterskiing
 waterskin
+waterslide
+waterslides
 watersmeet
 watersoaked
 waterspout
