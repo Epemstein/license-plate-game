@@ -3495,6 +3495,7 @@
             });
         } else if (h2hActiveSubTab === 'results') {
             filtered = h2hChallengesCache.filter(c => c.status === 'completed');
+            filtered.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
         }
 
         if (filtered.length === 0) {
@@ -3513,34 +3514,44 @@
             const dateStr = formatRelativeDate(ch.created_at);
 
             if (h2hActiveSubTab === 'incoming') {
-                html += `<div class="challenge-row">`;
-                html += `<div class="ch-info">`;
-                html += `<div class="ch-name">${oppName}</div>`;
-                html += `<div class="ch-meta">${diffLabel} &middot; ${dateStr}</div>`;
+                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:#f0f0ff;border:1px solid #c7d2fe;">`;
+                html += `<div style="flex:1;min-width:0;">`;
+                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">${oppName}</div>`;
+                html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${diffLabel} · ${dateStr}</div>`;
                 html += `</div>`;
-                html += `<div class="ch-actions">`;
-                html += `<button class="ch-accept-btn" onclick="event.stopPropagation();acceptChallenge('${ch.id}')">Accept</button>`;
-                html += `<button class="ch-decline-btn" onclick="event.stopPropagation();declineChallenge('${ch.id}')">Decline</button>`;
+                html += `<div style="display:flex;gap:8px;">`;
+                html += `<button onclick="event.stopPropagation();acceptChallenge('${ch.id}')" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Accept</button>`;
+                html += `<button onclick="event.stopPropagation();declineChallenge('${ch.id}')" style="padding:6px 14px;background:#ef4444;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Decline</button>`;
                 html += `</div>`;
                 html += `</div>`;
             } else if (h2hActiveSubTab === 'pending') {
                 const myRun = ch._runs && ch._runs[currentUser.id];
                 const oppId = isChallenger ? ch.opponent_id : ch.challenger_id;
                 const oppRun = ch._runs && ch._runs[oppId];
-                const myScore = myRun && myRun.forfeited ? 'Forfeit' : (myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(2) + 's' : (myRun ? 'In progress' : 'Not played'));
-                const oppScore = oppRun && oppRun.forfeited ? 'Forfeit' : (oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(2) + 's' : 'TBD');
+                const myScore = myRun && myRun.forfeited ? 'Forfeit' : (myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(1) + 's' : (myRun ? 'In progress' : 'Not played'));
+                const oppScore = oppRun && oppRun.forfeited ? 'Forfeit' : (oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(1) + 's' : '—');
 
                 const canPlay = (!myRun || (myRun && myRun.totalSeconds == null)) && ch.status === 'accepted';
-                html += `<div class="challenge-row" onclick="${canPlay ? `playH2HChallenge('${ch.id}')` : `viewH2HScorecard('${ch.id}')`}">`;
-                html += `<div class="ch-info">`;
-                html += `<div class="ch-name">${oppName}</div>`;
-                html += `<div class="ch-meta">${diffLabel} &middot; ${ch.status === 'pending' ? 'Waiting for response' : dateStr}</div>`;
+                const statusLabel = ch.status === 'pending' ? 'Waiting for response' : (canPlay ? 'Tap to play' : 'Waiting for opponent');
+                const statusColor = canPlay ? '#16a34a' : '#9ca3af';
+                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:#fffbeb;border:1px solid #fde68a;cursor:pointer;" onclick="${canPlay ? `playH2HChallenge('${ch.id}')` : `viewH2HScorecard('${ch.id}')`}">`;
+                html += `<div style="flex:1;min-width:0;">`;
+                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">vs ${oppName}</div>`;
+                html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${diffLabel} · ${dateStr}</div>`;
+                html += `<div style="font-size:0.75rem;color:${statusColor};font-weight:600;margin-top:2px;">${statusLabel}</div>`;
                 html += `</div>`;
-                html += `<div class="ch-scores" style="font-size:0.85rem;">`;
-                html += `<div>You: <strong>${myScore}</strong></div>`;
-                html += `<div class="ch-tbd">Them: ${oppScore}</div>`;
+                html += `<div style="display:flex;align-items:center;gap:12px;">`;
+                html += `<div style="text-align:center;min-width:55px;">`;
+                html += `<div style="font-size:0.7rem;color:#9ca3af;font-weight:600;">YOU</div>`;
+                html += `<div style="font-size:0.95rem;font-weight:700;color:#374151;">${myScore}</div>`;
                 html += `</div>`;
-                html += `<div class="ch-chevron">&#8250;</div>`;
+                html += `<div style="color:#d1d5db;font-size:0.8rem;">vs</div>`;
+                html += `<div style="text-align:center;min-width:55px;">`;
+                html += `<div style="font-size:0.7rem;color:#9ca3af;font-weight:600;">THEM</div>`;
+                html += `<div style="font-size:0.95rem;font-weight:700;color:#9ca3af;">${oppScore}</div>`;
+                html += `</div>`;
+                html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
+                html += `</div>`;
                 html += `</div>`;
             } else if (h2hActiveSubTab === 'results') {
                 const myRun = ch._runs && ch._runs[currentUser.id];
@@ -4357,24 +4368,29 @@
         }
     };
 
-    window.rematchChallenge = async function(oppId, oppName, difficulty) {
+    window.rematchChallenge = function(oppId, oppName, difficulty) {
         if (!currentUser) return;
-        try {
-            const plates = generateChallengeSequence(difficulty);
-            if (plates.length < 100) { alert('Error generating plates'); return; }
-
-            const { data, error } = await sb.rpc('create_h2h_challenge', {
-                p_opponent_id: oppId,
-                p_plates: plates,
-                p_difficulty: difficulty
-            });
-            if (error) throw error;
-
-            await playH2HChallenge(data);
-        } catch (e) {
-            console.error('Rematch error:', e);
-            alert('Error creating rematch: ' + e.message);
-        }
+        const backdrop = document.getElementById('rematchConfirmBackdrop');
+        document.getElementById('rematchConfirmName').textContent = oppName;
+        document.getElementById('rematchConfirmDiff').textContent = getDifficultyLabel(difficulty);
+        document.getElementById('rematchConfirmBtn').onclick = async () => {
+            backdrop.classList.remove('show');
+            try {
+                const plates = generateChallengeSequence(difficulty);
+                if (plates.length < 100) { alert('Error generating plates'); return; }
+                const { data, error } = await sb.rpc('create_h2h_challenge', {
+                    p_opponent_id: oppId,
+                    p_plates: plates,
+                    p_difficulty: difficulty
+                });
+                if (error) throw error;
+                await playH2HChallenge(data);
+            } catch (e) {
+                console.error('Rematch error:', e);
+                alert('Error creating rematch: ' + e.message);
+            }
+        };
+        backdrop.classList.add('show');
     };
 
     window.closeProfileModal = function() {
