@@ -659,7 +659,7 @@
             html += '<th style="padding:8px 10px;text-align:right;">Skip</th>';
             html += '<th style="padding:8px 10px;text-align:right;">Think</th>';
             html += '<th style="padding:8px 10px;text-align:right;">Total</th>';
-            html += '<th style="padding:8px 10px;text-align:right;">Your Word (time)</th>';
+            html += '<th style="padding:8px 10px;text-align:right;">Top Word</th>';
             html += '</tr></thead><tbody>';
 
             for (let i = 0; i < plates.length; i++) {
@@ -673,9 +673,13 @@
                 const thinkAvg = validTimes.length > 0 ? (validTimes.reduce((s, e) => s + e.thinking_seconds, 0) / validTimes.length).toFixed(1) : '--';
                 const totalAvg = validTimes.length > 0 ? (validTimes.reduce((s, e) => s + e.thinking_seconds + (e.skipped ? e.penalty_seconds : 0), 0) / validTimes.length).toFixed(1) : '--';
 
-                // Your word from current game
-                const myEntry = gameHistory[i];
-                const yourWordStr = myEntry ? (myEntry.skipped ? `❌ (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
+                // Top word from all players
+                const wordCounts = {};
+                pe.filter(e => !e.skipped && e.word).forEach(e => {
+                    wordCounts[e.word] = (wordCounts[e.word] || 0) + 1;
+                });
+                const topWord = Object.entries(wordCounts).sort((a, b) => b[1] - a[1])[0];
+                const topWordStr = topWord ? `${topWord[0]} (${Math.round(topWord[1] / total * 100)}%)` : '--';
 
                 // Row color based on skip rate
                 const t = Math.min(Math.max(skipPct, 0), 100) / 100;
@@ -708,7 +712,7 @@
                 html += `<td style="padding:6px 10px;text-align:right;">${total > 0 ? skipPct + '%' : '--'}</td>`;
                 html += `<td style="padding:6px 10px;text-align:right;">${thinkAvg}</td>`;
                 html += `<td style="padding:6px 10px;text-align:right;font-weight:500;">${totalAvg}</td>`;
-                html += `<td style="padding:6px 10px;text-align:right;">${yourWordStr}</td>`;
+                html += `<td style="padding:6px 10px;text-align:right;">${topWordStr}</td>`;
                 html += '</tr>';
             }
 
