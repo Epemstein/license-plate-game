@@ -232,9 +232,14 @@
         const canNext = year < today.getFullYear() || (year === today.getFullYear() && month < today.getMonth());
 
         let html = '';
-        if (!isModal) {
+        if (isModal && histCalUserId) {
+            html += '<div style="display:flex;align-items:center;margin-bottom:16px;">';
+            html += `<button onclick="closePracticeStatsModal();openProfileModal('${histCalUserId}')" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>`;
+            html += '</div>';
+        } else if (!isModal) {
             html += '<div style="display:flex;align-items:center;margin-bottom:16px;">';
             html += '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>';
+            html += '<h3 style="margin:0 0 0 12px;font-size:1.1rem;">Historical Scores</h3>';
             html += '</div>';
         }
 
