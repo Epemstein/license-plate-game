@@ -155,6 +155,9 @@
     }
 
     let histCalMonth = new Date();
+    let histCalContainer = null; // tracks which element the calendar renders into
+    let histCalUserId = null; // whose calendar is showing
+    let histCalUserName = null;
 
     async function showHistoricalScores() {
         if (!currentUser) return;
@@ -195,7 +198,10 @@
             window._histRunByDate = runByDate;
             window._histPctByDate = pctByDate;
             histCalMonth = new Date();
-            renderHistoricalCalendar(container);
+            histCalContainer = container;
+            histCalUserId = currentUser.id;
+            histCalUserName = null;
+            renderHistoricalCalendar();
         } catch(e) {
             console.error('Error loading historical scores:', e);
             container.innerHTML = `
@@ -205,8 +211,9 @@
     }
     window.showHistoricalScores = showHistoricalScores;
 
-    function renderHistoricalCalendar(container) {
-        if (!container) container = document.getElementById('profileContent');
+    function renderHistoricalCalendar() {
+        const container = histCalContainer || document.getElementById('profileContent');
+        const isModal = container.id === 'practiceStatsModalContent';
         const runByDate = window._histRunByDate || {};
         const pctByDate = window._histPctByDate || {};
 
@@ -224,9 +231,12 @@
         const canPrev = year > 2026 || (year === 2026 && month > 3);
         const canNext = year < today.getFullYear() || (year === today.getFullYear() && month < today.getMonth());
 
-        let html = '<div style="display:flex;align-items:center;margin-bottom:16px;">';
-        html += '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>';
-        html += '</div>';
+        let html = '';
+        if (!isModal) {
+            html += '<div style="display:flex;align-items:center;margin-bottom:16px;">';
+            html += '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#f3f4f6;border-radius:8px;cursor:pointer;font-size:0.85rem;">&larr; Back</button>';
+            html += '</div>';
+        }
 
         // Month nav
         html += '<div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:14px;">';
@@ -277,7 +287,11 @@
 
             const border = isToday ? '2px solid #000' : '1px solid rgba(0,0,0,0.1)';
             const cursor = hasTime ? 'cursor:pointer;' : '';
-            const onclick = hasTime ? `onclick="switchTab('leaderboard');setTimeout(()=>{displayLeaderboard('${dateStr}');},100);"` : '';
+            let onclick = '';
+            if (hasTime && histCalUserId) {
+                const playerName = histCalUserName ? histCalUserName.replace(/'/g, "\\'") : 'My Run';
+                onclick = `onclick="viewPlayerRun('${histCalUserId}','${dateStr}','${playerName}',${run.total_seconds},0,0,0,0)"`;
+            }
 
             html += `<div ${onclick} style="height:64px;border-radius:8px;background:${bgColor};border:${border};position:relative;${cursor}">`;
             // Day number
@@ -339,7 +353,10 @@
             window._histRunByDate = runByDate;
             window._histPctByDate = pctByDate;
             histCalMonth = new Date();
-            renderHistoricalCalendar(content);
+            histCalContainer = content;
+            histCalUserId = userId;
+            histCalUserName = displayName;
+            renderHistoricalCalendar();
         } catch (e) {
             console.error('Error loading user history:', e);
             content.innerHTML = '<p style="color:#dc2626;">Error loading scores</p>';
