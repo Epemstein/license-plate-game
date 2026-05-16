@@ -3511,7 +3511,7 @@
             const oppName = getOpponentName(ch);
             const isChallenger = ch.challenger_id === currentUser.id;
             const diffLabel = getDifficultyLabel(ch.difficulty ?? 50);
-            const dateStr = formatRelativeDate(ch.created_at);
+            const dateStr = formatRelativeDate(h2hActiveSubTab === 'results' && ch.completed_at ? ch.completed_at : ch.created_at);
 
             if (h2hActiveSubTab === 'incoming') {
                 html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:#f0f0ff;border:1px solid #c7d2fe;">`;
