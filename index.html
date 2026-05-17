@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v136</title>
+    <title>License Plate Game v137</title>
     <link rel="stylesheet" href="styles.css?v=88">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -387,6 +387,28 @@
             <div id="practiceStatsModalContent">
                 <p style="color:#6b7280;">Loading...</p>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Practice Mode Choice Modal -->
+<div id="practiceModeBackdrop" class="modal-backdrop" style="z-index:1100;" onclick="if(event.target.id==='practiceModeBackdrop')this.classList.remove('show')">
+    <div style="background:white;border-radius:16px;max-width:340px;width:85%;padding:24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="font-size:1.1rem;font-weight:700;margin-bottom:16px;">Choose Mode</div>
+        <button id="choosePracticeBtn" style="width:100%;padding:14px;background:#9370db;color:white;border:none;border-radius:12px;font-weight:700;font-size:1rem;cursor:pointer;margin-bottom:10px;">Practice<br><span style="font-size:0.8rem;font-weight:400;opacity:0.9;">Race to 10</span></button>
+        <button id="chooseEndlessBtn" style="width:100%;padding:14px;background:#14b8a6;color:white;border:none;border-radius:12px;font-weight:700;font-size:1rem;cursor:pointer;margin-bottom:10px;">Endless Mode<br><span style="font-size:0.8rem;font-weight:400;opacity:0.9;">Endless Plates</span></button>
+        <button onclick="document.getElementById('practiceModeBackdrop').classList.remove('show')" style="margin-top:4px;background:none;border:none;color:#6b7280;font-size:0.9rem;cursor:pointer;">Cancel</button>
+    </div>
+</div>
+
+<!-- End Endless Confirmation Modal -->
+<div id="endEndlessBackdrop" class="modal-backdrop" style="z-index:1100;" onclick="if(event.target.id==='endEndlessBackdrop')this.classList.remove('show')">
+    <div style="background:white;border-radius:16px;max-width:340px;width:85%;padding:24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="font-size:1.1rem;font-weight:700;margin-bottom:6px;">End Session?</div>
+        <div style="color:#6b7280;font-size:0.9rem;margin-bottom:18px;">Your stats will be saved.</div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button onclick="document.getElementById('endEndlessBackdrop').classList.remove('show')" style="padding:8px 20px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;font-weight:600;font-size:0.9rem;cursor:pointer;">Cancel</button>
+            <button id="confirmEndEndlessBtn" style="padding:8px 20px;background:#dc2626;color:white;border:none;border-radius:10px;font-weight:600;font-size:0.9rem;cursor:pointer;">End Session</button>
         </div>
     </div>
 </div>

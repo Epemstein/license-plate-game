@@ -420,6 +420,12 @@
     let currentUser = null;
     let dailyPlateSequence = null;
     let currentViewingDate = null;
+
+    // Endless mode state
+    let endlessSessionId = null;
+    let endlessTotalSeen = 0;
+    let endlessTotalSolved = 0;
+    let endlessPendingEntries = []; // accumulated locally, flushed on end
     let currentDailyRunId = null;
 
     // Words modal state
@@ -1579,9 +1585,16 @@
             resultEl.style.color = "red";
             return;
         }
-        if ((gameMode==='daily' || gameMode==='h2h_challenge' || gameMode==='practice') && dailyPlateSequence && dailyPlateSequence.length) {
+        if ((gameMode==='daily' || gameMode==='h2h_challenge' || gameMode==='practice' || gameMode==='endless') && dailyPlateSequence && dailyPlateSequence.length) {
             const idx = usedPlates.size;
             console.log('Using sequence mode! Index:', idx, 'Sequence length:', dailyPlateSequence.length);
+
+            // Auto-extend sequence for endless mode
+            if (gameMode === 'endless' && idx >= dailyPlateSequence.length - 10) {
+                const existing = new Set(dailyPlateSequence);
+                const extra = generateChallengeSequence(50);
+                extra.forEach(p => { if (!existing.has(p)) { dailyPlateSequence.push(p); existing.add(p); } });
+            }
 
             if (idx>=dailyPlateSequence.length) {
                 resultEl.textContent = "Ran out of plates! This shouldn't happen. Please report this bug.";
@@ -1591,7 +1604,7 @@
             }
 
             console.log('Daily/H2H mode - solvedCount:', solvedCount, 'TOTAL_PLATES:', TOTAL_PLATES);
-            if (solvedCount >= TOTAL_PLATES) {
+            if (gameMode !== 'endless' && solvedCount >= TOTAL_PLATES) {
                 console.log('Ending game - solved 10!');
                 endGame();
                 return;
@@ -1691,12 +1704,23 @@
 
     // --------- TIMER / GAME STATE ---------
     function updateProgressDisplay() {
-        progressDisplayEl.textContent = `Solved: ${solvedCount} / ${TOTAL_PLATES}`;
+        if (gameMode === 'endless') {
+            const seen = endlessTotalSeen;
+            const solved = endlessTotalSolved;
+            const pct = seen > 0 ? (solved / seen * 100).toFixed(1) : '0.0';
+            progressDisplayEl.textContent = `Solved: ${solved}/${seen} (${pct}%)`;
+        } else {
+            progressDisplayEl.textContent = `Solved: ${solvedCount} / ${TOTAL_PLATES}`;
+        }
     }
 
     function updateSkipButtonLabel() {
-        const nextPenalty = (skipCount + 1) * 5;
-        skipButtonEl.textContent = `Skip +${nextPenalty}s`;
+        if (gameMode === 'endless') {
+            skipButtonEl.textContent = 'Skip';
+        } else {
+            const nextPenalty = (skipCount + 1) * 5;
+            skipButtonEl.textContent = `Skip +${nextPenalty}s`;
+        }
     }
 
     function showStartGameButton() {
@@ -1909,6 +1933,11 @@
     }
 
     async function startOrRestartFromMain() {
+        // Endless mode: "End Session" button triggers confirmation
+        if (gameMode === 'endless' && gameStarted) {
+            document.getElementById('endEndlessBackdrop').classList.add('show');
+            return;
+        }
         // Submit practice stats from previous run before restarting
         if (gameMode === 'practice' && gameHistory.length > 0) {
             submitPracticePlateStats();
@@ -1943,7 +1972,9 @@
         if (!gameStarted || !startTime) return;
         const baseElapsedSec = (performance.now() - startTime) / 1000;
         const totalSec = baseElapsedSec + penaltySeconds;
-        if (gameMode === 'practice' && !practiceTimed) {
+        if (gameMode === 'endless') {
+            timerDisplayEl.textContent = "";
+        } else if (gameMode === 'practice' && !practiceTimed) {
             timerDisplayEl.textContent = "UNTIMED";
         } else {
             timerDisplayEl.textContent = "Time: " + totalSec.toFixed(2) + " s";
@@ -2747,6 +2778,14 @@
             plate, word, skipped: false, thinkingSeconds, penaltySeconds: 0
         });
 
+        if (gameMode === 'endless') {
+            endlessTotalSeen++;
+            endlessTotalSolved++;
+            endlessPendingEntries.push({ plate, word: word.toLowerCase(), skipped: false, thinking_seconds: Math.floor(thinkingSeconds * 100) / 100 });
+            updateProgressDisplay();
+            updateSkipButtonLabel();
+        }
+
         addToHistoryWithAnimation(
             plate, word, matchIndices, null, diffScore, timeLabel,
             () => {
@@ -2804,6 +2843,13 @@
         gameHistory.push({
             plate, word: "skipped", skipped: true, thinkingSeconds, penaltySeconds: added
         });
+
+        if (gameMode === 'endless') {
+            endlessTotalSeen++;
+            endlessPendingEntries.push({ plate, word: null, skipped: true, thinking_seconds: Math.floor(thinkingSeconds * 100) / 100 });
+            updateProgressDisplay();
+            updateSkipButtonLabel();
+        }
 
         addToHistoryWithAnimation(
             plate, penaltyLabel, null, skipRect, diffScore, timeLabel,
@@ -3407,7 +3453,22 @@
             if (!currentUser) {
                 if (!await signInWithApple()) return;
             }
-            // Submit practice stats from previous run (not H2H)
+            // Show mode choice modal
+            document.getElementById('practiceModeBackdrop').classList.add('show');
+        });
+
+        document.getElementById('choosePracticeBtn').addEventListener('click', () => {
+            document.getElementById('practiceModeBackdrop').classList.remove('show');
+            startPracticeMode();
+        });
+
+        document.getElementById('chooseEndlessBtn').addEventListener('click', () => {
+            document.getElementById('practiceModeBackdrop').classList.remove('show');
+            startEndlessMode();
+        });
+
+        function startPracticeMode() {
+            // Submit previous run stats
             if (gameMode === 'practice' && gameHistory.length > 0 && !practiceStatsSubmitted) {
                 submitPracticePlateStats();
             }
@@ -3416,12 +3477,10 @@
             dailyPlateSequence = null;
             document.getElementById('practiceSettingsBtn').style.display = '';
 
-            // Reset game state from any previous game
             if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
             resetGameState();
-                window.onbeforeunload = null;
+            window.onbeforeunload = null;
 
-            // Clear UI
             plateEl.textContent = '---';
             resultEl.textContent = '';
             while (historyBodyEl.firstChild) historyBodyEl.removeChild(historyBodyEl.firstChild);
@@ -3450,6 +3509,143 @@
 
             document.getElementById('dailyChallengeBtn').disabled = false;
             document.getElementById('dailyChallengeBtn').style.opacity = '1';
+        }
+
+        async function startEndlessMode() {
+            // Submit previous run stats
+            if (gameMode === 'practice' && gameHistory.length > 0 && !practiceStatsSubmitted) {
+                submitPracticePlateStats();
+            }
+            practiceStatsSubmitted = false;
+            gameMode = 'endless';
+            dailyPlateSequence = null;
+            document.getElementById('practiceSettingsBtn').style.display = 'none';
+
+            if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+            resetGameState();
+            window.onbeforeunload = null;
+
+            // Start or resume session on server
+            try {
+                const today = getTodayString();
+                const { data } = await sb.rpc('start_unlimited_session', { p_date: today });
+                if (data && data.length > 0) {
+                    endlessSessionId = data[0].session_id;
+                    if (data[0].total_plates_seen > 0) {
+                        endlessTotalSeen = data[0].total_plates_seen;
+                        endlessTotalSolved = data[0].total_solved;
+                    } else {
+                        endlessTotalSeen = 0;
+                        endlessTotalSolved = 0;
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to start endless session:', e);
+                endlessTotalSeen = 0;
+                endlessTotalSolved = 0;
+            }
+
+            endlessPendingEntries = [];
+            gameHistory = [];
+
+            const mi = document.getElementById('modeIndicator');
+            mi.textContent = 'Endless Mode';
+            mi.style.background = '#f0fdfa';
+            mi.style.color = '#0f766e';
+            mi.style.border = '2px solid #99f6e4';
+
+            // Hide start button — game starts directly
+            const startBtn = document.getElementById('startButton');
+            startBtn.textContent = 'End Session';
+            startBtn.style.display = 'inline-block';
+            startBtn.disabled = false;
+            startBtn.style.opacity = '1';
+            startBtn.style.cursor = 'pointer';
+
+            document.getElementById('dailyChallengeBtn').disabled = true;
+            document.getElementById('dailyChallengeBtn').style.opacity = '0.5';
+
+            // Start the game directly
+            dailyPlateSequence = generateChallengeSequence(50);
+            await beginNewRun();
+        }
+
+        // End endless session — flush entries to server
+        async function endEndlessSession() {
+            if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+            gameStarted = false;
+            gameOver = true;
+            plateLocked = true;
+            wordInputEl.disabled = true;
+            wordInputEl.readOnly = true;
+            checkButtonEl.disabled = true;
+            skipButtonEl.disabled = true;
+
+            // Flush pending entries
+            if (currentUser && endlessPendingEntries.length > 0) {
+                try {
+                    const rows = endlessPendingEntries.map(e => ({
+                        user_id: currentUser.id,
+                        plate: e.plate,
+                        word: e.word,
+                        skipped: e.skipped,
+                        thinking_seconds: e.thinking_seconds,
+                        source: 'unlimited',
+                        difficulty: 50
+                    }));
+                    await sb.from('practice_plate_stats').insert(rows);
+                    console.log('[Endless] Flushed', rows.length, 'entries');
+                } catch (e) {
+                    console.error('[Endless] Flush error:', e);
+                }
+            }
+
+            // Update session counters
+            if (endlessSessionId) {
+                try {
+                    await sb.from('unlimited_sessions')
+                        .update({
+                            total_solved: endlessTotalSolved,
+                            total_skipped: endlessTotalSeen - endlessTotalSolved,
+                            total_plates_seen: endlessTotalSeen,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', endlessSessionId);
+                } catch (e) {
+                    console.error('[Endless] Session update error:', e);
+                }
+            }
+
+            endlessPendingEntries = [];
+
+            // Enable plate stats button
+            if (gameHistory.length > 0) {
+                const psBtn = document.getElementById('practiceStatsBtn2');
+                if (psBtn) { psBtn.disabled = false; psBtn.style.opacity = '1'; }
+            }
+
+            resultEl.textContent = `Session ended! ${endlessTotalSolved}/${endlessTotalSeen} solved.`;
+            resultEl.style.color = 'green';
+
+            // Reset buttons
+            document.getElementById('dailyChallengeBtn').disabled = false;
+            document.getElementById('dailyChallengeBtn').style.opacity = '1';
+
+            const startBtn = document.getElementById('startButton');
+            startBtn.textContent = 'Start Game';
+            startBtn.disabled = true;
+            startBtn.style.opacity = '0.5';
+
+            const mi = document.getElementById('modeIndicator');
+            mi.textContent = 'Select a game mode above to begin';
+            mi.style.background = '#f3f4f6';
+            mi.style.color = '#000000';
+            mi.style.border = '2px dashed #d1d5db';
+        }
+
+        document.getElementById('confirmEndEndlessBtn').addEventListener('click', () => {
+            document.getElementById('endEndlessBackdrop').classList.remove('show');
+            endEndlessSession();
         });
 
         // Practice settings
