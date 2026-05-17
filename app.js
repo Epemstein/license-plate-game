@@ -3558,20 +3558,31 @@
             mi.style.color = '#0f766e';
             mi.style.border = '2px solid #99f6e4';
 
-            // Hide start button — game starts directly
+            dailyPlateSequence = generateChallengeSequence(50);
+
+            // Set up UI — game starts when user clicks Start Game
+            plateEl.textContent = '---';
+            resultEl.textContent = '';
+            while (historyBodyEl.firstChild) historyBodyEl.removeChild(historyBodyEl.firstChild);
+            historyEmptyEl.style.display = 'block';
+            timerDisplayEl.textContent = '';
+            updateProgressDisplay();
+            wordInputEl.value = '';
+            wordInputEl.disabled = false;
+            wordInputEl.readOnly = false;
+            checkButtonEl.disabled = false;
+            skipButtonEl.disabled = false;
+            updateSkipButtonLabel();
+
             const startBtn = document.getElementById('startButton');
-            startBtn.textContent = 'End Session';
+            startBtn.textContent = 'Start Game';
             startBtn.style.display = 'inline-block';
             startBtn.disabled = false;
             startBtn.style.opacity = '1';
             startBtn.style.cursor = 'pointer';
 
-            document.getElementById('dailyChallengeBtn').disabled = true;
-            document.getElementById('dailyChallengeBtn').style.opacity = '0.5';
-
-            // Start the game directly
-            dailyPlateSequence = generateChallengeSequence(50);
-            await beginNewRun();
+            document.getElementById('dailyChallengeBtn').disabled = false;
+            document.getElementById('dailyChallengeBtn').style.opacity = '1';
         }
 
         // End endless session — flush entries to server
