@@ -2878,6 +2878,7 @@
             endlessPendingEntries.push({ plate, word: word.toLowerCase(), skipped: false, thinking_seconds: Math.floor(thinkingSeconds * 100) / 100 });
             updateProgressDisplay();
             updateSkipButtonLabel();
+            saveEndlessStateLocally();
         }
 
         addToHistoryWithAnimation(
@@ -2943,6 +2944,7 @@
             endlessPendingEntries.push({ plate, word: null, skipped: true, thinking_seconds: Math.floor(thinkingSeconds * 100) / 100 });
             updateProgressDisplay();
             updateSkipButtonLabel();
+            saveEndlessStateLocally();
         }
 
         addToHistoryWithAnimation(
