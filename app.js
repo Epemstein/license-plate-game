@@ -3515,10 +3515,24 @@
                     const { data } = await sb.rpc('start_unlimited_session', { p_date: today });
                     if (data && data.length > 0) {
                         endlessSessionId = data[0].session_id;
-                        endlessTotalSeen = data[0].total_plates_seen || 0;
-                        endlessTotalSolved = data[0].total_solved || 0;
-                        updateProgressDisplay();
                     }
+                    // Count actual rows for accurate counters
+                    const { count: totalCount } = await sb.from('practice_plate_stats')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('user_id', currentUser.id)
+                        .eq('source', 'unlimited')
+                        .gte('created_at', today + 'T00:00:00')
+                        .lte('created_at', today + 'T23:59:59');
+                    const { count: solvedCount } = await sb.from('practice_plate_stats')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('user_id', currentUser.id)
+                        .eq('source', 'unlimited')
+                        .eq('skipped', false)
+                        .gte('created_at', today + 'T00:00:00')
+                        .lte('created_at', today + 'T23:59:59');
+                    endlessTotalSeen = totalCount || 0;
+                    endlessTotalSolved = solvedCount || 0;
+                    updateProgressDisplay();
                     // Try to restore plate sequence from saved state
                     const savedState = localStorage.getItem('pendingEndlessState');
                     if (savedState) {
@@ -3710,12 +3724,33 @@
                 const { data } = await sb.rpc('start_unlimited_session', { p_date: today });
                 if (data && data.length > 0) {
                     endlessSessionId = data[0].session_id;
-                    if (data[0].total_plates_seen > 0) {
-                        endlessTotalSeen = data[0].total_plates_seen;
-                        endlessTotalSolved = data[0].total_solved;
-                    } else {
-                        endlessTotalSeen = 0;
-                        endlessTotalSolved = 0;
+                }
+                // Count actual rows for accurate counters (session counter may be stale)
+                if (currentUser) {
+                    const { count: totalCount } = await sb.from('practice_plate_stats')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('user_id', currentUser.id)
+                        .eq('source', 'unlimited')
+                        .gte('created_at', today + 'T00:00:00')
+                        .lte('created_at', today + 'T23:59:59');
+                    const { count: solvedCount } = await sb.from('practice_plate_stats')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('user_id', currentUser.id)
+                        .eq('source', 'unlimited')
+                        .eq('skipped', false)
+                        .gte('created_at', today + 'T00:00:00')
+                        .lte('created_at', today + 'T23:59:59');
+                    endlessTotalSeen = totalCount || 0;
+                    endlessTotalSolved = solvedCount || 0;
+                    // Sync session counter
+                    if (endlessSessionId) {
+                        await sb.from('unlimited_sessions')
+                            .update({
+                                total_plates_seen: endlessTotalSeen,
+                                total_solved: endlessTotalSolved,
+                                total_skipped: endlessTotalSeen - endlessTotalSolved
+                            })
+                            .eq('id', endlessSessionId);
                     }
                 }
             } catch (e) {
