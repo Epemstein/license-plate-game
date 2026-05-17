@@ -1732,7 +1732,11 @@
     }
 
     function showRestartGameButton() {
-        startButtonEl.textContent = "Restart game";
+        if (gameMode === 'endless') {
+            startButtonEl.textContent = "End Session";
+        } else {
+            startButtonEl.textContent = "Restart game";
+        }
         startButtonEl.disabled = false;
         startButtonEl.style.opacity = '1';
         startButtonEl.style.cursor = 'pointer';
@@ -2789,7 +2793,7 @@
         addToHistoryWithAnimation(
             plate, word, matchIndices, null, diffScore, timeLabel,
             () => {
-                if (solvedCount >= TOTAL_PLATES) endGame();
+                if (gameMode !== 'endless' && solvedCount >= TOTAL_PLATES) endGame();
                 else pickRandomPlate();
             },
             thinkingSeconds, false
