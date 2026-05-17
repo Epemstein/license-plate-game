@@ -428,7 +428,7 @@
     let endlessPendingEntries = []; // accumulated locally, flushed on end
 
     function saveEndlessStateLocally() {
-        if (gameMode !== 'endless' || endlessPendingEntries.length === 0) return;
+        if (endlessPendingEntries.length === 0 && endlessTotalSeen === 0) return;
         const state = {
             sessionId: endlessSessionId,
             totalSeen: endlessTotalSeen,
@@ -436,8 +436,12 @@
             entries: endlessPendingEntries,
             userId: currentUser?.id
         };
-        localStorage.setItem('pendingEndlessState', JSON.stringify(state));
-        console.log('[Endless] Saved', endlessPendingEntries.length, 'entries to localStorage');
+        try {
+            localStorage.setItem('pendingEndlessState', JSON.stringify(state));
+            console.log('[Endless] Saved state:', endlessPendingEntries.length, 'entries, seen:', endlessTotalSeen);
+        } catch (e) {
+            console.error('[Endless] localStorage save error:', e);
+        }
     }
 
     async function submitPendingEndlessState() {
@@ -480,16 +484,12 @@
     }
 
     // Save endless state on page unload/refresh/close
-    function maybeSaveEndless() {
-        if (gameMode === 'endless' && (gameStarted || endlessPendingEntries.length > 0)) {
-            saveEndlessStateLocally();
-        }
-    }
+    // Always try to save — the function itself checks if there's anything to save
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') maybeSaveEndless();
+        if (document.visibilityState === 'hidden') saveEndlessStateLocally();
     });
-    window.addEventListener('pagehide', maybeSaveEndless);
-    window.addEventListener('beforeunload', maybeSaveEndless);
+    window.addEventListener('pagehide', saveEndlessStateLocally);
+    window.addEventListener('beforeunload', saveEndlessStateLocally);
     let currentDailyRunId = null;
 
     // Words modal state
@@ -658,9 +658,16 @@
         // Restore buttons
         btn.onclick = null;
         practiceBtn.onclick = null;
-        practiceBtn.textContent = 'Practice Mode';
-        practiceBtn.style.background = '#9370db';
-        practiceBtn.style.color = '#ffffff';
+        if (gameMode === 'endless') {
+            practiceBtn.textContent = 'Endless Mode';
+            practiceBtn.style.background = '#ccfbf1';
+            practiceBtn.style.color = '#0f766e';
+            practiceSettingsBtn.style.background = '#14b8a6';
+        } else {
+            practiceBtn.textContent = 'Practice Mode';
+            practiceBtn.style.background = '#9370db';
+            practiceBtn.style.color = '#ffffff';
+        }
         practiceBtn.style.cursor = 'pointer';
         practiceBtn.disabled = false;
         practiceSettingsBtn.style.display = '';
