@@ -426,6 +426,68 @@
     let endlessTotalSeen = 0;
     let endlessTotalSolved = 0;
     let endlessPendingEntries = []; // accumulated locally, flushed on end
+
+    function saveEndlessStateLocally() {
+        if (gameMode !== 'endless' || endlessPendingEntries.length === 0) return;
+        const state = {
+            sessionId: endlessSessionId,
+            totalSeen: endlessTotalSeen,
+            totalSolved: endlessTotalSolved,
+            entries: endlessPendingEntries,
+            userId: currentUser?.id
+        };
+        localStorage.setItem('pendingEndlessState', JSON.stringify(state));
+        console.log('[Endless] Saved', endlessPendingEntries.length, 'entries to localStorage');
+    }
+
+    async function submitPendingEndlessState() {
+        const saved = localStorage.getItem('pendingEndlessState');
+        if (!saved) return;
+        localStorage.removeItem('pendingEndlessState');
+        try {
+            const state = JSON.parse(saved);
+            if (!state || !state.entries || state.entries.length === 0 || !currentUser) return;
+
+            // Flush entries
+            const rows = state.entries.map(e => ({
+                user_id: state.userId || currentUser.id,
+                plate: e.plate,
+                word: e.word,
+                skipped: e.skipped,
+                thinking_seconds: e.thinking_seconds,
+                source: 'unlimited',
+                difficulty: 50
+            }));
+            await sb.from('practice_plate_stats').insert(rows);
+            console.log('[Endless] Submitted', rows.length, 'pending entries from localStorage');
+
+            // Update session counters
+            if (state.sessionId) {
+                await sb.from('unlimited_sessions')
+                    .update({
+                        total_solved: state.totalSolved,
+                        total_skipped: state.totalSeen - state.totalSolved,
+                        total_plates_seen: state.totalSeen,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', state.sessionId);
+            }
+        } catch (e) {
+            console.error('[Endless] Pending state submit error:', e);
+        }
+    }
+
+    // Save endless state on page unload
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && gameMode === 'endless' && gameStarted) {
+            saveEndlessStateLocally();
+        }
+    });
+    window.addEventListener('pagehide', () => {
+        if (gameMode === 'endless' && gameStarted) {
+            saveEndlessStateLocally();
+        }
+    });
     let currentDailyRunId = null;
 
     // Words modal state
@@ -447,6 +509,7 @@
             updateProfileTab();
             updateDailyBtnState();
             submitPendingPracticeStats();
+            submitPendingEndlessState();
 
             // Check if there's a challenge ID in the URL
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
@@ -3463,11 +3526,13 @@
 
         document.getElementById('choosePracticeBtn').addEventListener('click', () => {
             document.getElementById('practiceModeBackdrop').classList.remove('show');
+            document.getElementById('practiceBtn').textContent = 'Practice Mode';
             startPracticeMode();
         });
 
         document.getElementById('chooseEndlessBtn').addEventListener('click', () => {
             document.getElementById('practiceModeBackdrop').classList.remove('show');
+            document.getElementById('practiceBtn').textContent = 'Endless Mode';
             startEndlessMode();
         });
 
