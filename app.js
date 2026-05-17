@@ -2016,11 +2016,14 @@
             console.log('[Practice] savePracticeStatsLocally SKIPPED');
             return;
         }
+        const diff = typeof practiceDifficulty === 'number' ? practiceDifficulty : 50;
         const data = gameHistory.map(entry => ({
             plate: entry.plate,
             skipped: entry.skipped || false,
             thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100,
-            word: entry.skipped ? null : (entry.word || null)
+            word: entry.skipped ? null : (entry.word || null),
+            difficulty: diff,
+            source: 'practice'
         }));
         localStorage.setItem('pendingPracticeStats', JSON.stringify(data));
     }
@@ -2037,15 +2040,18 @@
         localStorage.removeItem('pendingPracticeStats');
         console.log('[Practice] SUBMITTING to server...');
         try {
+            const diff = typeof practiceDifficulty === 'number' ? practiceDifficulty : 50;
             const rows = gameHistory.map(entry => ({
                 user_id: currentUser.id,
                 plate: entry.plate,
                 skipped: entry.skipped || false,
                 thinking_seconds: Math.floor((entry.thinkingSeconds || 0) * 100) / 100,
-                word: entry.skipped ? null : (entry.word || null)
+                word: entry.skipped ? null : (entry.word || null),
+                difficulty: diff,
+                source: 'practice'
             }));
             await sb.from('practice_plate_stats').insert(rows);
-            console.log('[Practice] Submitted', rows.length, 'plate stats');
+            console.log('[Practice] Submitted', rows.length, 'plate stats at difficulty', diff);
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
         }
@@ -2067,7 +2073,9 @@
                 plate: entry.plate,
                 skipped: entry.skipped,
                 thinking_seconds: entry.thinking_seconds,
-                word: entry.word || null
+                word: entry.word || null,
+                difficulty: entry.difficulty || null,
+                source: entry.source || 'practice'
             }));
             await sb.from('practice_plate_stats').insert(rows);
             console.log('[Practice] Submitted', rows.length, 'pending plate stats from previous session');
