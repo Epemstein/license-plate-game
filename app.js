@@ -3639,23 +3639,22 @@
                 if (psBtn) { psBtn.disabled = false; psBtn.style.opacity = '1'; }
             }
 
-            resultEl.textContent = `Session ended! ${endlessTotalSolved}/${endlessTotalSeen} solved.`;
+            resultEl.textContent = `Session paused — ${endlessTotalSolved}/${endlessTotalSeen} solved.`;
             resultEl.style.color = 'green';
 
-            // Reset buttons
+            // Generate fresh sequence for resume
+            dailyPlateSequence = generateChallengeSequence(50);
+            gameHistory = [];
+
+            // Show Resume Session button
+            const startBtn = document.getElementById('startButton');
+            startBtn.textContent = 'Resume Session';
+            startBtn.disabled = false;
+            startBtn.style.opacity = '1';
+            startBtn.style.cursor = 'pointer';
+
             document.getElementById('dailyChallengeBtn').disabled = false;
             document.getElementById('dailyChallengeBtn').style.opacity = '1';
-
-            const startBtn = document.getElementById('startButton');
-            startBtn.textContent = 'Start Game';
-            startBtn.disabled = true;
-            startBtn.style.opacity = '0.5';
-
-            const mi = document.getElementById('modeIndicator');
-            mi.textContent = 'Select a game mode above to begin';
-            mi.style.background = '#f3f4f6';
-            mi.style.color = '#000000';
-            mi.style.border = '2px dashed #d1d5db';
         }
 
         document.getElementById('confirmEndEndlessBtn').addEventListener('click', () => {
