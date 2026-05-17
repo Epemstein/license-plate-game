@@ -443,14 +443,16 @@
     async function submitPendingEndlessState() {
         const saved = localStorage.getItem('pendingEndlessState');
         if (!saved) return;
-        localStorage.removeItem('pendingEndlessState');
         try {
             const state = JSON.parse(saved);
-            if (!state || !state.entries || state.entries.length === 0 || !currentUser) return;
+            if (!state || !state.entries || state.entries.length === 0) return;
+            const userId = state.userId || (currentUser && currentUser.id);
+            if (!userId) return; // can't submit without a user ID
+            localStorage.removeItem('pendingEndlessState');
 
             // Flush entries
             const rows = state.entries.map(e => ({
-                user_id: state.userId || currentUser.id,
+                user_id: userId,
                 plate: e.plate,
                 word: e.word,
                 skipped: e.skipped,
@@ -477,17 +479,17 @@
         }
     }
 
-    // Save endless state on page unload
+    // Save endless state on page unload/refresh/close
+    function maybeSaveEndless() {
+        if (gameMode === 'endless' && (gameStarted || endlessPendingEntries.length > 0)) {
+            saveEndlessStateLocally();
+        }
+    }
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden' && gameMode === 'endless' && gameStarted) {
-            saveEndlessStateLocally();
-        }
+        if (document.visibilityState === 'hidden') maybeSaveEndless();
     });
-    window.addEventListener('pagehide', () => {
-        if (gameMode === 'endless' && gameStarted) {
-            saveEndlessStateLocally();
-        }
-    });
+    window.addEventListener('pagehide', maybeSaveEndless);
+    window.addEventListener('beforeunload', maybeSaveEndless);
     let currentDailyRunId = null;
 
     // Words modal state
