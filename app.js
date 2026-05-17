@@ -448,14 +448,30 @@
         }
     }
 
+    let endlessFlushInProgress = false;
     async function submitPendingEndlessState() {
+        if (endlessFlushInProgress) return;
         const saved = localStorage.getItem('pendingEndlessState');
         if (!saved) return;
+        // Remove immediately to prevent double-submit
+        localStorage.removeItem('pendingEndlessState');
+        endlessFlushInProgress = true;
         try {
             const state = JSON.parse(saved);
-            if (!state || !state.entries || state.entries.length === 0) return;
+            if (!state || !state.entries || state.entries.length === 0) {
+                // Re-save sequence without entries if needed
+                if (state && state.plateSequence && state.plateSequence.length > 0) {
+                    state.entries = [];
+                    localStorage.setItem('pendingEndlessState', JSON.stringify(state));
+                }
+                return;
+            }
             const userId = state.userId || (currentUser && currentUser.id);
-            if (!userId) return; // can't submit without a user ID
+            if (!userId) {
+                // Can't submit — put it back for next attempt
+                localStorage.setItem('pendingEndlessState', saved);
+                return;
+            }
 
             // Flush entries
             const rows = state.entries.map(e => ({
@@ -482,7 +498,9 @@
                     .eq('id', state.sessionId);
             }
 
-            // Re-save without entries but keep sequence for resume
+            // Re-save without entries but keep sequence for resume.
+            // Also clear in-memory entries so they don't get re-saved by saveEndlessStateLocally.
+            endlessPendingEntries = [];
             const cleaned = {
                 sessionId: state.sessionId,
                 totalSeen: state.totalSeen,
@@ -496,6 +514,7 @@
         } catch (e) {
             console.error('[Endless] Pending state submit error:', e);
         }
+        endlessFlushInProgress = false;
     }
 
     // Save endless state on page unload/refresh/close
