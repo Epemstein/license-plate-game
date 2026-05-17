@@ -429,16 +429,20 @@
 
     function saveEndlessStateLocally() {
         if (endlessPendingEntries.length === 0 && endlessTotalSeen === 0) return;
+        // Save the current plate index so we resume on the same plate
+        const currentIdx = dailyPlateSequence ? usedPlates.size : 0;
         const state = {
             sessionId: endlessSessionId,
             totalSeen: endlessTotalSeen,
             totalSolved: endlessTotalSolved,
             entries: endlessPendingEntries,
-            userId: currentUser?.id
+            userId: currentUser?.id,
+            plateSequence: dailyPlateSequence || [],
+            cursor: Math.max(0, currentIdx - 1) // back up to unsolved plate
         };
         try {
             localStorage.setItem('pendingEndlessState', JSON.stringify(state));
-            console.log('[Endless] Saved state:', endlessPendingEntries.length, 'entries, seen:', endlessTotalSeen);
+            console.log('[Endless] Saved state:', endlessPendingEntries.length, 'entries, seen:', endlessTotalSeen, 'cursor:', state.cursor);
         } catch (e) {
             console.error('[Endless] localStorage save error:', e);
         }
@@ -452,7 +456,6 @@
             if (!state || !state.entries || state.entries.length === 0) return;
             const userId = state.userId || (currentUser && currentUser.id);
             if (!userId) return; // can't submit without a user ID
-            localStorage.removeItem('pendingEndlessState');
 
             // Flush entries
             const rows = state.entries.map(e => ({
@@ -478,6 +481,18 @@
                     })
                     .eq('id', state.sessionId);
             }
+
+            // Re-save without entries but keep sequence for resume
+            const cleaned = {
+                sessionId: state.sessionId,
+                totalSeen: state.totalSeen,
+                totalSolved: state.totalSolved,
+                entries: [],
+                userId: state.userId,
+                plateSequence: state.plateSequence || [],
+                cursor: state.cursor || 0
+            };
+            localStorage.setItem('pendingEndlessState', JSON.stringify(cleaned));
         } catch (e) {
             console.error('[Endless] Pending state submit error:', e);
         }
@@ -1843,7 +1858,10 @@
         penaltySeconds = 0;
         skipCount = 0;
         plateLocked = false;
-        usedPlates = new Set();
+        // For endless mode, usedPlates may be pre-filled from saved state — don't clear
+        if (gameMode !== 'endless') {
+            usedPlates = new Set();
+        }
         plateStartTime = null;
         gameHistory = [];
         updateSkipButtonLabel();
@@ -3466,7 +3484,7 @@
             practiceBtn.style.color = '#0f766e';
             document.querySelector('.mode-btn-settings').style.background = '#14b8a6';
             startBtn.textContent = 'Resume Session';
-            // Restore session counters after auth is ready
+            // Restore session counters and plate sequence after auth is ready
             setTimeout(async () => {
                 if (!currentUser) return;
                 try {
@@ -3478,7 +3496,28 @@
                         endlessTotalSolved = data[0].total_solved || 0;
                         updateProgressDisplay();
                     }
-                    dailyPlateSequence = generateChallengeSequence(50);
+                    // Try to restore plate sequence from saved state
+                    const savedState = localStorage.getItem('pendingEndlessState');
+                    if (savedState) {
+                        try {
+                            const parsed = JSON.parse(savedState);
+                            if (parsed.plateSequence && parsed.plateSequence.length > 0) {
+                                dailyPlateSequence = parsed.plateSequence;
+                                // Pre-fill usedPlates up to the saved cursor
+                                usedPlates = new Set();
+                                for (let i = 0; i < (parsed.cursor || 0); i++) {
+                                    if (i < dailyPlateSequence.length) usedPlates.add(dailyPlateSequence[i]);
+                                }
+                                console.log('[Endless] Restored sequence, cursor:', parsed.cursor, 'usedPlates:', usedPlates.size);
+                            } else {
+                                dailyPlateSequence = generateChallengeSequence(50);
+                            }
+                        } catch (e) {
+                            dailyPlateSequence = generateChallengeSequence(50);
+                        }
+                    } else {
+                        dailyPlateSequence = generateChallengeSequence(50);
+                    }
                 } catch (e) { console.error('[Endless] Session restore error:', e); }
             }, 1500);
         } else {
@@ -3671,7 +3710,26 @@
             mi.style.color = '#0f766e';
             mi.style.border = '2px solid #99f6e4';
 
-            dailyPlateSequence = generateChallengeSequence(50);
+            // Try to restore plate sequence from saved state
+            let restored = false;
+            const savedState = localStorage.getItem('pendingEndlessState');
+            if (savedState) {
+                try {
+                    const parsed = JSON.parse(savedState);
+                    if (parsed.plateSequence && parsed.plateSequence.length > 0 && parsed.cursor != null) {
+                        dailyPlateSequence = parsed.plateSequence;
+                        usedPlates = new Set();
+                        for (let i = 0; i < parsed.cursor; i++) {
+                            if (i < dailyPlateSequence.length) usedPlates.add(dailyPlateSequence[i]);
+                        }
+                        restored = true;
+                        console.log('[Endless] Restored sequence from localStorage, cursor:', parsed.cursor);
+                    }
+                } catch (e) { /* ignore parse errors */ }
+            }
+            if (!restored) {
+                dailyPlateSequence = generateChallengeSequence(50);
+            }
 
             // Set up UI — game starts when user clicks Start Game
             plateEl.textContent = '---';
