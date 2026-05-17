@@ -3767,10 +3767,15 @@
             checkButtonEl.disabled = true;
             skipButtonEl.disabled = true;
 
+            // Grab entries and clear immediately so beforeunload doesn't re-save them
+            const entriesToFlush = endlessPendingEntries.slice();
+            endlessPendingEntries = [];
+            localStorage.removeItem('pendingEndlessState');
+
             // Flush pending entries
-            if (currentUser && endlessPendingEntries.length > 0) {
+            if (currentUser && entriesToFlush.length > 0) {
                 try {
-                    const rows = endlessPendingEntries.map(e => ({
+                    const rows = entriesToFlush.map(e => ({
                         user_id: currentUser.id,
                         plate: e.plate,
                         word: e.word,
@@ -3801,8 +3806,6 @@
                     console.error('[Endless] Session update error:', e);
                 }
             }
-
-            endlessPendingEntries = [];
 
             // Enable plate stats button
             if (gameHistory.length > 0) {
