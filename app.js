@@ -416,7 +416,7 @@
 
     // Stub for removed Firebase
     const database = { ref: () => ({ set: async () => {}, once: async () => ({ exists: () => false, val: () => null }), push: () => ({ key: null }), remove: async () => {}, update: async () => {} }) };
-    let gameMode = 'practice';
+    let gameMode = localStorage.getItem('currentGameMode') || 'practice';
     let currentUser = null;
     let dailyPlateSequence = null;
     let currentViewingDate = null;
@@ -3448,17 +3448,46 @@
 
     // === EVENT HANDLERS ===
     window.addEventListener('DOMContentLoaded', function() {
-        // Initialize to practice mode on page load
-        gameMode = 'practice';
-        const mi = document.getElementById('modeIndicator');
-        mi.textContent = 'Practice Mode - Unlimited attempts';
-        mi.style.background = '#f3e8ff';
-        mi.style.color = '#6b21a8';
-        mi.style.border = '2px solid #e9d5ff';
+        // Restore mode from localStorage or default to practice
+        const savedMode = localStorage.getItem('currentGameMode');
+        gameMode = (savedMode === 'endless') ? 'endless' : 'practice';
 
-        // Show start button
+        const mi = document.getElementById('modeIndicator');
+        const practiceBtn = document.getElementById('practiceBtn');
         const startBtn = document.getElementById('startButton');
-        startBtn.textContent = 'Start Game';
+
+        if (gameMode === 'endless') {
+            mi.textContent = 'Endless Mode';
+            mi.style.background = '#f0fdfa';
+            mi.style.color = '#0f766e';
+            mi.style.border = '2px solid #99f6e4';
+            practiceBtn.textContent = 'Endless Mode';
+            practiceBtn.style.background = '#ccfbf1';
+            practiceBtn.style.color = '#0f766e';
+            document.querySelector('.mode-btn-settings').style.background = '#14b8a6';
+            startBtn.textContent = 'Resume Session';
+            // Restore session counters after auth is ready
+            setTimeout(async () => {
+                if (!currentUser) return;
+                try {
+                    const today = getTodayString();
+                    const { data } = await sb.rpc('start_unlimited_session', { p_date: today });
+                    if (data && data.length > 0) {
+                        endlessSessionId = data[0].session_id;
+                        endlessTotalSeen = data[0].total_plates_seen || 0;
+                        endlessTotalSolved = data[0].total_solved || 0;
+                        updateProgressDisplay();
+                    }
+                    dailyPlateSequence = generateChallengeSequence(50);
+                } catch (e) { console.error('[Endless] Session restore error:', e); }
+            }, 1500);
+        } else {
+            mi.textContent = 'Practice Mode - Unlimited attempts';
+            mi.style.background = '#f3e8ff';
+            mi.style.color = '#6b21a8';
+            mi.style.border = '2px solid #e9d5ff';
+            startBtn.textContent = 'Start Game';
+        }
         startBtn.disabled = false;
         startBtn.style.opacity = '1';
         startBtn.style.cursor = 'pointer';
@@ -3560,6 +3589,7 @@
             }
             practiceStatsSubmitted = false;
             gameMode = 'practice';
+            localStorage.setItem('currentGameMode', 'practice');
             dailyPlateSequence = null;
             document.getElementById('practiceSettingsBtn').style.display = '';
 
@@ -3604,6 +3634,7 @@
             }
             practiceStatsSubmitted = false;
             gameMode = 'endless';
+            localStorage.setItem('currentGameMode', 'endless');
             dailyPlateSequence = null;
             document.getElementById('practiceSettingsBtn').style.display = 'none';
 
