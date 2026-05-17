@@ -3757,7 +3757,7 @@
 
             // Generate fresh sequence for resume
             dailyPlateSequence = generateChallengeSequence(50);
-            gameHistory = [];
+            // Don't clear gameHistory — Plate Stats button needs it
 
             // Show Resume Session button
             const startBtn = document.getElementById('startButton');
