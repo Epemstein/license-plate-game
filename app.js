@@ -3526,13 +3526,21 @@
 
         document.getElementById('choosePracticeBtn').addEventListener('click', () => {
             document.getElementById('practiceModeBackdrop').classList.remove('show');
-            document.getElementById('practiceBtn').textContent = 'Practice Mode';
+            const btn = document.getElementById('practiceBtn');
+            btn.textContent = 'Practice Mode';
+            btn.style.background = '#e9d5ff';
+            btn.style.color = '#6b21a8';
+            document.querySelector('.mode-btn-settings').style.background = '#7c5cbf';
             startPracticeMode();
         });
 
         document.getElementById('chooseEndlessBtn').addEventListener('click', () => {
             document.getElementById('practiceModeBackdrop').classList.remove('show');
-            document.getElementById('practiceBtn').textContent = 'Endless Mode';
+            const btn = document.getElementById('practiceBtn');
+            btn.textContent = 'Endless Mode';
+            btn.style.background = '#ccfbf1';
+            btn.style.color = '#0f766e';
+            document.querySelector('.mode-btn-settings').style.background = '#14b8a6';
             startEndlessMode();
         });
 
