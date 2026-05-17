@@ -428,7 +428,10 @@
     let endlessPendingEntries = []; // accumulated locally, flushed on end
 
     function saveEndlessStateLocally() {
-        if (endlessPendingEntries.length === 0 && endlessTotalSeen === 0) return;
+        if (endlessPendingEntries.length === 0 && endlessTotalSeen === 0) {
+            console.log('[Endless] saveLocally SKIPPED — no entries, seen=0');
+            return;
+        }
         // Save the current plate index so we resume on the same plate
         const currentIdx = dailyPlateSequence ? usedPlates.size : 0;
         const state = {
@@ -449,10 +452,14 @@
     }
 
     let endlessFlushInProgress = false;
+    let endlessFlushDone = false;
     async function submitPendingEndlessState() {
-        if (endlessFlushInProgress) return;
+        if (endlessFlushInProgress || endlessFlushDone) {
+            console.log('[Endless] submitPending SKIPPED — inProgress:', endlessFlushInProgress, 'done:', endlessFlushDone);
+            return;
+        }
         const saved = localStorage.getItem('pendingEndlessState');
-        if (!saved) return;
+        if (!saved) { console.log('[Endless] submitPending — nothing in localStorage'); return; }
         // Remove immediately to prevent double-submit
         localStorage.removeItem('pendingEndlessState');
         endlessFlushInProgress = true;
@@ -515,15 +522,25 @@
             console.error('[Endless] Pending state submit error:', e);
         }
         endlessFlushInProgress = false;
+        endlessFlushDone = true;
     }
 
     // Save endless state on page unload/refresh/close
     // Always try to save — the function itself checks if there's anything to save
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') saveEndlessStateLocally();
+        if (document.visibilityState === 'hidden') {
+            console.log('[Endless] visibilitychange hidden — saving');
+            saveEndlessStateLocally();
+        }
     });
-    window.addEventListener('pagehide', saveEndlessStateLocally);
-    window.addEventListener('beforeunload', saveEndlessStateLocally);
+    window.addEventListener('pagehide', () => {
+        console.log('[Endless] pagehide — saving');
+        saveEndlessStateLocally();
+    });
+    window.addEventListener('beforeunload', () => {
+        console.log('[Endless] beforeunload — saving');
+        saveEndlessStateLocally();
+    });
     let currentDailyRunId = null;
 
     // Words modal state
@@ -2895,6 +2912,7 @@
             endlessTotalSeen++;
             endlessTotalSolved++;
             endlessPendingEntries.push({ plate, word: word.toLowerCase(), skipped: false, thinking_seconds: Math.floor(thinkingSeconds * 100) / 100 });
+            console.log('[Endless] SOLVE', plate, '— pending:', endlessPendingEntries.length, 'seen:', endlessTotalSeen);
             updateProgressDisplay();
             updateSkipButtonLabel();
             saveEndlessStateLocally();
@@ -2961,6 +2979,7 @@
         if (gameMode === 'endless') {
             endlessTotalSeen++;
             endlessPendingEntries.push({ plate, word: null, skipped: true, thinking_seconds: Math.floor(thinkingSeconds * 100) / 100 });
+            console.log('[Endless] SKIP', plate, '— pending:', endlessPendingEntries.length, 'seen:', endlessTotalSeen);
             updateProgressDisplay();
             updateSkipButtonLabel();
             saveEndlessStateLocally();
