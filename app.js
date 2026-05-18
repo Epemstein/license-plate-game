@@ -1243,7 +1243,11 @@
 
                 h += `<div class="lb-row${meClass}" ${clickAttr}>`;
                 h += `<div class="lb-rank">${rankDisplay}</div>`;
-                h += `<div class="lb-name"><span onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')" style="cursor:pointer;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
+                if (s.userName === 'Anonymous') {
+                    h += `<div class="lb-name"><span style="color:#9ca3af;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
+                } else {
+                    h += `<div class="lb-name"><span onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')" style="cursor:pointer;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
+                }
                 h += timeHtml;
                 if (userHasPlayed || isPastDate) {
                     h += `<div class="lb-chevron">&#8250;</div>`;
