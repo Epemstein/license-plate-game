@@ -265,6 +265,11 @@
             html += '<div style="height:64px;"></div>';
         }
 
+        // Check if viewing another user and current user hasn't played today
+        const isOtherUser = histCalUserId && currentUser && histCalUserId !== currentUser.id;
+        const viewerPlayedToday = todaysDailyTime != null;
+        const todayLocked = isOtherUser && !viewerPlayedToday;
+
         for (let day = 1; day <= daysInMonth; day++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const cellDate = new Date(year, month, day);
@@ -274,10 +279,12 @@
             const hasTime = run && run.total_seconds != null;
             const connectionLost = run && run.total_seconds == null;
             const isMissed = !isFuture && !isToday && !run;
+            const cellLocked = isToday && todayLocked && hasTime;
 
             // Cell color (matches iOS)
             let bgColor;
-            if (isFuture) { bgColor = '#f5f5f5'; }
+            if (cellLocked) { bgColor = '#e5e5e5'; }
+            else if (isFuture) { bgColor = '#f5f5f5'; }
             else if (connectionLost) { bgColor = 'rgba(239,68,68,0.08)'; }
             else if (isMissed) { bgColor = '#e0e0e0'; }
             else if (hasTime && pctByDate[dateStr] != null) {
@@ -291,9 +298,9 @@
             } else { bgColor = 'white'; }
 
             const border = isToday ? '2px solid #000' : '1px solid rgba(0,0,0,0.1)';
-            const cursor = hasTime ? 'cursor:pointer;' : '';
+            const cursor = (hasTime && !cellLocked) ? 'cursor:pointer;' : '';
             let onclick = '';
-            if (hasTime && histCalUserId) {
+            if (hasTime && histCalUserId && !cellLocked) {
                 const playerName = histCalUserName ? histCalUserName.replace(/'/g, "\\'") : 'My Run';
                 onclick = `onclick="viewPlayerRun('${histCalUserId}','${dateStr}','${playerName}',${run.total_seconds},0,0,0,0)"`;
             }
@@ -303,7 +310,9 @@
             html += `<div style="position:absolute;top:3px;left:5px;font-size:0.65rem;font-weight:600;color:${isFuture ? '#d1d5db' : '#374151'};">${day}</div>`;
             // Content
             html += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding-top:4px;">';
-            if (hasTime) {
+            if (cellLocked) {
+                html += '<div style="font-size:1rem;color:#9ca3af;">&#128274;</div>';
+            } else if (hasTime) {
                 const pct = pctByDate[dateStr];
                 const topPct = pct != null ? Math.round(100 - pct) : null;
                 html += `<div style="font-size:0.75rem;font-weight:700;font-family:monospace;">${run.total_seconds.toFixed(1)}</div>`;
