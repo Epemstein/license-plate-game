@@ -58527,8 +58527,6 @@ clawer
 clawers
 clawhammer
 clawing
-clawk
-clawker
 clawless
 clawlike
 claws

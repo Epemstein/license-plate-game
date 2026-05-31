@@ -1462,10 +1462,37 @@
     let resultsChart = null;
 
     // --------- LOADING ---------
+    const STORAGE_BASE = 'https://ggbvtaegsnlimscmjirf.supabase.co/storage/v1/object/public/app-data';
+    let DEFINITIONS = {};
+
     async function loadDictionary() {
         try {
-            const res = await fetch("words.txt");
-            const text = await res.text();
+            // Try remote dictionary first, fallback to local
+            let text;
+            try {
+                const vRes = await fetch(`${STORAGE_BASE}/dictionary-version.json`);
+                const vInfo = await vRes.json();
+                const cachedVersion = parseInt(localStorage.getItem('dictVersion') || '0');
+                if (vInfo.version > cachedVersion || !localStorage.getItem('cachedWords')) {
+                    console.log(`[Dict] Updating v${cachedVersion} → v${vInfo.version}`);
+                    const res = await fetch(`${STORAGE_BASE}/words.txt`);
+                    text = await res.text();
+                    localStorage.setItem('cachedWords', text);
+                    localStorage.setItem('dictVersion', String(vInfo.version));
+                } else {
+                    console.log(`[Dict] Using cached v${cachedVersion}`);
+                    text = localStorage.getItem('cachedWords');
+                }
+            } catch (e) {
+                console.log('[Dict] Remote unavailable, using local');
+                const cached = localStorage.getItem('cachedWords');
+                if (cached) {
+                    text = cached;
+                } else {
+                    const res = await fetch("words.txt");
+                    text = await res.text();
+                }
+            }
 
             WORDS = [];
             DICTIONARY = new Set();
@@ -1489,6 +1516,37 @@
             resultEl.textContent = "Failed to load words.txt.";
             resultEl.style.color = "red";
         }
+    }
+
+    async function loadDefinitions() {
+        try {
+            // Definitions are ~25MB — too large for localStorage.
+            // Fetch from server each session, but only when first needed.
+            console.log('[Defs] Will load on first use');
+        } catch (e) {
+            console.warn('[Defs] Init error:', e);
+        }
+    }
+
+    let definitionsLoading = false;
+    async function ensureDefinitionsLoaded() {
+        if (Object.keys(DEFINITIONS).length > 0) return;
+        if (definitionsLoading) return;
+        definitionsLoading = true;
+        try {
+            console.log('[Defs] Downloading definitions.json...');
+            const res = await fetch(`${STORAGE_BASE}/definitions.json`);
+            DEFINITIONS = await res.json();
+            console.log(`[Defs] Loaded ${Object.keys(DEFINITIONS).length} definitions`);
+        } catch (e) {
+            console.warn('[Defs] Failed to load:', e);
+            // Fallback: try local file
+            try {
+                const res = await fetch('definitions.json');
+                DEFINITIONS = await res.json();
+            } catch (e2) { DEFINITIONS = {}; }
+        }
+        definitionsLoading = false;
     }
 
     async function loadDifficulty() {
@@ -3363,12 +3421,12 @@
         if (tab === 'common') {
             const sorted = [...wordsModalCommon].sort((a, b) => a.length - b.length || a.localeCompare(b));
             sorted.forEach(word => {
-                html += `<div class="word-item">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
+                html += `<div class="word-item" onclick="showDefinition('${word.replace(/'/g, "\\'")}')" style="cursor:pointer;">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
             });
         } else if (tab === 'viable') {
             const sorted = [...wordsModalViable].sort((a, b) => a.length - b.length || a.localeCompare(b));
             sorted.forEach(word => {
-                html += `<div class="word-item">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
+                html += `<div class="word-item" onclick="showDefinition('${word.replace(/'/g, "\\'")}')" style="cursor:pointer;">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
             });
         } else if (tab === 'used') {
             if (wordsModalUsed.length === 0) {
@@ -3381,7 +3439,7 @@
                     const badge = isMyEntry ? ' <span class="lb-badge lb-badge-you" style="font-size:0.7rem;">YOU</span>' : '';
                     const wordDisplay = entry.isSkip
                         ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
-                        : highlightWordWithPlate(entry.word, wordsModalPlate);
+                        : `<span onclick="event.stopPropagation();showDefinition('${entry.word.replace(/'/g, "\\'")}')" style="cursor:pointer;">${highlightWordWithPlate(entry.word, wordsModalPlate)}</span>`;
 
                     if (wordsModalSource === 'daily' && entry.users && entry.users.length > 0) {
                         // Daily: clickable with user dropdown
@@ -3440,6 +3498,44 @@
     window.displayViableWords = displayViableWords;
     window.showViableWordsForPlate = showViableWordsForPlate;
 
+    async function showDefinition(word) {
+        await ensureDefinitionsLoaded();
+        const senses = DEFINITIONS[word.toLowerCase()];
+        let popup = document.getElementById('definitionPopup');
+        if (!popup) {
+            popup = document.createElement('div');
+            popup.id = 'definitionPopup';
+            popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10001;background:#e5e7eb;border:2px solid #000;border-radius:14px;padding:18px;max-width:340px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);';
+            document.body.appendChild(popup);
+
+            const backdrop = document.createElement('div');
+            backdrop.id = 'definitionBackdrop';
+            backdrop.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:rgba(0,0,0,0.3);';
+            backdrop.onclick = hideDefinition;
+            document.body.appendChild(backdrop);
+        }
+        document.getElementById('definitionBackdrop').style.display = 'block';
+        popup.style.display = 'block';
+
+        let html = `<div style="font-size:1.2rem;font-weight:700;margin-bottom:8px;">${highlightWordWithPlate(word, wordsModalPlate)}</div>`;
+        if (!senses || senses.length === 0) {
+            html += `<div style="color:#6b7280;">No definition available</div>`;
+        } else {
+            senses.forEach(s => {
+                html += `<div style="margin-bottom:6px;"><span style="font-style:italic;color:#6b7280;font-size:0.85rem;">${s.p}</span> <span style="color:#111;">${s.d}</span></div>`;
+            });
+        }
+        popup.innerHTML = html;
+    }
+    window.showDefinition = showDefinition;
+
+    function hideDefinition() {
+        const popup = document.getElementById('definitionPopup');
+        const backdrop = document.getElementById('definitionBackdrop');
+        if (popup) popup.style.display = 'none';
+        if (backdrop) backdrop.style.display = 'none';
+    }
+    window.hideDefinition = hideDefinition;
 
     function loadSelectedDate() {
         const v = document.getElementById('leaderboardDatePicker').value;
@@ -5323,6 +5419,7 @@
     });
 
     loadDictionary();
+    loadDefinitions();
     loadDifficulty();
 
     // Precache yesterday's leaderboard silently
