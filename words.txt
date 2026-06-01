@@ -258043,6 +258043,7 @@ qv
 qy
 r
 ra
+raaa
 raad
 raadzaal
 raanan
@@ -258165,7 +258166,9 @@ raccroc
 race
 raceabout
 racebrood
+racecar
 racecard
+racecars
 racecourse
 racecourses
 raced
