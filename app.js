@@ -1511,6 +1511,34 @@
             debugEl.textContent = '';
 
             tryBuildPlateList();
+
+            // Apply incremental dictionary changes (add/remove words, definitions)
+            // Always apply regardless of cached version — we rebuild from base each time.
+            try {
+                const cRes = await fetch(`${STORAGE_BASE}/dictionary-changes.json?t=${Date.now()}`);
+                if (cRes.ok) {
+                    const changes = await cRes.json();
+                    const removeSet = new Set((changes.remove || []).map(w => w.toUpperCase()));
+                    for (const w of removeSet) { DICTIONARY.delete(w); }
+                    WORDS = WORDS.filter(w => !removeSet.has(w.toUpperCase()));
+                    for (const w of (changes.add || [])) {
+                        const lower = w.toLowerCase();
+                        const upper = w.toUpperCase();
+                        if (!DICTIONARY.has(upper) && /^[a-z]+$/.test(lower) && lower.length >= 3) {
+                            DICTIONARY.add(upper);
+                            WORDS.push(lower);
+                        }
+                    }
+                    if (changes.definitions) {
+                        for (const [word, senses] of Object.entries(changes.definitions)) {
+                            DEFINITIONS[word.toLowerCase()] = senses;
+                        }
+                    }
+                    console.log(`[Dict] Applied changes v${changes.version}: +${(changes.add||[]).length} -${(changes.remove||[]).length} words, ${Object.keys(changes.definitions||{}).length} defs → ${DICTIONARY.size} total`);
+                }
+            } catch (e) {
+                console.log('[Dict] Changes check failed (offline?)');
+            }
         } catch (err) {
             console.error(err);
             resultEl.textContent = "Failed to load words.txt.";
