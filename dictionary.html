@@ -259,8 +259,9 @@
         document.getElementById('versionBadge').textContent = `v${changes.version}`;
     }
 
+    var dirty = false; // set true when any modification is made since last load/publish
     function hasUnpublished() {
-        return changes.add.length > 0 || changes.remove.length > 0 || Object.keys(changes.definitions).length > 0;
+        return dirty || changes.add.length > 0 || changes.remove.length > 0 || Object.keys(changes.definitions).length > 0;
     }
 
     function updatePublishBtn() {
@@ -415,7 +416,7 @@
         }
 
         input.value = '';
-        if (added > 0) rebuild();
+        if (added > 0) { dirty = true; rebuild(); }
     }
 
     function removeWord(word) {
@@ -428,12 +429,14 @@
             if (!changes.remove.includes(word)) changes.remove.push(word);
             delete changes.definitions[word];
         }
+        dirty = true;
         rebuild();
     }
 
     function restoreWord(word) {
         const ri = changes.remove.indexOf(word);
         if (ri !== -1) changes.remove.splice(ri, 1);
+        dirty = true;
         rebuild();
     }
 
@@ -497,6 +500,7 @@
         } else {
             delete changes.definitions[editingWord];
         }
+        dirty = true;
 
         closeDefModal();
         updateStats();
@@ -559,6 +563,7 @@
 
             changes.version = newVersion;
             savedVersion = newVersion;
+            dirty = false;
             updateStats();
             alert(`Published v${newVersion} successfully!\n\nUsers will get the update on next app launch.`);
         } catch (e) {
