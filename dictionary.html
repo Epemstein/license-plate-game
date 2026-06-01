@@ -178,7 +178,7 @@
         document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading words.txt...</div>';
         try {
             // Load base words
-            const res = await fetch('words.txt');
+            const res = await fetch(`words.txt?t=${Date.now()}`);
             const text = await res.text();
             baseWords = new Set();
             for (const line of text.split(/\r?\n/)) {
