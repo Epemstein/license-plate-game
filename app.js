@@ -555,6 +555,7 @@
             document.getElementById('userName').textContent = session.user.email || 'Player';
             updateProfileTab();
             updateDailyBtnState();
+            retryPendingSubmission();
             submitPendingPracticeStats();
             submitPendingEndlessState();
 
@@ -740,14 +741,10 @@
         }
         const today = getTodayString();
         const totalSeconds = Math.floor(time * 100) / 100;
-
-        await sb
-            .from('daily_runs')
-            .update({ total_seconds: totalSeconds, completed_at: new Date().toISOString() })
-            .eq('id', currentDailyRunId);
+        const runId = currentDailyRunId;
 
         const entries = gameHistory.map((entry, idx) => ({
-            run_id: currentDailyRunId,
+            run_id: runId,
             plate_index: idx,
             plate: entry.plate,
             word: entry.skipped ? null : (entry.word || '').toLowerCase(),
@@ -756,12 +753,14 @@
             penalty_seconds: entry.penaltySeconds || 0
         }));
 
-        const { error: insertError } = await sb.from('daily_run_entries').insert(entries);
-        if (insertError) {
-            console.error('Failed to save run entries:', insertError);
-            alert('Warning: your plate details may not have saved. Error: ' + insertError.message);
-        } else {
-            console.log('Saved', entries.length, 'run entries');
+        // Save pending submission to localStorage so we can retry if the page closes
+        const pending = { runId, date: today, totalSeconds, entries };
+        localStorage.setItem('pendingDailySubmission', JSON.stringify(pending));
+
+        const success = await submitDailyRun(runId, totalSeconds, entries);
+
+        if (success) {
+            localStorage.removeItem('pendingDailySubmission');
         }
 
         // Update daily button and refresh profile stats
@@ -771,6 +770,48 @@
         setTimeout(() => {
             displayLeaderboard(today);
         }, 500);
+    }
+
+    async function submitDailyRun(runId, totalSeconds, entries) {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                const { error: updateError } = await sb
+                    .from('daily_runs')
+                    .update({ total_seconds: totalSeconds, completed_at: new Date().toISOString() })
+                    .eq('id', runId);
+                if (updateError) throw updateError;
+
+                const { error: insertError } = await sb.from('daily_run_entries').insert(entries);
+                // Duplicate entries are fine (means entries saved on a prior attempt)
+                if (insertError && !insertError.message.includes('duplicate')) throw insertError;
+
+                console.log(`[Submit] Success on attempt ${attempt}`);
+                return true;
+            } catch (e) {
+                console.warn(`[Submit] Attempt ${attempt} failed:`, e.message || e);
+                if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1500));
+            }
+        }
+        console.error('[Submit] All 3 attempts failed — saved to localStorage for retry');
+        alert('Your score was saved locally and will be submitted when you reload the page.');
+        return false;
+    }
+
+    // On page load, retry any pending submission from a previous session
+    async function retryPendingSubmission() {
+        const raw = localStorage.getItem('pendingDailySubmission');
+        if (!raw) return;
+        try {
+            const pending = JSON.parse(raw);
+            console.log(`[Submit] Found pending submission for ${pending.date}, retrying...`);
+            const success = await submitDailyRun(pending.runId, pending.totalSeconds, pending.entries);
+            if (success) {
+                localStorage.removeItem('pendingDailySubmission');
+                console.log('[Submit] Pending submission recovered successfully');
+            }
+        } catch (e) {
+            console.warn('[Submit] Pending retry failed:', e);
+        }
     }
 
 
