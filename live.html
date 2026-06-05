@@ -46,7 +46,9 @@
         .entry .word .pl { color: #16a34a; font-weight: 700; }
         .entry .word .nl { color: #111; }
         .entry .word.skipped { color: #dc2626; font-style: italic; }
-        .entry .time { font-size: 0.85rem; color: #6b7280; font-variant-numeric: tabular-nums; width: 60px; text-align: right; }
+        .entry .time-col { display: flex; align-items: center; gap: 6px; flex: 2; min-width: 160px; }
+        .entry .time-val { font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+        .entry .time-bar { height: 6px; border-radius: 3px; flex-shrink: 0; }
         .entry .mode { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 10px; text-transform: uppercase; width: 70px; text-align: center; }
         .mode-daily { background: #fef3c7; color: #92400e; }
         .mode-practice { background: #ede9fe; color: #6d28d9; }
@@ -64,7 +66,7 @@
         .feed-header .h-user { flex: 1; min-width: 100px; }
         .feed-header .h-plate { width: 60px; }
         .feed-header .h-word { flex: 1.5; min-width: 130px; }
-        .feed-header .h-time { width: 60px; text-align: right; }
+        .feed-header .h-time { flex: 2; min-width: 160px; }
         .feed-header .h-mode { width: 70px; text-align: center; }
         .feed-header .h-ago { width: 50px; text-align: right; }
         .bump { display: inline-block; animation: bumpUp 0.5s ease-out; }
@@ -358,17 +360,36 @@
         return result;
     }
 
+    function timeColor(seconds) {
+        if (seconds == null) return '#6b7280';
+        if (seconds < 3) return '#16a34a';
+        if (seconds < 6) return '#ca8a04';
+        if (seconds < 10) return '#ea580c';
+        return '#dc2626';
+    }
+
+    function timeBarWidth(seconds) {
+        if (seconds == null) return 0;
+        // Scale: 0s = 0%, 30s+ = 100%
+        return Math.min(Math.max(seconds / 30 * 100, 3), 100);
+    }
+
     function renderEntryHTML(e) {
         const wordHtml = e.skipped
             ? '<span class="word skipped">skipped</span>'
             : `<span class="word">${highlightWord(e.word || '?', e.plate)}</span>`;
         const timeStr = e.time != null ? e.time.toFixed(1) + 's' : '--';
+        const barColor = e.skipped ? '#111' : timeColor(e.time);
+        const barW = timeBarWidth(e.time);
         const user = e.userName ? esc(e.userName) : '<span style="color:#d1d5db;">anon</span>';
         return `<div class="entry entry-${e.mode}">
             <span class="user">${user}</span>
             <span class="plate">${esc(e.plate)}</span>
             ${wordHtml}
-            <span class="time">${timeStr}</span>
+            <span class="time-col">
+                <span class="time-val" style="color:${barColor}">${timeStr}</span>
+                <span class="time-bar" style="width:${barW}%;background:${barColor};"></span>
+            </span>
             <span class="mode mode-${e.mode}">${e.mode}</span>
             <span class="ago">${ago(e.at)}</span>
         </div>`;
