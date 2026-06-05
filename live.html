@@ -213,7 +213,17 @@
         if (e.skipped) sessionStats.skips++;
         if (e.time != null) sessionStats.times.push(e.time);
         updateStats();
-        renderFeed();
+
+        // Prepend new entry to DOM instead of re-rendering everything
+        if (activeFilter === 'all' || activeFilter === e.mode) {
+            const feed = document.getElementById('feed');
+            const empty = feed.querySelector('.empty');
+            if (empty) empty.remove();
+            const html = renderEntryHTML(e);
+            feed.insertAdjacentHTML('afterbegin', html);
+            // Trim excess DOM entries
+            while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+        }
     }
 
     function updateStats() {
@@ -240,6 +250,22 @@
         renderFeed();
     }
 
+    function renderEntryHTML(e) {
+        const wordHtml = e.skipped
+            ? '<span class="word skipped">skipped</span>'
+            : `<span class="word">${esc(e.word || '?')}</span>`;
+        const timeStr = e.time != null ? e.time.toFixed(1) + 's' : '--';
+        const user = e.userName ? esc(e.userName) : '<span style="color:#334155;">anon</span>';
+        return `<div class="entry">
+            <span class="mode mode-${e.mode}">${e.mode}</span>
+            <span class="plate">${esc(e.plate)}</span>
+            ${wordHtml}
+            <span class="time">${timeStr}</span>
+            <span class="user">${user}</span>
+            <span class="ago">${ago(e.at)}</span>
+        </div>`;
+    }
+
     function renderFeed() {
         const feed = document.getElementById('feed');
         const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.mode === activeFilter);
@@ -249,22 +275,7 @@
             return;
         }
 
-        feed.innerHTML = filtered.slice(0, 100).map(e => {
-            const wordHtml = e.skipped
-                ? '<span class="word skipped">skipped</span>'
-                : `<span class="word">${esc(e.word || '?')}</span>`;
-            const timeStr = e.time != null ? e.time.toFixed(1) + 's' : '--';
-            const modeLabel = e.mode;
-            const user = e.userName ? esc(e.userName) : '<span style="color:#334155;">anon</span>';
-            return `<div class="entry">
-                <span class="mode mode-${e.mode}">${modeLabel}</span>
-                <span class="plate">${esc(e.plate)}</span>
-                ${wordHtml}
-                <span class="time">${timeStr}</span>
-                <span class="user">${user}</span>
-                <span class="ago">${ago(e.at)}</span>
-            </div>`;
-        }).join('');
+        feed.innerHTML = filtered.slice(0, 100).map(e => renderEntryHTML(e)).join('');
     }
 
     function updateAgos() {
