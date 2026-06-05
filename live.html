@@ -487,17 +487,28 @@
         if (needsRerender) renderRecords();
     }
 
+    async function fetchAllEntryTimestamps(sinceDate) {
+        // daily_run_entries: join daily_runs for completed_at
+        // practice_plate_stats: has created_at directly
+        // h2h_run_entries: join h2h_runs for created_at
+        // group_daily_run_entries: join group_daily_runs for completed_at
+        const [daily, practice, h2h, group] = await Promise.all([
+            sb.from('daily_run_entries').select('run:daily_runs!inner(completed_at)').gte('run.completed_at', sinceDate).limit(10000),
+            sb.from('practice_plate_stats').select('created_at').gte('created_at', sinceDate).limit(10000),
+            sb.from('h2h_run_entries').select('run:h2h_runs!inner(created_at)').gte('run.created_at', sinceDate).limit(10000),
+            sb.from('group_daily_run_entries').select('run:group_daily_runs!inner(completed_at)').gte('run.completed_at', sinceDate).limit(10000),
+        ]);
+        const timestamps = [];
+        for (const r of (daily.data || [])) timestamps.push(r.run?.completed_at);
+        for (const r of (practice.data || [])) timestamps.push(r.created_at);
+        for (const r of (h2h.data || [])) timestamps.push(r.run?.created_at);
+        for (const r of (group.data || [])) timestamps.push(r.run?.completed_at);
+        return timestamps.filter(Boolean);
+    }
+
     async function loadActivityChart() {
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-        // Fetch from all real entry tables in parallel
-        const [daily, practice, h2h, group] = await Promise.all([
-            sb.from('daily_run_entries').select('created_at').gte('created_at', since).limit(5000),
-            sb.from('practice_plate_stats').select('created_at').gte('created_at', since).limit(5000),
-            sb.from('h2h_run_entries').select('created_at').gte('created_at', since).limit(5000),
-            sb.from('group_daily_run_entries').select('created_at').gte('created_at', since).limit(5000),
-        ]);
-        const allRows = [...(daily.data||[]), ...(practice.data||[]), ...(h2h.data||[]), ...(group.data||[])];
+        const allTimestamps = await fetchAllEntryTimestamps(since);
 
         // Bucket into 30-min intervals
         const buckets = {};
@@ -508,8 +519,8 @@
             buckets[key] = 0;
         }
 
-        for (const row of allRows) {
-            const t = new Date(row.created_at);
+        for (const ts of allTimestamps) {
+            const t = new Date(ts);
             const mins = t.getMinutes();
             t.setMinutes(mins < 30 ? 0 : 30, 0, 0);
             const key = t.toISOString().slice(0, 16);
@@ -565,20 +576,10 @@
         const counts = {};
         for (const d of days) counts[d] = 0;
 
-        const { data: daily } = await sb.from('daily_run_entries').select('created_at', { count: 'exact', head: false })
-            .gte('created_at', days[0] + 'T00:00:00Z').limit(10000);
-        const { data: practice } = await sb.from('practice_plate_stats').select('created_at')
-            .gte('created_at', days[0] + 'T00:00:00Z').limit(10000);
-        const { data: h2h } = await sb.from('h2h_run_entries').select('created_at')
-            .gte('created_at', days[0] + 'T00:00:00Z').limit(10000);
-        const { data: group } = await sb.from('group_daily_run_entries').select('created_at')
-            .gte('created_at', days[0] + 'T00:00:00Z').limit(10000);
-
-        for (const rows of [daily, practice, h2h, group]) {
-            for (const r of (rows || [])) {
-                const day = r.created_at?.slice(0, 10);
-                if (day && day in counts) counts[day]++;
-            }
+        const allTimestamps = await fetchAllEntryTimestamps(days[0] + 'T00:00:00Z');
+        for (const ts of allTimestamps) {
+            const day = ts.slice(0, 10);
+            if (day in counts) counts[day]++;
         }
 
         const maxCount = Math.max(...Object.values(counts), 1);
