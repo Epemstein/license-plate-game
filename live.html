@@ -22,7 +22,7 @@
         .tabs button { padding: 10px 24px; font-size: 14px; font-weight: 600; border: none; background: none; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
         .tabs button.active { color: #7c3aed; border-bottom-color: #7c3aed; }
         .tabs button:hover { color: #374151; }
-        .stats-bar { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stats-bar { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
         .stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 18px; min-width: 120px; }
         .stat-card .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
         .stat-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 2px; }
@@ -115,7 +115,7 @@
             <div class="stats-bar">
                 <div class="stat-card"><div class="label">Last hour</div><div class="value" id="statHour">0</div></div>
                 <div class="stat-card"><div class="label">Last 5 min</div><div class="value" id="statRecent">0</div></div>
-                <div style="display:flex;flex-direction:column;gap:3px;min-width:240px;">
+                <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
                     <div class="stat-card" style="padding:5px 14px;">
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span class="label" style="margin:0;">Today</span>
