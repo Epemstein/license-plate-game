@@ -31,19 +31,19 @@
         .filters button.active { background: #7c3aed; color: white; border-color: #7c3aed; }
         .filters button:hover { border-color: #7c3aed; }
         .feed { display: flex; flex-direction: column; gap: 4px; }
-        .entry { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #1e293b; border-radius: 10px; border: 1px solid #334155; animation: slideIn 0.3s ease-out; }
+        .entry { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid #334155; animation: slideIn 0.3s ease-out; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+        .entry-daily { background: #2a2517; border-color: #4a3f2a; }
+        .entry-practice { background: #1e293b; }
+        .entry-endless { background: #1e293b; }
+        .entry-h2h { background: #1e293b; }
+        .entry-group { background: #1e293b; }
         .entry .plate { font-family: monospace; font-size: 1.1rem; font-weight: 700; color: #f8fafc; min-width: 50px; }
-        .entry .word { font-size: 0.95rem; color: #a78bfa; font-weight: 600; min-width: 120px; }
+        .entry .word { font-size: 0.95rem; min-width: 120px; }
+        .entry .word .pl { color: #22c55e; font-weight: 700; }
+        .entry .word .nl { color: #94a3b8; }
         .entry .word.skipped { color: #f87171; font-style: italic; }
         .entry .time { font-size: 0.85rem; color: #64748b; font-variant-numeric: tabular-nums; min-width: 50px; text-align: right; }
-        .entry .mode { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; }
-        .mode-daily { background: #312e81; color: #a5b4fc; }
-        .mode-practice { background: #1e3a2f; color: #6ee7b7; }
-        .mode-h2h { background: #3b1a1a; color: #fca5a5; }
-        .mode-group { background: #1a2e3b; color: #7dd3fc; }
-        .mode-endless { background: #2d2305; color: #fde68a; }
-        .entry .user { font-size: 0.8rem; color: #64748b; flex: 1; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .entry .ago { font-size: 0.75rem; color: #475569; min-width: 60px; text-align: right; }
         .empty { text-align: center; padding: 60px 20px; color: #475569; }
     </style>
@@ -250,18 +250,31 @@
         renderFeed();
     }
 
+    function highlightWord(word, plate) {
+        const upper = word.toUpperCase();
+        const upperPlate = plate.toUpperCase();
+        let result = '';
+        let pi = 0;
+        for (let i = 0; i < word.length; i++) {
+            if (pi < upperPlate.length && upper[i] === upperPlate[pi]) {
+                result += `<span class="pl">${word[i]}</span>`;
+                pi++;
+            } else {
+                result += `<span class="nl">${word[i]}</span>`;
+            }
+        }
+        return result;
+    }
+
     function renderEntryHTML(e) {
         const wordHtml = e.skipped
             ? '<span class="word skipped">skipped</span>'
-            : `<span class="word">${esc(e.word || '?')}</span>`;
+            : `<span class="word">${highlightWord(e.word || '?', e.plate)}</span>`;
         const timeStr = e.time != null ? e.time.toFixed(1) + 's' : '--';
-        const user = e.userName ? esc(e.userName) : '<span style="color:#334155;">anon</span>';
-        return `<div class="entry">
-            <span class="mode mode-${e.mode}">${e.mode}</span>
+        return `<div class="entry entry-${e.mode}">
             <span class="plate">${esc(e.plate)}</span>
             ${wordHtml}
             <span class="time">${timeStr}</span>
-            <span class="user">${user}</span>
             <span class="ago">${ago(e.at)}</span>
         </div>`;
     }
