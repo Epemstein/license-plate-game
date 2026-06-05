@@ -362,8 +362,8 @@
 
     function timeColor(seconds) {
         if (seconds == null) return '#6b7280';
-        // Smooth gradient: 0s = green(22,163,74) → 15s = yellow(202,138,4) → 30s = red(220,38,38)
-        const t = Math.min(Math.max(seconds / 30, 0), 1);
+        // Smooth gradient: 0s = green(22,163,74) → 10s = yellow(202,138,4) → 20s+ = red(220,38,38)
+        const t = Math.min(Math.max(seconds / 20, 0), 1);
         let r, g, b;
         if (t < 0.5) {
             const f = t / 0.5;
