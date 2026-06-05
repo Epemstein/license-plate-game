@@ -135,34 +135,16 @@
         } catch { return null; }
     }
 
-    // Resolve user from a run_id by looking up the parent run table
-    async function resolveUserFromRun(runId, table) {
-        try {
-            const { data } = await sb.from(table).select('user_id').eq('id', runId).single();
-            if (data?.user_id) return resolveUser(data.user_id);
-        } catch {}
-        return null;
-    }
-
     async function loadRecent() {
         const since = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // last hour
 
-        const [daily, practice, h2h, group] = await Promise.all([
-            sb.from('daily_run_entries').select('plate, word, skipped, thinking_seconds, created_at, run_id').gte('created_at', since).order('created_at', { ascending: false }).limit(50),
-            sb.from('practice_plate_stats').select('plate, word, skipped, thinking_seconds, created_at, user_id, source').gte('created_at', since).order('created_at', { ascending: false }).limit(50),
-            sb.from('h2h_run_entries').select('plate, word, skipped, thinking_seconds, created_at, run_id').gte('created_at', since).order('created_at', { ascending: false }).limit(50),
-            sb.from('group_daily_run_entries').select('plate, word, skipped, thinking_seconds, created_at, run_id').gte('created_at', since).order('created_at', { ascending: false }).limit(50),
-        ]);
+        const { data } = await sb.from('live_plays')
+            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id')
+            .gte('created_at', since)
+            .order('created_at', { ascending: false })
+            .limit(MAX_ENTRIES);
 
-        const all = [
-            ...(daily.data || []).map(r => ({ ...r, mode: 'daily' })),
-            ...(practice.data || []).map(r => ({ ...r, mode: r.source === 'unlimited' ? 'endless' : 'practice' })),
-            ...(h2h.data || []).map(r => ({ ...r, mode: 'h2h' })),
-            ...(group.data || []).map(r => ({ ...r, mode: 'group' })),
-        ];
-        all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-        for (const e of all.slice(0, MAX_ENTRIES)) {
+        for (const e of (data || [])) {
             entries.push({
                 plate: e.plate,
                 word: e.word,
@@ -170,8 +152,7 @@
                 time: e.thinking_seconds,
                 mode: e.mode,
                 at: new Date(e.created_at),
-                userId: e.user_id || null,
-                runId: e.run_id || null,
+                userId: e.user_id,
                 userName: null
             });
         }
@@ -184,15 +165,8 @@
 
     async function resolveAllUserNames() {
         for (const e of entries) {
-            if (e.userName) continue;
-            if (e.userId) {
-                e.userName = await resolveUser(e.userId);
-            } else if (e.runId) {
-                const table = e.mode === 'daily' ? 'daily_runs' :
-                              e.mode === 'h2h' ? 'h2h_runs' :
-                              e.mode === 'group' ? 'group_daily_runs' : null;
-                if (table) e.userName = await resolveUserFromRun(e.runId, table);
-            }
+            if (e.userName || !e.userId) continue;
+            e.userName = await resolveUser(e.userId);
         }
         renderFeed();
     }
@@ -200,21 +174,8 @@
     function subscribe() {
         const channel = sb.channel('live-tracker');
 
-        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'daily_run_entries' }, (payload) => {
-            addEntry(payload.new, 'daily');
-        });
-
-        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'practice_plate_stats' }, (payload) => {
-            const mode = payload.new.source === 'unlimited' ? 'endless' : 'practice';
-            addEntry(payload.new, mode);
-        });
-
-        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'h2h_run_entries' }, (payload) => {
-            addEntry(payload.new, 'h2h');
-        });
-
-        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_daily_run_entries' }, (payload) => {
-            addEntry(payload.new, 'group');
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_plays' }, (payload) => {
+            addEntry(payload.new);
         });
 
         channel.subscribe((status) => {
@@ -230,27 +191,20 @@
         });
     }
 
-    async function addEntry(row, mode) {
+    async function addEntry(row) {
         const e = {
             plate: row.plate,
             word: row.word,
             skipped: row.skipped,
             time: row.thinking_seconds,
-            mode,
+            mode: row.mode,
             at: new Date(row.created_at || Date.now()),
             userId: row.user_id || null,
-            runId: row.run_id || null,
             userName: null
         };
 
-        // Resolve username
         if (e.userId) {
             e.userName = await resolveUser(e.userId);
-        } else if (e.runId) {
-            const table = mode === 'daily' ? 'daily_runs' :
-                          mode === 'h2h' ? 'h2h_runs' :
-                          mode === 'group' ? 'group_daily_runs' : null;
-            if (table) e.userName = await resolveUserFromRun(e.runId, table);
         }
 
         entries.unshift(e);

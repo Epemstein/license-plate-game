@@ -814,6 +814,21 @@
         }
     }
 
+    // Fire-and-forget live play for the realtime tracker
+    function emitLivePlay(plate, word, skipped, thinkingSeconds) {
+        if (!currentUser) return;
+        sb.from('live_plays').insert({
+            user_id: currentUser.id,
+            plate,
+            word: skipped ? null : (word || '').toLowerCase(),
+            skipped,
+            thinking_seconds: Math.floor(thinkingSeconds * 100) / 100,
+            mode: gameMode === 'endless' ? 'endless' : gameMode
+        }).then(({ error }) => {
+            if (error) console.warn('[Live]', error.message);
+        });
+    }
+
 
     const playerHistoryCache = {};
 
@@ -3032,6 +3047,7 @@
         gameHistory.push({
             plate, word, skipped: false, thinkingSeconds, penaltySeconds: 0
         });
+        emitLivePlay(plate, word, false, thinkingSeconds);
 
         if (gameMode === 'endless') {
             endlessTotalSeen++;
@@ -3099,6 +3115,7 @@
         gameHistory.push({
             plate, word: "skipped", skipped: true, thinkingSeconds, penaltySeconds: added
         });
+        emitLivePlay(plate, null, true, thinkingSeconds);
 
         if (gameMode === 'endless') {
             endlessTotalSeen++;
