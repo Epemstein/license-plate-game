@@ -246,7 +246,6 @@
 
     async function loadRecent() {
         const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-        const today = new Date().toISOString().slice(0, 10) + 'T00:00:00Z';
 
         // Fetch last hour for feed
         const feedRes = await sb.from('live_plays')
@@ -256,7 +255,7 @@
             .limit(MAX_ENTRIES);
 
         // Today counts from real entry tables (accurate, includes non-live users)
-        await loadTodayCounts(today);
+        await loadTodayCounts();
         const data = feedRes.data;
 
         for (const e of (data || [])) {
@@ -537,26 +536,16 @@
         if (needsRerender) renderRecords();
     }
 
-    async function loadTodayCounts(todayISO) {
-        const todayDate = todayISO.slice(0, 10);
-        const [daily, practiceAll, endless, h2h, group] = await Promise.all([
-            sb.from('daily_run_entries').select('id', { count: 'exact', head: true })
-                .select('run:daily_runs!inner(date)').eq('run.date', todayDate),
-            sb.from('practice_plate_stats').select('id', { count: 'exact', head: true })
-                .gte('created_at', todayISO).or('source.is.null,source.neq.unlimited'),
-            sb.from('practice_plate_stats').select('id', { count: 'exact', head: true })
-                .gte('created_at', todayISO).eq('source', 'unlimited'),
-            sb.from('h2h_run_entries').select('id', { count: 'exact', head: true })
-                .select('run:h2h_runs!inner(created_at)').gte('run.created_at', todayISO),
-            sb.from('group_daily_run_entries').select('id', { count: 'exact', head: true })
-                .select('run:group_daily_runs!inner(date)').eq('run.date', todayDate),
-        ]);
-        todaySplits.daily = daily.count || 0;
-        todaySplits.practice = practiceAll.count || 0;
-        todaySplits.endless = endless.count || 0;
-        todaySplits.h2h = h2h.count || 0;
-        todaySplits.group = group.count || 0;
-        todayCount = todaySplits.daily + todaySplits.practice + todaySplits.endless + todaySplits.h2h + todaySplits.group;
+    async function loadTodayCounts() {
+        const { data } = await sb.rpc('today_plate_counts');
+        if (data) {
+            todaySplits.daily = data.daily || 0;
+            todaySplits.practice = data.practice || 0;
+            todaySplits.endless = data.endless || 0;
+            todaySplits.h2h = data.h2h || 0;
+            todaySplits.group = data.group || 0;
+            todayCount = data.total || 0;
+        }
     }
 
     async function fetchAllEntryTimestamps(sinceDate) {
