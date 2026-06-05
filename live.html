@@ -489,11 +489,15 @@
 
     async function loadActivityChart() {
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { data } = await sb.from('live_plays')
-            .select('created_at')
-            .gte('created_at', since)
-            .order('created_at', { ascending: true })
-            .limit(5000);
+
+        // Fetch from all real entry tables in parallel
+        const [daily, practice, h2h, group] = await Promise.all([
+            sb.from('daily_run_entries').select('created_at').gte('created_at', since).limit(5000),
+            sb.from('practice_plate_stats').select('created_at').gte('created_at', since).limit(5000),
+            sb.from('h2h_run_entries').select('created_at').gte('created_at', since).limit(5000),
+            sb.from('group_daily_run_entries').select('created_at').gte('created_at', since).limit(5000),
+        ]);
+        const allRows = [...(daily.data||[]), ...(practice.data||[]), ...(h2h.data||[]), ...(group.data||[])];
 
         // Bucket into 30-min intervals
         const buckets = {};
@@ -504,9 +508,8 @@
             buckets[key] = 0;
         }
 
-        for (const row of (data || [])) {
+        for (const row of allRows) {
             const t = new Date(row.created_at);
-            // Round down to 30-min
             const mins = t.getMinutes();
             t.setMinutes(mins < 30 ? 0 : 30, 0, 0);
             const key = t.toISOString().slice(0, 16);
