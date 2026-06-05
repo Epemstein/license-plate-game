@@ -823,7 +823,7 @@
             word: skipped ? null : (word || '').toLowerCase(),
             skipped,
             thinking_seconds: Math.floor(thinkingSeconds * 100) / 100,
-            mode: gameMode === 'endless' ? 'endless' : gameMode
+            mode: gameMode === 'endless' ? 'endless' : gameMode === 'h2h_challenge' ? 'h2h' : gameMode
         }).then(({ error }) => {
             if (error) console.warn('[Live]', error.message);
         });
