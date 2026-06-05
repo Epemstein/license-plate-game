@@ -117,9 +117,19 @@
                     <div class="dot" id="statusDot"></div>
                     <span class="status-label" id="statusText">Connecting...</span>
                 </div>
-                <div class="stat-card"><div class="label">Today</div><div class="value" id="statToday">0</div></div>
                 <div class="stat-card"><div class="label">Last hour</div><div class="value" id="statHour">0</div></div>
                 <div class="stat-card"><div class="label">Last 5 min</div><div class="value" id="statRecent">0</div></div>
+                <div class="stat-card" style="min-width:auto;">
+                    <div class="label">Today</div>
+                    <div class="value" id="statToday">0</div>
+                    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+                        <span class="mode mode-daily" style="font-size:9px;padding:2px 6px;cursor:default;" id="splitDaily">0</span>
+                        <span class="mode mode-practice" style="font-size:9px;padding:2px 6px;cursor:default;" id="splitPractice">0</span>
+                        <span class="mode mode-endless" style="font-size:9px;padding:2px 6px;cursor:default;" id="splitEndless">0</span>
+                        <span class="mode mode-h2h" style="font-size:9px;padding:2px 6px;cursor:default;" id="splitH2h">0</span>
+                        <span class="mode mode-group" style="font-size:9px;padding:2px 6px;cursor:default;" id="splitGroup">0</span>
+                    </div>
+                </div>
             </div>
             <div class="tabs">
                 <button class="active" onclick="switchTab('feed',this)">Feed</button>
@@ -188,6 +198,7 @@
     let statsLoaded = false;
     let activityChart = null;
     let todayCount = 0; // actual full-day count from DB
+    let todaySplits = { daily: 0, practice: 0, endless: 0, h2h: 0, group: 0 };
 
     function doLogin() {
         const pw = document.getElementById('pw').value.trim();
@@ -237,19 +248,22 @@
         const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         const today = new Date().toISOString().slice(0, 10) + 'T00:00:00Z';
 
-        // Fetch last hour for feed + today count in parallel
-        const [feedRes, countRes] = await Promise.all([
+        // Fetch last hour for feed + today counts per mode in parallel
+        const modes = ['daily', 'practice', 'endless', 'h2h', 'group'];
+        const [feedRes, ...modeCounts] = await Promise.all([
             sb.from('live_plays')
                 .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id')
                 .gte('created_at', since)
                 .order('created_at', { ascending: false })
                 .limit(MAX_ENTRIES),
-            sb.from('live_plays')
-                .select('id', { count: 'exact', head: true })
-                .gte('created_at', today)
+            ...modes.map(m => sb.from('live_plays').select('id', { count: 'exact', head: true }).gte('created_at', today).eq('mode', m))
         ]);
 
-        todayCount = countRes.count || 0;
+        todayCount = 0;
+        modes.forEach((m, i) => {
+            todaySplits[m] = modeCounts[i].count || 0;
+            todayCount += todaySplits[m];
+        });
         const data = feedRes.data;
 
         for (const e of (data || [])) {
@@ -296,6 +310,7 @@
         entries.unshift(e);
         if (entries.length > MAX_ENTRIES) entries.pop();
         todayCount++;
+        if (e.mode in todaySplits) todaySplits[e.mode]++;
         updateStats(true);
 
         if (activeFilter === 'all' || activeFilter === e.mode) {
@@ -321,6 +336,12 @@
         const fiveMin = Date.now() - 5 * 60 * 1000;
         hourEl.textContent = entries.filter(e => e.at.getTime() > oneHour).length;
         recentEl.textContent = entries.filter(e => e.at.getTime() > fiveMin).length;
+        // Update mode splits
+        document.getElementById('splitDaily').textContent = todaySplits.daily;
+        document.getElementById('splitPractice').textContent = todaySplits.practice;
+        document.getElementById('splitEndless').textContent = todaySplits.endless;
+        document.getElementById('splitH2h').textContent = todaySplits.h2h;
+        document.getElementById('splitGroup').textContent = todaySplits.group;
         if (animate) { bumpEl(todayEl); bumpEl(hourEl); bumpEl(recentEl); }
     }
 
