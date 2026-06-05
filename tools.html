@@ -605,7 +605,7 @@
                     const pct = (item.count / total * 100).toFixed(1);
                     const wordHtml = item.isSkip
                         ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
-                        : `<span style="font-size:1rem;">${highlightPlate(item.word, plate)}</span>`;
+                        : `<span style="font-size:1rem;cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;" onclick="openWordDetail('${plate}','${item.word}')">${highlightPlate(item.word, plate)}</span>`;
                     html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
                     html += `<div style="flex:1;">${wordHtml}</div>`;
                     html += `<div style="width:70px;text-align:right;font-weight:600;color:#374151;">${item.count}</div>`;
@@ -618,6 +618,98 @@
                 content.innerHTML = '<p style="color:#dc2626;">Error: ' + e.message + '</p>';
             }
         }
+        async function openWordDetail(plate, word) {
+            const content = document.getElementById('plateUsedContent');
+            const titleEl = document.getElementById('plateUsedTitle');
+            titleEl.innerHTML = `<span style="cursor:pointer;color:#7c3aed;" onclick="openPlateUsed('${plate}')">&larr; ${plate}</span> &nbsp; ${highlightPlate(word, plate)}`;
+            content.innerHTML = '<p style="color:#6b7280;">Loading plays...</p>';
+
+            try {
+                // Fetch all plays of this word on this plate across all tables, with user info
+                const [dailyRes, practiceRes, h2hRes, groupRes] = await Promise.all([
+                    sb.from('daily_run_entries').select('thinking_seconds, run:daily_runs!inner(user_id, date, completed_at)').eq('plate', plate).eq('word', word),
+                    sb.from('practice_plate_stats').select('thinking_seconds, user_id, created_at, source').eq('plate', plate).eq('word', word),
+                    sb.from('h2h_run_entries').select('thinking_seconds, run:h2h_runs!inner(user_id, created_at)').eq('plate', plate).eq('word', word),
+                    sb.from('group_daily_run_entries').select('thinking_seconds, run:group_daily_runs!inner(user_id, date, completed_at)').eq('plate', plate).eq('word', word),
+                ]);
+
+                let plays = [];
+                for (const r of (dailyRes.data || [])) {
+                    plays.push({ userId: r.run?.user_id, time: r.thinking_seconds, mode: 'daily', at: r.run?.completed_at || r.run?.date });
+                }
+                for (const r of (practiceRes.data || [])) {
+                    plays.push({ userId: r.user_id, time: r.thinking_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', at: r.created_at });
+                }
+                for (const r of (h2hRes.data || [])) {
+                    plays.push({ userId: r.run?.user_id, time: r.thinking_seconds, mode: 'h2h', at: r.run?.created_at });
+                }
+                for (const r of (groupRes.data || [])) {
+                    plays.push({ userId: r.run?.user_id, time: r.thinking_seconds, mode: 'group', at: r.run?.completed_at || r.run?.date });
+                }
+
+                // Sort newest first
+                plays.sort((a, b) => new Date(b.at) - new Date(a.at));
+
+                // Resolve usernames
+                const userIds = [...new Set(plays.map(p => p.userId).filter(Boolean))];
+                const nameMap = {};
+                if (userIds.length > 0) {
+                    const { data: profiles } = await sb.from('profiles').select('id, display_name, handle').in('id', userIds);
+                    for (const p of (profiles || [])) {
+                        nameMap[p.id] = p.display_name || (p.handle ? '@' + p.handle : p.id.slice(0, 8));
+                    }
+                }
+
+                if (plays.length === 0) {
+                    content.innerHTML = '<p style="color:#6b7280;">No plays found.</p>';
+                    return;
+                }
+
+                let html = '<div style="display:flex;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:0.8rem;color:#9ca3af;font-weight:600;">';
+                html += '<div style="flex:1;">Player</div>';
+                html += '<div style="width:70px;text-align:right;">Time</div>';
+                html += '<div style="width:70px;text-align:center;">Mode</div>';
+                html += '<div style="width:90px;text-align:right;">When</div>';
+                html += '</div>';
+
+                const modeColors = {
+                    daily: 'background:#fef3c7;color:#92400e;',
+                    practice: 'background:#ede9fe;color:#6d28d9;',
+                    endless: 'background:#d1fae5;color:#047857;',
+                    h2h: 'background:#1f2937;color:#f9fafb;',
+                    group: 'background:#dbeafe;color:#1e40af;'
+                };
+
+                plays.forEach(p => {
+                    const name = nameMap[p.userId] || 'anon';
+                    const timeStr = p.time != null ? p.time.toFixed(1) + 's' : '--';
+                    const modeStyle = modeColors[p.mode] || '';
+                    const when = p.at ? formatWhen(p.at) : '--';
+                    html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
+                    html += `<div style="flex:1;font-weight:500;">${name}</div>`;
+                    html += `<div style="width:70px;text-align:right;font-variant-numeric:tabular-nums;">${timeStr}</div>`;
+                    html += `<div style="width:70px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;text-transform:uppercase;${modeStyle}">${p.mode}</span></div>`;
+                    html += `<div style="width:90px;text-align:right;font-size:0.8rem;color:#6b7280;">${when}</div>`;
+                    html += `</div>`;
+                });
+
+                content.innerHTML = html;
+            } catch (e) {
+                content.innerHTML = '<p style="color:#dc2626;">Error: ' + e.message + '</p>';
+            }
+        }
+
+        function formatWhen(dateStr) {
+            const d = new Date(dateStr);
+            if (isNaN(d)) return dateStr.slice(0, 10);
+            const now = new Date();
+            const diff = (now - d) / 86400000;
+            if (diff < 1) return 'Today';
+            if (diff < 2) return 'Yesterday';
+            const m = d.toLocaleString('default', { month: 'short' });
+            return `${m} ${d.getDate()}`;
+        }
+
     </script>
 <!-- Plate Used Modal -->
 <div id="plateUsedBackdrop" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target.id==='plateUsedBackdrop')closePlateUsed()">
