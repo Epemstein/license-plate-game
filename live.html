@@ -116,6 +116,7 @@
                     <span class="status-label" id="statusText">Connecting...</span>
                 </div>
                 <div class="stat-card"><div class="label">Today</div><div class="value" id="statToday">0</div></div>
+                <div class="stat-card"><div class="label">Last hour</div><div class="value" id="statHour">0</div></div>
                 <div class="stat-card"><div class="label">Last 5 min</div><div class="value" id="statRecent">0</div></div>
             </div>
             <div class="tabs">
@@ -184,6 +185,7 @@
     let activeTab = 'feed';
     let statsLoaded = false;
     let activityChart = null;
+    let todayCount = 0; // actual full-day count from DB
 
     function doLogin() {
         const pw = document.getElementById('pw').value.trim();
@@ -231,11 +233,22 @@
 
     async function loadRecent() {
         const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-        const { data } = await sb.from('live_plays')
-            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id')
-            .gte('created_at', since)
-            .order('created_at', { ascending: false })
-            .limit(MAX_ENTRIES);
+        const today = new Date().toISOString().slice(0, 10) + 'T00:00:00Z';
+
+        // Fetch last hour for feed + today count in parallel
+        const [feedRes, countRes] = await Promise.all([
+            sb.from('live_plays')
+                .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id')
+                .gte('created_at', since)
+                .order('created_at', { ascending: false })
+                .limit(MAX_ENTRIES),
+            sb.from('live_plays')
+                .select('id', { count: 'exact', head: true })
+                .gte('created_at', today)
+        ]);
+
+        todayCount = countRes.count || 0;
+        const data = feedRes.data;
 
         for (const e of (data || [])) {
             entries.push({
@@ -280,6 +293,7 @@
 
         entries.unshift(e);
         if (entries.length > MAX_ENTRIES) entries.pop();
+        todayCount++;
         updateStats(true);
 
         if (activeFilter === 'all' || activeFilter === e.mode) {
@@ -298,11 +312,14 @@
 
     function updateStats(animate) {
         const todayEl = document.getElementById('statToday');
+        const hourEl = document.getElementById('statHour');
         const recentEl = document.getElementById('statRecent');
-        todayEl.textContent = entries.length;
+        todayEl.textContent = todayCount;
+        const oneHour = Date.now() - 60 * 60 * 1000;
         const fiveMin = Date.now() - 5 * 60 * 1000;
+        hourEl.textContent = entries.filter(e => e.at.getTime() > oneHour).length;
         recentEl.textContent = entries.filter(e => e.at.getTime() > fiveMin).length;
-        if (animate) { bumpEl(todayEl); bumpEl(recentEl); }
+        if (animate) { bumpEl(todayEl); bumpEl(hourEl); bumpEl(recentEl); }
     }
 
     function bumpEl(el) {
@@ -312,7 +329,9 @@
     }
 
     function updateRecentStat() {
+        const oneHour = Date.now() - 60 * 60 * 1000;
         const fiveMin = Date.now() - 5 * 60 * 1000;
+        document.getElementById('statHour').textContent = entries.filter(e => e.at.getTime() > oneHour).length;
         document.getElementById('statRecent').textContent = entries.filter(e => e.at.getTime() > fiveMin).length;
     }
 
