@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Tracker</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; }
@@ -17,14 +18,21 @@
         .container { max-width: 900px; margin: 0 auto; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .header h1 { font-size: 1.3rem; }
-        .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b7280; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .dot.off { background: #ef4444; animation: none; }
+        .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
+        .tabs button { padding: 10px 24px; font-size: 14px; font-weight: 600; border: none; background: none; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tabs button.active { color: #7c3aed; border-bottom-color: #7c3aed; }
+        .tabs button:hover { color: #374151; }
         .stats-bar { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 18px; min-width: 120px; }
         .stat-card .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
         .stat-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 2px; }
+        .status-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
+        .status-card .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; flex-shrink: 0; }
+        .status-card .dot.off { background: #ef4444; animation: none; }
+        .status-card .status-label { font-size: 0.85rem; font-weight: 600; color: #374151; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .dot.off { background: #ef4444; animation: none; }
         .filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
         .filters button { padding: 6px 14px; border-radius: 20px; font-size: 12px; border: 1px solid #ddd; background: #fff; color: #6b7280; cursor: pointer; }
         .filters button.active { background: #7c3aed; color: white; border-color: #7c3aed; }
@@ -59,12 +67,31 @@
         .feed-header .h-time { width: 60px; text-align: right; }
         .feed-header .h-mode { width: 70px; text-align: center; }
         .feed-header .h-ago { width: 50px; text-align: right; }
-        .status-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
-        .status-card .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; flex-shrink: 0; }
-        .status-card .dot.off { background: #ef4444; animation: none; }
-        .status-card .status-label { font-size: 0.85rem; font-weight: 600; color: #374151; }
         .bump { display: inline-block; animation: bumpUp 0.5s ease-out; }
         @keyframes bumpUp { 0% { transform: translateY(0); } 30% { transform: translateY(-6px); color: #16a34a; } 100% { transform: translateY(0); } }
+        /* Stats tab */
+        .stats-panel { display: none; }
+        .stats-panel.active { display: block; }
+        .feed-panel { display: none; }
+        .feed-panel.active { display: block; }
+        .chart-container { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .chart-container h3 { font-size: 0.95rem; color: #374151; margin-bottom: 12px; }
+        .records-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        .record-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px 20px; }
+        .record-card h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+        .record-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+        .record-item:last-child { border-bottom: none; }
+        .record-word { font-weight: 700; font-size: 1rem; }
+        .record-word .pl { color: #16a34a; font-weight: 700; }
+        .record-word .nl { color: #111; }
+        .record-meta { text-align: right; font-size: 0.8rem; color: #6b7280; }
+        .record-meta .val { font-size: 1rem; font-weight: 700; color: #111; display: block; }
+        .record-plate { font-family: monospace; font-weight: 700; color: #6b7280; font-size: 0.8rem; }
+        .record-user { font-size: 0.75rem; color: #9ca3af; }
+        .peak-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
+        .peak-cell { text-align: center; padding: 6px 2px; border-radius: 6px; font-size: 11px; }
+        .peak-cell .day { font-weight: 600; color: #6b7280; }
+        .peak-cell .count { font-weight: 700; font-size: 1rem; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -91,24 +118,54 @@
                 <div class="stat-card"><div class="label">Today</div><div class="value" id="statToday">0</div></div>
                 <div class="stat-card"><div class="label">Last 5 min</div><div class="value" id="statRecent">0</div></div>
             </div>
-            <div class="filters">
-                <button class="active" data-mode="all" onclick="setFilter('all',this)">All</button>
-                <button data-mode="daily" onclick="setFilter('daily',this)">Daily</button>
-                <button data-mode="practice" onclick="setFilter('practice',this)">Practice</button>
-                <button data-mode="endless" onclick="setFilter('endless',this)">Endless</button>
-                <button data-mode="h2h" onclick="setFilter('h2h',this)">H2H</button>
-                <button data-mode="group" onclick="setFilter('group',this)">Group</button>
+            <div class="tabs">
+                <button class="active" onclick="switchTab('feed',this)">Feed</button>
+                <button onclick="switchTab('stats',this)">Stats</button>
             </div>
-            <div class="feed-header">
-                <span class="h-user">Player</span>
-                <span class="h-plate">Plate</span>
-                <span class="h-word">Word</span>
-                <span class="h-time">Time</span>
-                <span class="h-mode">Mode</span>
-                <span class="h-ago"></span>
+
+            <!-- Feed Tab -->
+            <div class="feed-panel active" id="feedPanel">
+                <div class="filters">
+                    <button class="active" data-mode="all" onclick="setFilter('all',this)">All</button>
+                    <button data-mode="daily" onclick="setFilter('daily',this)">Daily</button>
+                    <button data-mode="practice" onclick="setFilter('practice',this)">Practice</button>
+                    <button data-mode="endless" onclick="setFilter('endless',this)">Endless</button>
+                    <button data-mode="h2h" onclick="setFilter('h2h',this)">H2H</button>
+                    <button data-mode="group" onclick="setFilter('group',this)">Group</button>
+                </div>
+                <div class="feed-header">
+                    <span class="h-user">Player</span>
+                    <span class="h-plate">Plate</span>
+                    <span class="h-word">Word</span>
+                    <span class="h-time">Time</span>
+                    <span class="h-mode">Mode</span>
+                    <span class="h-ago"></span>
+                </div>
+                <div class="feed" id="feed">
+                    <div class="empty">Waiting for plays...</div>
+                </div>
             </div>
-            <div class="feed" id="feed">
-                <div class="empty">Waiting for plays...</div>
+
+            <!-- Stats Tab -->
+            <div class="stats-panel" id="statsPanel">
+                <div class="records-grid">
+                    <div class="record-card">
+                        <h3>Longest Words (Today)</h3>
+                        <div id="longestWords"><div class="empty" style="padding:20px;">Loading...</div></div>
+                    </div>
+                    <div class="record-card">
+                        <h3>Fastest Solves (Today)</h3>
+                        <div id="fastestSolves"><div class="empty" style="padding:20px;">Loading...</div></div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <h3>Activity — Last 24 Hours</h3>
+                    <canvas id="activityChart" height="80"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Plays Per Day — Last 7 Days</h3>
+                    <div class="peak-grid" id="weekGrid"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -124,7 +181,9 @@
     let entries = [];
     let profileCache = {};
     let activeFilter = 'all';
-    let sessionStats = { total: 0, skips: 0, times: [] };
+    let activeTab = 'feed';
+    let statsLoaded = false;
+    let activityChart = null;
 
     function doLogin() {
         const pw = document.getElementById('pw').value.trim();
@@ -138,14 +197,24 @@
         }
     }
 
+    // --- Tabs ---
+    function switchTab(tab, btn) {
+        activeTab = tab;
+        document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('feedPanel').className = tab === 'feed' ? 'feed-panel active' : 'feed-panel';
+        document.getElementById('statsPanel').className = tab === 'stats' ? 'stats-panel active' : 'stats-panel';
+        if (tab === 'stats' && !statsLoaded) {
+            loadStats();
+            statsLoaded = true;
+        }
+    }
+
+    // --- Init ---
     async function init() {
-        // Load recent entries to seed the feed
         await loadRecent();
-        // Subscribe to realtime inserts
         subscribe();
-        // Update "ago" times every 30s
         setInterval(updateAgos, 30000);
-        // Update "last 5 min" stat every 30s
         setInterval(updateRecentStat, 30000);
     }
 
@@ -161,8 +230,7 @@
     }
 
     async function loadRecent() {
-        const since = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // last hour
-
+        const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         const { data } = await sb.from('live_plays')
             .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id')
             .gte('created_at', since)
@@ -171,18 +239,11 @@
 
         for (const e of (data || [])) {
             entries.push({
-                plate: e.plate,
-                word: e.word,
-                skipped: e.skipped,
-                time: e.thinking_seconds,
-                mode: e.mode,
-                at: new Date(e.created_at),
-                userId: e.user_id,
-                userName: null
+                plate: e.plate, word: e.word, skipped: e.skipped,
+                time: e.thinking_seconds, mode: e.mode,
+                at: new Date(e.created_at), userId: e.user_id, userName: null
             });
         }
-
-        // Resolve usernames in background
         resolveAllUserNames();
         updateStats();
         renderFeed();
@@ -198,56 +259,40 @@
 
     function subscribe() {
         const channel = sb.channel('live-tracker');
-
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_plays' }, (payload) => {
             addEntry(payload.new);
         });
-
         channel.subscribe((status) => {
             const dot = document.getElementById('statusDot');
             const text = document.getElementById('statusText');
-            if (status === 'SUBSCRIBED') {
-                dot.className = 'dot';
-                text.textContent = 'Live';
-            } else {
-                dot.className = 'dot off';
-                text.textContent = status;
-            }
+            if (status === 'SUBSCRIBED') { dot.className = 'dot'; text.textContent = 'Live'; }
+            else { dot.className = 'dot off'; text.textContent = status; }
         });
     }
 
     async function addEntry(row) {
         const e = {
-            plate: row.plate,
-            word: row.word,
-            skipped: row.skipped,
-            time: row.thinking_seconds,
-            mode: row.mode,
-            at: new Date(row.created_at || Date.now()),
-            userId: row.user_id || null,
-            userName: null
+            plate: row.plate, word: row.word, skipped: row.skipped,
+            time: row.thinking_seconds, mode: row.mode,
+            at: new Date(row.created_at || Date.now()), userId: row.user_id || null, userName: null
         };
-
-        if (e.userId) {
-            e.userName = await resolveUser(e.userId);
-        }
+        if (e.userId) e.userName = await resolveUser(e.userId);
 
         entries.unshift(e);
         if (entries.length > MAX_ENTRIES) entries.pop();
-        sessionStats.total++;
-        if (e.skipped) sessionStats.skips++;
-        if (e.time != null) sessionStats.times.push(e.time);
         updateStats(true);
 
-        // Prepend new entry to DOM instead of re-rendering everything
         if (activeFilter === 'all' || activeFilter === e.mode) {
             const feed = document.getElementById('feed');
             const empty = feed.querySelector('.empty');
             if (empty) empty.remove();
-            const html = renderEntryHTML(e);
-            feed.insertAdjacentHTML('afterbegin', html);
-            // Trim excess DOM entries
+            feed.insertAdjacentHTML('afterbegin', renderEntryHTML(e));
             while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+        }
+
+        // Update stats tab live records if visible
+        if (activeTab === 'stats' && !e.skipped && e.word) {
+            updateLiveRecords(e);
         }
     }
 
@@ -257,15 +302,12 @@
         todayEl.textContent = entries.length;
         const fiveMin = Date.now() - 5 * 60 * 1000;
         recentEl.textContent = entries.filter(e => e.at.getTime() > fiveMin).length;
-        if (animate) {
-            bumpEl(todayEl);
-            bumpEl(recentEl);
-        }
+        if (animate) { bumpEl(todayEl); bumpEl(recentEl); }
     }
 
     function bumpEl(el) {
         el.classList.remove('bump');
-        void el.offsetWidth; // force reflow to restart animation
+        void el.offsetWidth;
         el.classList.add('bump');
     }
 
@@ -316,22 +358,226 @@
     function renderFeed() {
         const feed = document.getElementById('feed');
         const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.mode === activeFilter);
-
-        if (filtered.length === 0) {
-            feed.innerHTML = '<div class="empty">Waiting for plays...</div>';
-            return;
-        }
-
+        if (filtered.length === 0) { feed.innerHTML = '<div class="empty">Waiting for plays...</div>'; return; }
         feed.innerHTML = filtered.slice(0, 100).map(e => renderEntryHTML(e)).join('');
     }
 
     function updateAgos() {
         const agoEls = document.querySelectorAll('.entry .ago');
         const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.mode === activeFilter);
-        agoEls.forEach((el, i) => {
-            if (filtered[i]) el.textContent = ago(filtered[i].at);
+        agoEls.forEach((el, i) => { if (filtered[i]) el.textContent = ago(filtered[i].at); });
+    }
+
+    // ==================== STATS TAB ====================
+
+    let todayLongest = [];
+    let todayFastest = [];
+
+    async function loadStats() {
+        const today = new Date().toISOString().slice(0, 10);
+        const dayStart = today + 'T00:00:00Z';
+
+        // Fetch today's plays for records
+        const { data: todayPlays } = await sb.from('live_plays')
+            .select('plate, word, skipped, thinking_seconds, user_id, created_at')
+            .gte('created_at', dayStart)
+            .eq('skipped', false)
+            .order('created_at', { ascending: false })
+            .limit(2000);
+
+        if (todayPlays) {
+            // Longest words
+            todayLongest = todayPlays
+                .filter(p => p.word)
+                .sort((a, b) => b.word.length - a.word.length)
+                .slice(0, 10);
+
+            // Fastest solves (min 4 char word)
+            todayFastest = todayPlays
+                .filter(p => p.word && p.word.length >= 4 && p.thinking_seconds != null && p.thinking_seconds > 0)
+                .sort((a, b) => a.thinking_seconds - b.thinking_seconds)
+                .slice(0, 10);
+        }
+
+        await renderRecords();
+        await loadActivityChart();
+        await loadWeekGrid();
+    }
+
+    async function renderRecords() {
+        // Longest words
+        const longestEl = document.getElementById('longestWords');
+        if (todayLongest.length === 0) {
+            longestEl.innerHTML = '<div style="color:#9ca3af;padding:12px;">No plays today yet</div>';
+        } else {
+            let html = '';
+            for (const p of todayLongest) {
+                const name = await resolveUser(p.user_id) || 'anon';
+                html += `<div class="record-item">
+                    <div>
+                        <span class="record-word">${highlightWord(p.word, p.plate)}</span>
+                        <span class="record-plate">${p.plate}</span>
+                    </div>
+                    <div class="record-meta">
+                        <span class="val">${p.word.length} letters</span>
+                        <span class="record-user">${esc(name)}</span>
+                    </div>
+                </div>`;
+            }
+            longestEl.innerHTML = html;
+        }
+
+        // Fastest solves
+        const fastestEl = document.getElementById('fastestSolves');
+        if (todayFastest.length === 0) {
+            fastestEl.innerHTML = '<div style="color:#9ca3af;padding:12px;">No plays today yet</div>';
+        } else {
+            let html = '';
+            for (const p of todayFastest) {
+                const name = await resolveUser(p.user_id) || 'anon';
+                html += `<div class="record-item">
+                    <div>
+                        <span class="record-word">${highlightWord(p.word, p.plate)}</span>
+                        <span class="record-plate">${p.plate}</span>
+                    </div>
+                    <div class="record-meta">
+                        <span class="val">${p.thinking_seconds.toFixed(2)}s</span>
+                        <span class="record-user">${esc(name)}</span>
+                    </div>
+                </div>`;
+            }
+            fastestEl.innerHTML = html;
+        }
+    }
+
+    function updateLiveRecords(e) {
+        // Check if this entry belongs in longest or fastest
+        let needsRerender = false;
+        if (e.word && (todayLongest.length < 10 || e.word.length > todayLongest[todayLongest.length - 1]?.word?.length)) {
+            todayLongest.push({ plate: e.plate, word: e.word, thinking_seconds: e.time, user_id: e.userId });
+            todayLongest.sort((a, b) => b.word.length - a.word.length);
+            todayLongest = todayLongest.slice(0, 10);
+            needsRerender = true;
+        }
+        if (e.word && e.word.length >= 4 && e.time > 0 && (todayFastest.length < 10 || e.time < todayFastest[todayFastest.length - 1]?.thinking_seconds)) {
+            todayFastest.push({ plate: e.plate, word: e.word, thinking_seconds: e.time, user_id: e.userId });
+            todayFastest.sort((a, b) => a.thinking_seconds - b.thinking_seconds);
+            todayFastest = todayFastest.slice(0, 10);
+            needsRerender = true;
+        }
+        if (needsRerender) renderRecords();
+    }
+
+    async function loadActivityChart() {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data } = await sb.from('live_plays')
+            .select('created_at')
+            .gte('created_at', since)
+            .order('created_at', { ascending: true })
+            .limit(5000);
+
+        // Bucket into 30-min intervals
+        const buckets = {};
+        const now = Date.now();
+        for (let i = 0; i < 48; i++) {
+            const t = now - (47 - i) * 30 * 60 * 1000;
+            const key = new Date(t).toISOString().slice(0, 16);
+            buckets[key] = 0;
+        }
+
+        for (const row of (data || [])) {
+            const t = new Date(row.created_at);
+            // Round down to 30-min
+            const mins = t.getMinutes();
+            t.setMinutes(mins < 30 ? 0 : 30, 0, 0);
+            const key = t.toISOString().slice(0, 16);
+            if (key in buckets) buckets[key]++;
+        }
+
+        const labels = Object.keys(buckets).map(k => {
+            const d = new Date(k + ':00Z');
+            return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        });
+        const values = Object.values(buckets);
+
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        if (activityChart) activityChart.destroy();
+        activityChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: '#a78bfa',
+                    borderRadius: 4,
+                    barPercentage: 0.8,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: {
+                        ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, font: { size: 10 }, color: '#9ca3af' },
+                        grid: { color: '#f3f4f6' }
+                    }
+                }
+            }
         });
     }
+
+    async function loadWeekGrid() {
+        const grid = document.getElementById('weekGrid');
+        const days = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 86400000);
+            days.push(d.toISOString().slice(0, 10));
+        }
+
+        // Count plays per day from all entry tables
+        const counts = {};
+        for (const d of days) counts[d] = 0;
+
+        const { data: daily } = await sb.from('daily_run_entries').select('created_at', { count: 'exact', head: false })
+            .gte('created_at', days[0] + 'T00:00:00Z').limit(10000);
+        const { data: practice } = await sb.from('practice_plate_stats').select('created_at')
+            .gte('created_at', days[0] + 'T00:00:00Z').limit(10000);
+        const { data: h2h } = await sb.from('h2h_run_entries').select('created_at')
+            .gte('created_at', days[0] + 'T00:00:00Z').limit(10000);
+        const { data: group } = await sb.from('group_daily_run_entries').select('created_at')
+            .gte('created_at', days[0] + 'T00:00:00Z').limit(10000);
+
+        for (const rows of [daily, practice, h2h, group]) {
+            for (const r of (rows || [])) {
+                const day = r.created_at?.slice(0, 10);
+                if (day && day in counts) counts[day]++;
+            }
+        }
+
+        const maxCount = Math.max(...Object.values(counts), 1);
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        let html = '';
+        for (const d of days) {
+            const dt = new Date(d + 'T12:00:00');
+            const dayName = dayNames[dt.getDay()];
+            const count = counts[d];
+            const intensity = count / maxCount;
+            const bg = `rgba(124, 58, 237, ${0.08 + intensity * 0.35})`;
+            html += `<div class="peak-cell" style="background:${bg};">
+                <div class="day">${dayName}</div>
+                <div class="count">${count}</div>
+            </div>`;
+        }
+        grid.innerHTML = html;
+    }
+
+    // ==================== UTILITY ====================
 
     function ago(date) {
         const s = (Date.now() - date.getTime()) / 1000;
