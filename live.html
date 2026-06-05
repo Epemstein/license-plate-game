@@ -133,6 +133,7 @@
             </div>
             <div class="tabs">
                 <button class="active" onclick="switchTab('feed',this)">Feed</button>
+                <button onclick="switchTab('runs',this)">Runs</button>
                 <button onclick="switchTab('stats',this)">Stats</button>
             </div>
 
@@ -156,6 +157,19 @@
                 </div>
                 <div class="feed" id="feed">
                     <div class="empty">Waiting for plays...</div>
+                </div>
+            </div>
+
+            <!-- Runs Tab -->
+            <div class="feed-panel" id="runsPanel">
+                <div class="feed-header">
+                    <span class="h-user">Player</span>
+                    <span class="h-time" style="flex:1.5;min-width:80px;text-align:left;">Total Time</span>
+                    <span class="h-mode">Mode</span>
+                    <span class="h-ago"></span>
+                </div>
+                <div class="feed" id="runsFeed">
+                    <div class="empty">Waiting for completed runs...</div>
                 </div>
             </div>
 
@@ -213,16 +227,17 @@
     }
 
     // --- Tabs ---
+    let runsLoaded = false;
+
     function switchTab(tab, btn) {
         activeTab = tab;
         document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('feedPanel').className = tab === 'feed' ? 'feed-panel active' : 'feed-panel';
+        document.getElementById('runsPanel').className = tab === 'runs' ? 'feed-panel active' : 'feed-panel';
         document.getElementById('statsPanel').className = tab === 'stats' ? 'stats-panel active' : 'stats-panel';
-        if (tab === 'stats' && !statsLoaded) {
-            loadStats();
-            statsLoaded = true;
-        }
+        if (tab === 'stats' && !statsLoaded) { loadStats(); statsLoaded = true; }
+        if (tab === 'runs' && !runsLoaded) { loadRecentRuns(); runsLoaded = true; }
     }
 
     // --- Init ---
@@ -283,11 +298,99 @@
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_plays' }, (payload) => {
             addEntry(payload.new);
         });
+        // Watch for completed runs (UPDATE with total_seconds set)
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_runs' }, (payload) => {
+            if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
+                addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'daily', at: new Date(payload.new.completed_at || Date.now()) });
+            }
+        });
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'h2h_runs' }, (payload) => {
+            if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
+                addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'h2h', at: new Date() });
+            }
+        });
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_daily_runs' }, (payload) => {
+            if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
+                addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'group', at: new Date(payload.new.completed_at || Date.now()) });
+            }
+        });
         channel.subscribe((status) => {
             const dot = document.getElementById('statusDot');
             if (status === 'SUBSCRIBED') { dot.className = 'dot'; }
             else { dot.className = 'dot off'; }
         });
+    }
+
+    // ==================== RUNS TAB ====================
+
+    let runs = [];
+
+    async function loadRecentRuns() {
+        const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const today = new Date().toISOString().slice(0, 10);
+
+        const [daily, h2h, group] = await Promise.all([
+            sb.from('daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
+            sb.from('h2h_runs').select('user_id, total_seconds, created_at').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(50),
+            sb.from('group_daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
+        ]);
+
+        const all = [
+            ...(daily.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'daily', at: new Date(r.completed_at) })),
+            ...(h2h.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'h2h', at: new Date(r.created_at) })),
+            ...(group.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'group', at: new Date(r.completed_at) })),
+        ];
+        all.sort((a, b) => b.at - a.at);
+
+        for (const r of all) {
+            r.userName = null;
+            runs.push(r);
+        }
+        resolveRunUserNames();
+        renderRuns();
+    }
+
+    async function resolveRunUserNames() {
+        for (const r of runs) {
+            if (r.userName || !r.userId) continue;
+            r.userName = await resolveUser(r.userId);
+        }
+        renderRuns();
+    }
+
+    async function addRun(r) {
+        r.userName = r.userId ? await resolveUser(r.userId) : null;
+        runs.unshift(r);
+        if (runs.length > 100) runs.pop();
+
+        if (activeTab === 'runs') {
+            const feed = document.getElementById('runsFeed');
+            const empty = feed.querySelector('.empty');
+            if (empty) empty.remove();
+            feed.insertAdjacentHTML('afterbegin', renderRunHTML(r));
+            while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+        }
+    }
+
+    function renderRunHTML(r) {
+        const user = r.userName ? esc(r.userName) : '<span style="color:#d1d5db;">anon</span>';
+        const barColor = timeColor(r.time);
+        const barW = timeBarWidth(r.time);
+        return `<div class="entry entry-${r.mode}">
+            <span class="user">${user}</span>
+            <span class="time-col">
+                <span class="time-val" style="color:${barColor}">${r.time.toFixed(2)}s</span>
+                <span class="time-bar" style="width:${barW}%;background:${barColor};"></span>
+            </span>
+            <span class="mode mode-${r.mode}">${r.mode}</span>
+            <span class="ago">${ago(r.at)}</span>
+        </div>`;
+    }
+
+    function renderRuns() {
+        const feed = document.getElementById('runsFeed');
+        if (runs.length === 0) { feed.innerHTML = '<div class="empty">Waiting for completed runs...</div>'; return; }
+        feed.innerHTML = runs.slice(0, 100).map(r => renderRunHTML(r)).join('');
     }
 
     async function addEntry(row) {
