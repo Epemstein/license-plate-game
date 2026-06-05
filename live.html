@@ -248,22 +248,15 @@
         const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         const today = new Date().toISOString().slice(0, 10) + 'T00:00:00Z';
 
-        // Fetch last hour for feed + today counts per mode in parallel
-        const modes = ['daily', 'practice', 'endless', 'h2h', 'group'];
-        const [feedRes, ...modeCounts] = await Promise.all([
-            sb.from('live_plays')
-                .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id')
-                .gte('created_at', since)
-                .order('created_at', { ascending: false })
-                .limit(MAX_ENTRIES),
-            ...modes.map(m => sb.from('live_plays').select('id', { count: 'exact', head: true }).gte('created_at', today).eq('mode', m))
-        ]);
+        // Fetch last hour for feed
+        const feedRes = await sb.from('live_plays')
+            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id')
+            .gte('created_at', since)
+            .order('created_at', { ascending: false })
+            .limit(MAX_ENTRIES);
 
-        todayCount = 0;
-        modes.forEach((m, i) => {
-            todaySplits[m] = modeCounts[i].count || 0;
-            todayCount += todaySplits[m];
-        });
+        // Today counts from real entry tables (accurate, includes non-live users)
+        await loadTodayCounts(today);
         const data = feedRes.data;
 
         for (const e of (data || [])) {
@@ -542,6 +535,28 @@
             needsRerender = true;
         }
         if (needsRerender) renderRecords();
+    }
+
+    async function loadTodayCounts(todayISO) {
+        const todayDate = todayISO.slice(0, 10);
+        const [daily, practiceAll, endless, h2h, group] = await Promise.all([
+            sb.from('daily_run_entries').select('id', { count: 'exact', head: true })
+                .select('run:daily_runs!inner(date)').eq('run.date', todayDate),
+            sb.from('practice_plate_stats').select('id', { count: 'exact', head: true })
+                .gte('created_at', todayISO).or('source.is.null,source.neq.unlimited'),
+            sb.from('practice_plate_stats').select('id', { count: 'exact', head: true })
+                .gte('created_at', todayISO).eq('source', 'unlimited'),
+            sb.from('h2h_run_entries').select('id', { count: 'exact', head: true })
+                .select('run:h2h_runs!inner(created_at)').gte('run.created_at', todayISO),
+            sb.from('group_daily_run_entries').select('id', { count: 'exact', head: true })
+                .select('run:group_daily_runs!inner(date)').eq('run.date', todayDate),
+        ]);
+        todaySplits.daily = daily.count || 0;
+        todaySplits.practice = practiceAll.count || 0;
+        todaySplits.endless = endless.count || 0;
+        todaySplits.h2h = h2h.count || 0;
+        todaySplits.group = group.count || 0;
+        todayCount = todaySplits.daily + todaySplits.practice + todaySplits.endless + todaySplits.h2h + todaySplits.group;
     }
 
     async function fetchAllEntryTimestamps(sinceDate) {
