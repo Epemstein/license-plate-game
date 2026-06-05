@@ -173,7 +173,10 @@
         }
     }
 
-    if (new URLSearchParams(window.location.search).get('auth') === 'dictionary') { doLogin(); }
+    if (new URLSearchParams(window.location.search).get('auth') === 'dictionary') {
+        document.getElementById('pw').value = 'dictionary';
+        doLogin();
+    }
 
     // --- Data loading ---
     async function loadData() {

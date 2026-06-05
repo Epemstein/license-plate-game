@@ -96,7 +96,10 @@
             return false;
         }
         // Auto-login if loaded inside admin wrapper
-        if (new URLSearchParams(window.location.search).get('auth') === 'Admin') { adminLogin(); }
+        if (new URLSearchParams(window.location.search).get('auth') === 'Admin') {
+            document.getElementById('adminPassword').value = 'Admin';
+            adminLogin();
+        }
 
         async function loadConversations() {
             const { data: messages, error } = await sb

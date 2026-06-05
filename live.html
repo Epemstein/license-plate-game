@@ -225,7 +225,10 @@
             document.getElementById('pw').value = '';
         }
     }
-    if (new URLSearchParams(window.location.search).get('auth') === 'live') { doLogin(); }
+    if (new URLSearchParams(window.location.search).get('auth') === 'live') {
+        document.getElementById('pw').value = 'live';
+        doLogin();
+    }
 
     // --- Tabs ---
     let runsLoaded = false;
