@@ -119,18 +119,20 @@
                 </div>
                 <div class="stat-card"><div class="label">Last hour</div><div class="value" id="statHour">0</div></div>
                 <div class="stat-card"><div class="label">Last 5 min</div><div class="value" id="statRecent">0</div></div>
-            </div>
-            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 18px;margin-bottom:20px;">
-                <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
-                    <span style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Today</span>
-                    <span style="font-size:1.4rem;font-weight:700;" id="statToday">0</span>
-                </div>
-                <div style="display:flex;gap:8px;margin-top:8px;justify-content:center;">
-                    <span class="mode mode-daily" style="font-size:10px;padding:3px 10px;cursor:default;" id="splitDaily">0</span>
-                    <span class="mode mode-practice" style="font-size:10px;padding:3px 10px;cursor:default;" id="splitPractice">0</span>
-                    <span class="mode mode-endless" style="font-size:10px;padding:3px 10px;cursor:default;" id="splitEndless">0</span>
-                    <span class="mode mode-h2h" style="font-size:10px;padding:3px 10px;cursor:default;" id="splitH2h">0</span>
-                    <span class="mode mode-group" style="font-size:10px;padding:3px 10px;cursor:default;" id="splitGroup">0</span>
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                    <div class="stat-card" style="padding:6px 14px;min-width:auto;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span class="label" style="margin:0;">Today</span>
+                            <span style="font-size:1.1rem;font-weight:700;" id="statToday">0</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:3px;">
+                        <span class="mode mode-daily" style="font-size:8px;padding:2px 5px;cursor:default;flex:1;text-align:center;" id="splitDaily">0</span>
+                        <span class="mode mode-practice" style="font-size:8px;padding:2px 5px;cursor:default;flex:1;text-align:center;" id="splitPractice">0</span>
+                        <span class="mode mode-endless" style="font-size:8px;padding:2px 5px;cursor:default;flex:1;text-align:center;" id="splitEndless">0</span>
+                        <span class="mode mode-h2h" style="font-size:8px;padding:2px 5px;cursor:default;flex:1;text-align:center;" id="splitH2h">0</span>
+                        <span class="mode mode-group" style="font-size:8px;padding:2px 5px;cursor:default;flex:1;text-align:center;" id="splitGroup">0</span>
+                    </div>
                 </div>
             </div>
             <div class="tabs">
