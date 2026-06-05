@@ -32,25 +32,25 @@
         .feed { display: flex; flex-direction: column; gap: 4px; }
         .entry { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; animation: slideIn 0.3s ease-out; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
-        .entry-daily { background: #fefce8; border-color: #fde68a; }
-        .entry-practice { background: #fff; }
-        .entry-endless { background: #fff; }
-        .entry-h2h { background: #fff; }
-        .entry-group { background: #fff; }
-        .entry .mode { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; min-width: 55px; text-align: center; }
-        .mode-daily { background: #fef3c7; color: #92400e; }
-        .mode-practice { background: #f3f4f6; color: #6b7280; }
-        .mode-endless { background: #fef3c7; color: #a16207; }
-        .mode-h2h { background: #fee2e2; color: #991b1b; }
-        .mode-group { background: #dbeafe; color: #1e40af; }
+        .entry .user { font-size: 0.85rem; color: #374151; font-weight: 600; min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .entry .plate { font-family: monospace; font-size: 1.1rem; font-weight: 700; color: #111; min-width: 50px; }
         .entry .word { font-size: 0.95rem; min-width: 120px; }
         .entry .word .pl { color: #16a34a; font-weight: 700; }
         .entry .word .nl { color: #111; }
         .entry .word.skipped { color: #dc2626; font-style: italic; }
         .entry .time { font-size: 0.85rem; color: #6b7280; font-variant-numeric: tabular-nums; min-width: 50px; text-align: right; }
-        .entry .user { font-size: 0.8rem; color: #6b7280; flex: 1; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .entry .mode { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; min-width: 55px; text-align: center; }
+        .mode-daily { background: #fef3c7; color: #92400e; }
+        .mode-practice { background: #f3f4f6; color: #6b7280; }
+        .mode-endless { background: #fef3c7; color: #a16207; }
+        .mode-h2h { background: #fee2e2; color: #991b1b; }
+        .mode-group { background: #dbeafe; color: #1e40af; }
         .entry .ago { font-size: 0.75rem; color: #9ca3af; min-width: 60px; text-align: right; }
+        .entry-daily { background: #fefce8; border-color: #f59e0b; }
+        .entry-practice { background: #fff; border-color: #d1d5db; }
+        .entry-endless { background: #fff; border-color: #f59e0b; }
+        .entry-h2h { background: #fff; border-color: #ef4444; }
+        .entry-group { background: #fff; border-color: #3b82f6; }
         .empty { text-align: center; padding: 60px 20px; color: #9ca3af; }
     </style>
 </head>
@@ -279,11 +279,11 @@
         const timeStr = e.time != null ? e.time.toFixed(1) + 's' : '--';
         const user = e.userName ? esc(e.userName) : '<span style="color:#d1d5db;">anon</span>';
         return `<div class="entry entry-${e.mode}">
-            <span class="mode mode-${e.mode}">${e.mode}</span>
+            <span class="user">${user}</span>
             <span class="plate">${esc(e.plate)}</span>
             ${wordHtml}
             <span class="time">${timeStr}</span>
-            <span class="user">${user}</span>
+            <span class="mode mode-${e.mode}">${e.mode}</span>
             <span class="ago">${ago(e.at)}</span>
         </div>`;
     }
