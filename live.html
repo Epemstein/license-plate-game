@@ -362,10 +362,21 @@
 
     function timeColor(seconds) {
         if (seconds == null) return '#6b7280';
-        if (seconds < 3) return '#16a34a';
-        if (seconds < 6) return '#ca8a04';
-        if (seconds < 10) return '#ea580c';
-        return '#dc2626';
+        // Smooth gradient: 0s = green(22,163,74) → 15s = yellow(202,138,4) → 30s = red(220,38,38)
+        const t = Math.min(Math.max(seconds / 30, 0), 1);
+        let r, g, b;
+        if (t < 0.5) {
+            const f = t / 0.5;
+            r = Math.round(22 + (202 - 22) * f);
+            g = Math.round(163 + (138 - 163) * f);
+            b = Math.round(74 + (4 - 74) * f);
+        } else {
+            const f = (t - 0.5) / 0.5;
+            r = Math.round(202 + (220 - 202) * f);
+            g = Math.round(138 + (38 - 138) * f);
+            b = Math.round(4 + (38 - 4) * f);
+        }
+        return `rgb(${r},${g},${b})`;
     }
 
     function timeBarWidth(seconds) {
