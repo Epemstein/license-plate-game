@@ -119,6 +119,8 @@
             }
         }
 
+        if (new URLSearchParams(window.location.search).get('auth') === 'tools') { toolsLogin(); }
+
         // Paginated fetch from a table
         async function fetchAll(table, cols, label, extraFilter) {
             let all = [], offset = 0;

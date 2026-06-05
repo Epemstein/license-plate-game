@@ -173,6 +173,8 @@
         }
     }
 
+    if (new URLSearchParams(window.location.search).get('auth') === 'dictionary') { doLogin(); }
+
     // --- Data loading ---
     async function loadData() {
         document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading words.txt...</div>';
