@@ -379,7 +379,7 @@
         return `<div class="entry entry-${r.mode}">
             <span class="user">${user}</span>
             <span class="time-col">
-                <span class="time-val" style="color:${barColor}">${r.time.toFixed(2)}s</span>
+                <span class="time-val" style="color:${barColor}">${r.time.toFixed(2)}</span>
                 <span class="time-bar" style="width:${barW}%;background:${barColor};"></span>
             </span>
             <span class="mode mode-${r.mode}">${r.mode}</span>
@@ -509,7 +509,7 @@
         const wordHtml = e.skipped
             ? '<span class="word skipped">skipped</span>'
             : `<span class="word">${highlightWord(e.word || '?', e.plate)}</span>`;
-        const timeStr = e.time != null ? e.time.toFixed(1) + 's' : '--';
+        const timeStr = e.time != null ? e.time.toFixed(1) : '--';
         const barColor = e.skipped ? '#111' : timeColor(e.time);
         const barW = timeBarWidth(e.time);
         const user = e.userName ? esc(e.userName) : '<span style="color:#d1d5db;">anon</span>';
@@ -612,7 +612,7 @@
                         <span class="record-plate">${p.plate}</span>
                     </div>
                     <div class="record-meta">
-                        <span class="val">${p.thinking_seconds.toFixed(2)}s</span>
+                        <span class="val">${p.thinking_seconds.toFixed(2)}</span>
                         <span class="record-user">${esc(name)}</span>
                     </div>
                 </div>`;
@@ -769,7 +769,7 @@
     function ago(date) {
         const s = (Date.now() - date.getTime()) / 1000;
         if (s < 10) return 'now';
-        if (s < 60) return Math.floor(s) + 's';
+        if (s < 60) return '' + Math.floor(s);
         if (s < 3600) return Math.floor(s / 60) + 'm';
         if (s < 86400) return Math.floor(s / 3600) + 'h';
         return Math.floor(s / 86400) + 'd';
