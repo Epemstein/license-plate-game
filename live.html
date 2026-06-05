@@ -110,13 +110,9 @@
     <div id="mainApp" style="display:none;">
         <div class="container">
             <div class="header">
-                <h1>Live Tracker</h1>
+                <h1 style="display:flex;align-items:center;gap:8px;">Live Tracker <span class="dot" id="statusDot" style="margin-left:4px;"></span></h1>
             </div>
             <div class="stats-bar">
-                <div class="status-card">
-                    <div class="dot" id="statusDot"></div>
-                    <span class="status-label" id="statusText">Connecting...</span>
-                </div>
                 <div class="stat-card"><div class="label">Last hour</div><div class="value" id="statHour">0</div></div>
                 <div class="stat-card"><div class="label">Last 5 min</div><div class="value" id="statRecent">0</div></div>
                 <div style="display:flex;flex-direction:column;gap:3px;min-width:240px;">
@@ -297,9 +293,8 @@
         });
         channel.subscribe((status) => {
             const dot = document.getElementById('statusDot');
-            const text = document.getElementById('statusText');
-            if (status === 'SUBSCRIBED') { dot.className = 'dot'; text.textContent = 'Live'; }
-            else { dot.className = 'dot off'; text.textContent = status; }
+            if (status === 'SUBSCRIBED') { dot.className = 'dot'; }
+            else { dot.className = 'dot off'; }
         });
     }
 
