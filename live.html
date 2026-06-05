@@ -310,7 +310,7 @@
         if (entries.length > MAX_ENTRIES) entries.pop();
         todayCount++;
         if (e.mode in todaySplits) todaySplits[e.mode]++;
-        updateStats(true);
+        updateStats(true, e.mode);
 
         if (activeFilter === 'all' || activeFilter === e.mode) {
             const feed = document.getElementById('feed');
@@ -326,7 +326,9 @@
         }
     }
 
-    function updateStats(animate) {
+    const splitElMap = { daily: 'splitDaily', practice: 'splitPractice', endless: 'splitEndless', h2h: 'splitH2h', group: 'splitGroup' };
+
+    function updateStats(animate, mode) {
         const todayEl = document.getElementById('statToday');
         const hourEl = document.getElementById('statHour');
         const recentEl = document.getElementById('statRecent');
@@ -341,7 +343,10 @@
         document.getElementById('splitEndless').textContent = todaySplits.endless;
         document.getElementById('splitH2h').textContent = todaySplits.h2h;
         document.getElementById('splitGroup').textContent = todaySplits.group;
-        if (animate) { bumpEl(todayEl); bumpEl(hourEl); bumpEl(recentEl); }
+        if (animate) {
+            bumpEl(todayEl); bumpEl(hourEl); bumpEl(recentEl);
+            if (mode && splitElMap[mode]) bumpEl(document.getElementById(splitElMap[mode]));
+        }
     }
 
     function bumpEl(el) {
