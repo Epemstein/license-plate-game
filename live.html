@@ -52,6 +52,19 @@
         .entry-h2h { background: #fff; border-color: #ef4444; }
         .entry-group { background: #fff; border-color: #3b82f6; }
         .empty { text-align: center; padding: 60px 20px; color: #9ca3af; }
+        .feed-header { display: flex; align-items: center; gap: 12px; padding: 6px 14px; font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .feed-header .h-user { min-width: 90px; }
+        .feed-header .h-plate { min-width: 50px; }
+        .feed-header .h-word { min-width: 120px; }
+        .feed-header .h-time { min-width: 50px; text-align: right; }
+        .feed-header .h-mode { min-width: 55px; text-align: center; }
+        .feed-header .h-ago { min-width: 60px; text-align: right; }
+        .status-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
+        .status-card .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; flex-shrink: 0; }
+        .status-card .dot.off { background: #ef4444; animation: none; }
+        .status-card .status-label { font-size: 0.85rem; font-weight: 600; color: #374151; }
+        .bump { display: inline-block; animation: bumpUp 0.5s ease-out; }
+        @keyframes bumpUp { 0% { transform: translateY(0); } 30% { transform: translateY(-6px); color: #16a34a; } 100% { transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -69,16 +82,14 @@
         <div class="container">
             <div class="header">
                 <h1>Live Tracker</h1>
-                <div class="status">
-                    <div class="dot" id="statusDot"></div>
-                    <span id="statusText">Connecting...</span>
-                </div>
             </div>
             <div class="stats-bar">
+                <div class="status-card">
+                    <div class="dot" id="statusDot"></div>
+                    <span class="status-label" id="statusText">Connecting...</span>
+                </div>
                 <div class="stat-card"><div class="label">Today</div><div class="value" id="statToday">0</div></div>
                 <div class="stat-card"><div class="label">Last 5 min</div><div class="value" id="statRecent">0</div></div>
-                <div class="stat-card"><div class="label">Skips</div><div class="value" id="statSkips">0</div></div>
-                <div class="stat-card"><div class="label">Avg Time</div><div class="value" id="statAvg">--</div></div>
             </div>
             <div class="filters">
                 <button class="active" data-mode="all" onclick="setFilter('all',this)">All</button>
@@ -87,6 +98,14 @@
                 <button data-mode="endless" onclick="setFilter('endless',this)">Endless</button>
                 <button data-mode="h2h" onclick="setFilter('h2h',this)">H2H</button>
                 <button data-mode="group" onclick="setFilter('group',this)">Group</button>
+            </div>
+            <div class="feed-header">
+                <span class="h-user">Player</span>
+                <span class="h-plate">Plate</span>
+                <span class="h-word">Word</span>
+                <span class="h-time">Time</span>
+                <span class="h-mode">Mode</span>
+                <span class="h-ago"></span>
             </div>
             <div class="feed" id="feed">
                 <div class="empty">Waiting for plays...</div>
@@ -218,7 +237,7 @@
         sessionStats.total++;
         if (e.skipped) sessionStats.skips++;
         if (e.time != null) sessionStats.times.push(e.time);
-        updateStats();
+        updateStats(true);
 
         // Prepend new entry to DOM instead of re-rendering everything
         if (activeFilter === 'all' || activeFilter === e.mode) {
@@ -232,16 +251,22 @@
         }
     }
 
-    function updateStats() {
-        document.getElementById('statToday').textContent = entries.length;
+    function updateStats(animate) {
+        const todayEl = document.getElementById('statToday');
+        const recentEl = document.getElementById('statRecent');
+        todayEl.textContent = entries.length;
         const fiveMin = Date.now() - 5 * 60 * 1000;
-        document.getElementById('statRecent').textContent = entries.filter(e => e.at.getTime() > fiveMin).length;
-        const skips = entries.filter(e => e.skipped).length;
-        document.getElementById('statSkips').textContent = skips;
-        const times = entries.filter(e => e.time != null).map(e => e.time);
-        document.getElementById('statAvg').textContent = times.length > 0
-            ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) + 's'
-            : '--';
+        recentEl.textContent = entries.filter(e => e.at.getTime() > fiveMin).length;
+        if (animate) {
+            bumpEl(todayEl);
+            bumpEl(recentEl);
+        }
+    }
+
+    function bumpEl(el) {
+        el.classList.remove('bump');
+        void el.offsetWidth; // force reflow to restart animation
+        el.classList.add('bump');
     }
 
     function updateRecentStat() {
