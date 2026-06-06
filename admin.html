@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Speller Admin</title>
+    <title>Plate Speller Admin v2</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; height: 100vh; display: flex; flex-direction: column; }
@@ -43,11 +43,12 @@
     </div>
 
     <script>
+    const v = Date.now();
     const TABS = {
-        live: 'live.html?auth=live',
-        dictionary: 'dictionary.html?auth=dictionary',
-        tools: 'tools.html?auth=tools',
-        feedback: 'feedback.html?auth=Admin',
+        live: `live.html?auth=live&v=${v}`,
+        dictionary: `dictionary.html?auth=dictionary&v=${v}`,
+        tools: `tools.html?auth=tools&v=${v}`,
+        feedback: `feedback.html?auth=Admin&v=${v}`,
     };
 
     let activeTab = null;
