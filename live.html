@@ -513,7 +513,7 @@
         const wordHtml = e.skipped
             ? '<span class="word skipped">skipped</span>'
             : `<span class="word">${highlightWord(e.word || '?', e.plate)}</span>`;
-        const timeStr = e.time != null ? e.time.toFixed(1) : '--';
+        const timeStr = e.time != null ? e.time.toFixed(2) : '--';
         const barColor = e.skipped ? '#111' : timeColor(e.time);
         const barW = timeBarWidth(e.time);
         const user = e.userName ? esc(e.userName) : '<span style="color:#d1d5db;">anon</span>';
