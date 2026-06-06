@@ -89,10 +89,9 @@
             auth: { persistSession: false, autoRefreshToken: false }
         });
 
-        // Raw data per source: { daily: { "ABC": [{skipped, t}, ...], ... }, practice: {...}, h2h: {...}, groups: {...} }
-        let rawBySource = { daily: {}, practice: {}, h2h: {}, groups: {} };
+        let allPlateStats = []; // raw data from RPC
         let plateAnalysis = {}; // plate -> { common, viable }
-        let computedData = []; // Combined plate data based on selected checkboxes
+        let computedData = []; // filtered view based on checkboxes
         let sortCol = 'total_plays';
         let sortDir = 'desc';
         let currentPage = 0;
@@ -103,9 +102,6 @@
             plateAnalysis = data;
             console.log('Loaded plate_analysis.json:', Object.keys(data).length, 'plates');
         }).catch(e => console.warn('plate_analysis.json not loaded:', e));
-
-        const CACHE_PREFIX = 'plateRaw_';
-        const CACHE_TTL = 30 * 60 * 1000;
 
         function toolsLogin() {
             const pw = document.getElementById('toolsPassword').value.trim();
@@ -124,34 +120,25 @@
             toolsLogin();
         }
 
-        // Paginated fetch from a table
-        async function fetchAll(table, cols, label, extraFilter) {
-            let all = [], offset = 0;
-            while (true) {
-                document.getElementById('tableContainer').innerHTML = `<div class="loading">Loading ${label}... (${all.length.toLocaleString()} rows)</div>`;
-                let query = sb.from(table).select(cols).range(offset, offset + 999);
-                if (extraFilter) query = extraFilter(query);
-                const { data, error } = await query;
-                if (error) { console.error(`Fetch error ${table}:`, error); break; }
-                if (!data || data.length === 0) break;
-                all.push(...data);
-                if (data.length < 1000) break;
-                offset += 1000;
+        async function loadData() {
+            document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading plate data...</div>';
+            document.getElementById('cacheStatus').textContent = '';
+            try {
+                const { data, error } = await sb.rpc('plate_stats_summary');
+                if (error) throw error;
+                allPlateStats = data || [];
+                console.log('Loaded ' + allPlateStats.length + ' plates from RPC');
+                document.getElementById('cacheStatus').textContent = '(just loaded)';
+                reloadSources();
+            } catch (e) {
+                console.error('Load error:', e);
+                document.getElementById('tableContainer').innerHTML = '<div class="loading" style="color:#dc2626;">Error: ' + e.message + '</div>';
             }
-            return all;
         }
 
-        // Group raw rows into { plate -> [{skipped, t}] }
-        function groupByPlate(rows) {
-            const map = {};
-            rows.forEach(r => {
-                if (!map[r.plate]) map[r.plate] = [];
-                map[r.plate].push({ skipped: !!r.skipped, t: r.thinking_seconds });
-            });
-            return map;
-        }
+        function refreshData() { loadData(); }
 
-        async function loadData(forceRefresh) {
+        /*
             const sources = ['daily', 'practice', 'h2h', 'groups'];
             let allCached = true;
             let oldestAge = 0;
@@ -252,8 +239,36 @@
             loadData(true);
         }
 
-        // Combine raw data from selected sources, compute skip%, median, plays per plate
         function reloadSources() {
+            const useDaily = document.getElementById('srcDaily').checked;
+            const usePractice = document.getElementById('srcPractice').checked;
+            const useH2H = document.getElementById('srcH2H').checked;
+            const useGroups = document.getElementById('srcGroups').checked;
+
+            computedData = [];
+            for (const r of allPlateStats) {
+                const plays = (useDaily ? r.daily_plays : 0) + (usePractice ? r.practice_plays : 0)
+                    + (useH2H ? r.h2h_plays : 0) + (useGroups ? r.group_plays : 0);
+                if (plays === 0) continue;
+                const pa = plateAnalysis[r.plate] || plateAnalysis[(r.plate || '').toUpperCase()] || {};
+                computedData.push({
+                    plate: r.plate,
+                    total_plays: plays,
+                    skip_pct: r.skip_pct ?? 0,
+                    median_think: r.median_think,
+                    mean_think: r.mean_think,
+                    common_words: pa.common || 0,
+                    viable_words: pa.viable || 0,
+                    daily_plays: r.daily_plays,
+                    practice_plays: r.practice_plays,
+                    h2h_plays: r.h2h_plays,
+                    group_plays: r.group_plays
+                });
+            }
+            renderTable();
+        }
+
+        function reloadSources_OLD_UNUSED() {
             const useDaily = document.getElementById('srcDaily').checked;
             const usePractice = document.getElementById('srcPractice').checked;
             const useH2H = document.getElementById('srcH2H').checked;
@@ -309,6 +324,7 @@
 
             renderTable();
         }
+        */
 
         function renderTable() {
             const srcOn = {
