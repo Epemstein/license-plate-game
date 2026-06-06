@@ -656,22 +656,8 @@
     }
 
     async function fetchAllEntryTimestamps(sinceDate) {
-        // daily_run_entries: join daily_runs for completed_at
-        // practice_plate_stats: has created_at directly
-        // h2h_run_entries: join h2h_runs for created_at
-        // group_daily_run_entries: join group_daily_runs for completed_at
-        const [daily, practice, h2h, group] = await Promise.all([
-            sb.from('daily_run_entries').select('run:daily_runs!inner(completed_at)').gte('run.completed_at', sinceDate).limit(10000),
-            sb.from('practice_plate_stats').select('created_at').gte('created_at', sinceDate).limit(10000),
-            sb.from('h2h_run_entries').select('run:h2h_runs!inner(created_at)').gte('run.created_at', sinceDate).limit(10000),
-            sb.from('group_daily_run_entries').select('run:group_daily_runs!inner(completed_at)').gte('run.completed_at', sinceDate).limit(10000),
-        ]);
-        const timestamps = [];
-        for (const r of (daily.data || [])) timestamps.push(r.run?.completed_at);
-        for (const r of (practice.data || [])) timestamps.push(r.created_at);
-        for (const r of (h2h.data || [])) timestamps.push(r.run?.created_at);
-        for (const r of (group.data || [])) timestamps.push(r.run?.completed_at);
-        return timestamps.filter(Boolean);
+        const { data } = await sb.rpc('activity_timestamps', { since_ts: sinceDate });
+        return data || [];
     }
 
     async function loadActivityChart() {
