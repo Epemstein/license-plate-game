@@ -656,8 +656,12 @@
     }
 
     async function fetchAllEntryTimestamps(sinceDate) {
-        const { data } = await sb.rpc('activity_timestamps', { since_ts: sinceDate });
-        return data || [];
+        const { data, error } = await sb.rpc('activity_timestamps', { since_ts: sinceDate });
+        if (error) { console.error('[Activity] RPC error:', error); return []; }
+        // RPC returns jsonb — could be array directly or nested
+        const result = Array.isArray(data) ? data : (data || []);
+        console.log('[Activity] Got', result.length, 'timestamps, first:', result[0]);
+        return result;
     }
 
     async function loadActivityChart() {
@@ -673,13 +677,15 @@
             buckets[key] = 0;
         }
 
+        let matched = 0;
         for (const ts of allTimestamps) {
             const t = new Date(ts);
             const mins = t.getMinutes();
             t.setMinutes(mins < 30 ? 0 : 30, 0, 0);
             const key = t.toISOString().slice(0, 16);
-            if (key in buckets) buckets[key]++;
+            if (key in buckets) { buckets[key]++; matched++; }
         }
+        console.log('[Activity] Bucketed', matched, '/', allTimestamps.length, 'timestamps');
 
         const labels = Object.keys(buckets).map(k => {
             const d = new Date(k + ':00Z');
