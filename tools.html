@@ -138,6 +138,35 @@
 
         function refreshData() { loadData(); }
 
+        function reloadSources() {
+            const useDaily = document.getElementById('srcDaily').checked;
+            const usePractice = document.getElementById('srcPractice').checked;
+            const useH2H = document.getElementById('srcH2H').checked;
+            const useGroups = document.getElementById('srcGroups').checked;
+
+            computedData = [];
+            for (const r of allPlateStats) {
+                const plays = (useDaily ? r.daily_plays : 0) + (usePractice ? r.practice_plays : 0)
+                    + (useH2H ? r.h2h_plays : 0) + (useGroups ? r.group_plays : 0);
+                if (plays === 0) continue;
+                const pa = plateAnalysis[r.plate] || plateAnalysis[(r.plate || '').toUpperCase()] || {};
+                computedData.push({
+                    plate: r.plate,
+                    total_plays: plays,
+                    skip_pct: r.skip_pct ?? 0,
+                    median_think: r.median_think,
+                    mean_think: r.mean_think,
+                    common_words: pa.common || 0,
+                    viable_words: pa.viable || 0,
+                    daily_plays: r.daily_plays,
+                    practice_plays: r.practice_plays,
+                    h2h_plays: r.h2h_plays,
+                    group_plays: r.group_plays
+                });
+            }
+            renderTable();
+        }
+
         /*
             const sources = ['daily', 'practice', 'h2h', 'groups'];
             let allCached = true;
