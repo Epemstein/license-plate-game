@@ -726,22 +726,10 @@
 
     async function loadWeekGrid() {
         const grid = document.getElementById('weekGrid');
-        const days = [];
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date(Date.now() - i * 86400000);
-            days.push(d.toISOString().slice(0, 10));
-        }
+        const { data: counts } = await sb.rpc('plays_per_day_last7');
+        if (!counts) { grid.innerHTML = '<p style="color:#9ca3af;">Failed to load</p>'; return; }
 
-        // Count plays per day from all entry tables
-        const counts = {};
-        for (const d of days) counts[d] = 0;
-
-        const allTimestamps = await fetchAllEntryTimestamps(days[0] + 'T00:00:00Z');
-        for (const ts of allTimestamps) {
-            const day = ts.slice(0, 10);
-            if (day in counts) counts[day]++;
-        }
-
+        const days = Object.keys(counts).sort();
         const maxCount = Math.max(...Object.values(counts), 1);
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
