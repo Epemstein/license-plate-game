@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v20</title>
+    <title>Live Tracker v21</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -145,6 +145,7 @@
                 <button class="active" onclick="switchTab('feed',this)">Feed</button>
                 <button onclick="switchTab('runs',this)">Runs</button>
                 <button onclick="switchTab('stats',this)">Stats</button>
+                <button onclick="switchTab('activity',this)">Activity</button>
             </div>
 
             <div class="main-layout">
@@ -197,6 +198,10 @@
                         <div id="fastestSolves"><div class="empty" style="padding:20px;">Loading...</div></div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Activity Tab -->
+            <div class="feed-panel" id="activityPanel">
                 <div class="chart-container">
                     <h3>Activity — Last 24 Hours</h3>
                     <canvas id="activityChart" height="80"></canvas>
@@ -262,6 +267,7 @@
 
     // --- Tabs ---
     let runsLoaded = false;
+    let activityLoaded = false;
 
     function switchTab(tab, btn) {
         activeTab = tab;
@@ -270,8 +276,10 @@
         document.getElementById('feedPanel').className = tab === 'feed' ? 'feed-panel active' : 'feed-panel';
         document.getElementById('runsPanel').className = tab === 'runs' ? 'feed-panel active' : 'feed-panel';
         document.getElementById('statsPanel').className = tab === 'stats' ? 'stats-panel active' : 'stats-panel';
+        document.getElementById('activityPanel').className = tab === 'activity' ? 'feed-panel active' : 'feed-panel';
         if (tab === 'stats' && !statsLoaded) { loadStats(); statsLoaded = true; }
         if (tab === 'runs' && !runsLoaded) { loadRecentRuns(); runsLoaded = true; }
+        if (tab === 'activity' && !activityLoaded) { loadActivityData(); activityLoaded = true; }
     }
 
     // --- Init ---
@@ -1013,6 +1021,9 @@
         }
 
         await renderRecords();
+    }
+
+    async function loadActivityData() {
         await loadActivityChart();
         await loadWeekGrid();
     }
