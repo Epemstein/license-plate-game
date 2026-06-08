@@ -18,11 +18,11 @@
         .container { max-width: 1300px; margin: 0 auto; padding: 20px; }
         .main-layout { display: flex; gap: 20px; }
         .main-left { flex: 1; min-width: 0; }
-        .daily-sidebar { width: 280px; flex-shrink: 0; position: sticky; top: 20px; align-self: flex-start; max-height: calc(100vh - 40px); overflow-y: auto; }
+        .daily-sidebar { width: 380px; flex-shrink: 0; position: sticky; top: 20px; align-self: flex-start; max-height: calc(100vh - 40px); overflow-y: auto; }
         .daily-sidebar h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
         .daily-plate-row { display: flex; align-items: center; padding: 5px 8px; border-radius: 6px; margin-bottom: 2px; background: #fff; border: 1px solid #e5e7eb; min-height: 30px; }
         .daily-plate-row .dp-num { font-size: 0.7rem; color: #9ca3af; width: 18px; flex-shrink: 0; }
-        .daily-plate-row .dp-plate { font-family: monospace; font-weight: 700; font-size: 0.85rem; width: 36px; flex-shrink: 0; }
+        .daily-plate-row .dp-plate { font-family: monospace; font-weight: 700; font-size: 0.9rem; width: 40px; flex-shrink: 0; }
         .daily-plate-row .dp-players { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
         .dp-avatar { width: 22px; height: 22px; border-radius: 50%; font-size: 0.55rem; font-weight: 700; display: flex; align-items: center; justify-content: center; color: white; cursor: default; }
         @media (max-width: 1000px) { .daily-sidebar { display: none; } }
@@ -523,21 +523,21 @@
             for (const uid of showPlayers) {
                 const p = dailyPlayers[uid];
                 const result = p.plateResults[i];
+                const solvedSoFar = Object.keys(p.plateResults).filter(k => !p.plateResults[k].skipped && parseInt(k) <= i).length;
                 if (p.currentPlate === i) {
-                    // Player is currently on this plate — show their dot
-                    html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;" title="${p.name}">⏳</span>`;
+                    // Player is currently on this plate — show solved count
+                    html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;font-size:0.6rem;" title="${p.name} — solving plate ${i+1}">${solvedSoFar}</span>`;
                 } else if (result) {
                     // Player already passed this plate — show result
                     if (result.skipped) {
-                        html += '<span style="width:22px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 1px;color:#dc2626;">✕</span>';
+                        html += '<span style="width:40px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 1px;color:#dc2626;" title="skipped">✕</span>';
                     } else {
                         const w = (result.word || '?').toLowerCase();
-                        const display = w.length > 3 ? w.substring(0, 3) : w;
-                        html += `<span style="width:22px;text-align:center;font-size:0.55rem;flex-shrink:0;margin:0 1px;color:#16a34a;font-weight:600;" title="${w}">${display}</span>`;
+                        html += `<span style="width:40px;text-align:center;font-size:0.55rem;flex-shrink:0;margin:0 1px;color:#16a34a;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${w}">${w}</span>`;
                     }
                 } else {
                     // Player hasn't reached this plate yet
-                    html += '<span style="width:22px;flex-shrink:0;margin:0 1px;"></span>';
+                    html += '<span style="width:40px;flex-shrink:0;margin:0 1px;"></span>';
                 }
             }
 
