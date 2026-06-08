@@ -15,7 +15,17 @@
         .login-box button { margin-top: 8px; background: #7c3aed; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 14px; cursor: pointer; }
         .login-box button:hover { background: #6d28d9; }
         #loginError { color: #dc2626; margin-top: 8px; font-size: 13px; }
-        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 1300px; margin: 0 auto; padding: 20px; }
+        .main-layout { display: flex; gap: 20px; }
+        .main-left { flex: 1; min-width: 0; }
+        .daily-sidebar { width: 280px; flex-shrink: 0; position: sticky; top: 20px; align-self: flex-start; max-height: calc(100vh - 40px); overflow-y: auto; }
+        .daily-sidebar h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+        .daily-plate-row { display: flex; align-items: center; padding: 5px 8px; border-radius: 6px; margin-bottom: 2px; background: #fff; border: 1px solid #e5e7eb; min-height: 30px; }
+        .daily-plate-row .dp-num { font-size: 0.7rem; color: #9ca3af; width: 18px; flex-shrink: 0; }
+        .daily-plate-row .dp-plate { font-family: monospace; font-weight: 700; font-size: 0.85rem; width: 36px; flex-shrink: 0; }
+        .daily-plate-row .dp-players { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
+        .dp-avatar { width: 22px; height: 22px; border-radius: 50%; font-size: 0.55rem; font-weight: 700; display: flex; align-items: center; justify-content: center; color: white; cursor: default; }
+        @media (max-width: 1000px) { .daily-sidebar { display: none; } }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .header h1 { font-size: 1.3rem; }
         .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
@@ -137,6 +147,8 @@
                 <button onclick="switchTab('stats',this)">Stats</button>
             </div>
 
+            <div class="main-layout">
+            <div class="main-left">
             <!-- Feed Tab -->
             <div class="feed-panel active" id="feedPanel">
                 <div class="filters">
@@ -194,6 +206,15 @@
                     <div class="peak-grid" id="weekGrid"></div>
                 </div>
             </div>
+            </div><!-- end main-left -->
+
+            <!-- Daily Challenge Sidebar -->
+            <div class="daily-sidebar" id="dailySidebar">
+                <h3>Daily Challenge</h3>
+                <div id="dailyPlateGrid" style="font-size:0.8rem;color:#9ca3af;">Loading plates...</div>
+            </div>
+
+            </div><!-- end main-layout -->
         </div>
     </div>
 
@@ -213,6 +234,12 @@
     let activityChart = null;
     let todayCount = 0; // actual full-day count from DB
     let todaySplits = { daily: 0, practice: 0, endless: 0, h2h: 0, group: 0 };
+
+    // Daily challenge sidebar state
+    let dailyPlates = [];
+    // playerPositions: userId -> { name, initials, plateIndex, color }
+    let dailyPlayerPositions = {};
+    const avatarColors = ['#7c3aed','#dc2626','#2563eb','#16a34a','#d97706','#ec4899','#0891b2','#4f46e5','#059669','#b91c1c','#7c2d12','#6d28d9'];
 
     function doLogin() {
         const pw = document.getElementById('pw').value.trim();
@@ -247,6 +274,7 @@
     // --- Init ---
     async function init() {
         await loadRecent();
+        await loadDailyPlates();
         subscribe();
         setInterval(updateAgos, 1000);
         setInterval(updateRecentStat, 30000);
@@ -297,6 +325,144 @@
         renderFeed();
     }
 
+    // ==================== DAILY SIDEBAR ====================
+    function getTodayStr() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    async function loadDailyPlates() {
+        try {
+            const today = getTodayStr();
+            const { data } = await sb.from('daily_plates').select('plates').eq('date', today).single();
+            if (data && data.plates) {
+                dailyPlates = data.plates;
+                // Load existing daily entries for today to populate positions
+                await loadDailyPositions();
+                renderDailySidebar();
+            } else {
+                document.getElementById('dailyPlateGrid').textContent = 'No plates for today';
+            }
+        } catch (e) {
+            console.error('Failed to load daily plates:', e);
+            document.getElementById('dailyPlateGrid').textContent = 'Error loading plates';
+        }
+    }
+
+    async function loadDailyPositions() {
+        const today = getTodayStr();
+        // Get all daily runs for today
+        const { data: runs } = await sb.from('daily_runs')
+            .select('id, user_id, total_seconds')
+            .eq('date', today);
+        if (!runs || runs.length === 0) return;
+
+        // Get entry counts per run to know which plate they're on
+        for (const run of runs) {
+            const { count } = await sb.from('daily_run_entries')
+                .select('id', { count: 'exact', head: true })
+                .eq('run_id', run.id);
+            const userName = await resolveUser(run.user_id);
+            const initials = getInitials(userName || 'Anon');
+            const colorIdx = Math.abs(hashStr(run.user_id)) % avatarColors.length;
+            const plateIdx = (count || 0); // they've completed this many, so they're ON the next one
+            const completed = run.total_seconds != null;
+            dailyPlayerPositions[run.user_id] = {
+                name: userName || 'Anon',
+                initials,
+                plateIndex: completed ? -1 : plateIdx, // -1 = finished
+                color: avatarColors[colorIdx],
+                completed,
+                time: run.total_seconds
+            };
+        }
+    }
+
+    function getInitials(name) {
+        const parts = name.trim().split(/\s+/);
+        if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        return name.substring(0, 2).toUpperCase();
+    }
+
+    function hashStr(s) {
+        let h = 0;
+        for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+        return h;
+    }
+
+    function updateDailyPosition(userId, plate) {
+        if (dailyPlates.length === 0) return;
+        const plateIdx = dailyPlates.indexOf(plate);
+        if (plateIdx === -1) return;
+
+        if (!dailyPlayerPositions[userId]) {
+            const colorIdx = Math.abs(hashStr(userId)) % avatarColors.length;
+            resolveUser(userId).then(name => {
+                dailyPlayerPositions[userId] = {
+                    name: name || 'Anon',
+                    initials: getInitials(name || 'Anon'),
+                    plateIndex: plateIdx + 1, // they solved/skipped this plate, now on the next
+                    color: avatarColors[colorIdx],
+                    completed: false
+                };
+                renderDailySidebar();
+            });
+            return;
+        }
+        // Move to next plate
+        dailyPlayerPositions[userId].plateIndex = plateIdx + 1;
+        renderDailySidebar();
+    }
+
+    function markDailyCompleted(userId, time) {
+        if (dailyPlayerPositions[userId]) {
+            dailyPlayerPositions[userId].completed = true;
+            dailyPlayerPositions[userId].plateIndex = -1;
+            dailyPlayerPositions[userId].time = time;
+        }
+        renderDailySidebar();
+    }
+
+    function renderDailySidebar() {
+        const grid = document.getElementById('dailyPlateGrid');
+        if (dailyPlates.length === 0) { grid.textContent = 'No plates loaded'; return; }
+
+        // Show first 20 plates (most people don't go beyond that)
+        const showCount = Math.min(20, dailyPlates.length);
+        let html = '';
+
+        // Completed players at top
+        const completed = Object.values(dailyPlayerPositions).filter(p => p.completed);
+        if (completed.length > 0) {
+            html += '<div style="margin-bottom:8px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;">';
+            html += '<div style="font-size:0.65rem;color:#16a34a;font-weight:700;margin-bottom:4px;">FINISHED</div>';
+            html += '<div style="display:flex;flex-wrap:wrap;gap:3px;">';
+            completed.sort((a, b) => (a.time || 999) - (b.time || 999));
+            for (const p of completed) {
+                const timeStr = p.time ? p.time.toFixed(1) + 's' : '';
+                html += `<span class="dp-avatar" style="background:${p.color};" title="${p.name} ${timeStr}">${p.initials}</span>`;
+            }
+            html += '</div></div>';
+        }
+
+        for (let i = 0; i < showCount; i++) {
+            const plate = dailyPlates[i];
+            // Find players currently on this plate
+            const playersHere = Object.values(dailyPlayerPositions).filter(p => !p.completed && p.plateIndex === i);
+            const hasPlayers = playersHere.length > 0;
+
+            html += `<div class="daily-plate-row" style="${hasPlayers ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
+            html += `<span class="dp-num">${i + 1}</span>`;
+            html += `<span class="dp-plate">${plate}</span>`;
+            html += '<span class="dp-players">';
+            for (const p of playersHere) {
+                html += `<span class="dp-avatar" style="background:${p.color};" title="${p.name}">${p.initials}</span>`;
+            }
+            html += '</span></div>';
+        }
+        grid.innerHTML = html;
+    }
+
     function subscribe() {
         const channel = sb.channel('live-tracker');
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_plays' }, (payload) => {
@@ -306,6 +472,7 @@
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_runs' }, (payload) => {
             if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
                 addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'daily', at: new Date(payload.new.completed_at || Date.now()) });
+                markDailyCompleted(payload.new.user_id, payload.new.total_seconds);
             }
         });
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'h2h_runs' }, (payload) => {
@@ -423,6 +590,11 @@
         // Update stats tab live records if visible
         if (activeTab === 'stats' && !e.skipped && e.word) {
             updateLiveRecords(e);
+        }
+
+        // Track daily challenge positions
+        if (e.mode === 'daily' && e.userId) {
+            updateDailyPosition(e.userId, e.plate);
         }
     }
 
