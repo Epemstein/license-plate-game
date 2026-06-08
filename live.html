@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v9</title>
+    <title>Live Tracker v10</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -419,10 +419,13 @@
                 if (e.plate_index > maxIdx) maxIdx = e.plate_index;
             }
 
+            // Find latest entry timestamp for this run
+            const lastEntryAt = runEntries.length > 0 ? new Date() : new Date();
             dailyPlayers[uid] = {
                 name: userName, initials, color: avatarColors[colorIdx],
                 plateResults, currentPlate: completed ? -1 : maxIdx + 1,
-                completed, time: run.total_seconds
+                completed, time: run.total_seconds,
+                lastActivity: lastEntryAt
             };
             if (!dailyPlayerOrder.includes(uid)) dailyPlayerOrder.push(uid);
         }
@@ -433,7 +436,7 @@
         const today = getTodayStr();
         const since = today + 'T00:00:00';
         const { data } = await sb.from('live_plays')
-            .select('user_id, plate, word, skipped')
+            .select('user_id, plate, word, skipped, created_at')
             .eq('mode', 'daily')
             .gte('created_at', since)
             .order('created_at', { ascending: true });
@@ -459,13 +462,15 @@
                 const colorIdx = Math.abs(hashStr(uid)) % avatarColors.length;
                 dailyPlayers[uid] = {
                     name, initials: getInitials(name), color: avatarColors[colorIdx],
-                    plateResults: {}, currentPlate: 0, completed: false
+                    plateResults: {}, currentPlate: 0, completed: false,
+                    lastActivity: new Date(e.created_at)
                 };
                 if (!dailyPlayerOrder.includes(uid)) dailyPlayerOrder.push(uid);
             }
 
             dailyPlayers[uid].plateResults[plateIdx] = { word: e.skipped ? null : e.word, skipped: e.skipped };
             dailyPlayers[uid].currentPlate = plateIdx + 1;
+            dailyPlayers[uid].lastActivity = new Date(e.created_at);
         }
     }
 
@@ -507,6 +512,7 @@
         }
         dailyPlayers[userId].plateResults[plateIdx] = { word: skipped ? null : word, skipped };
         dailyPlayers[userId].currentPlate = plateIdx + 1;
+        dailyPlayers[userId].lastActivity = new Date();
         if (!dailyPlayerOrder.includes(userId)) dailyPlayerOrder.push(userId);
         renderDailySidebar();
     }
@@ -531,7 +537,14 @@
 
         const activePlayers = dailyPlayerOrder.filter(uid => dailyPlayers[uid]);
         const completed = activePlayers.filter(uid => dailyPlayers[uid].completed);
-        const inProgress = activePlayers.filter(uid => !dailyPlayers[uid].completed);
+        const now = Date.now();
+        const STALE_MS = 10 * 60 * 1000; // 10 minutes
+        const inProgress = activePlayers.filter(uid => {
+            const p = dailyPlayers[uid];
+            if (p.completed) return false;
+            if (p.lastActivity && (now - p.lastActivity.getTime()) > STALE_MS) return false;
+            return true;
+        });
         const sel = dailySelectedPlayer;
         const selPlayer = sel ? dailyPlayers[sel] : null;
 
