@@ -237,8 +237,9 @@
 
     // Daily challenge sidebar state
     let dailyPlates = [];
-    // playerPositions: userId -> { name, initials, plateIndex, color }
-    let dailyPlayerPositions = {};
+    // dailyPlayers: userId -> { name, initials, color, plateResults: { plateIndex -> { word, skipped } }, currentPlate, completed, time }
+    let dailyPlayers = {};
+    let dailyPlayerOrder = []; // ordered list of userIds for consistent column assignment
     const avatarColors = ['#7c3aed','#dc2626','#2563eb','#16a34a','#d97706','#ec4899','#0891b2','#4f46e5','#059669','#b91c1c','#7c2d12','#6d28d9'];
 
     function doLogin() {
@@ -352,30 +353,39 @@
 
     async function loadDailyPositions() {
         const today = getTodayStr();
-        // Get all daily runs for today
         const { data: runs } = await sb.from('daily_runs')
             .select('id, user_id, total_seconds')
             .eq('date', today);
         if (!runs || runs.length === 0) return;
 
-        // Get entry counts per run to know which plate they're on
         for (const run of runs) {
-            const { count } = await sb.from('daily_run_entries')
-                .select('id', { count: 'exact', head: true })
-                .eq('run_id', run.id);
+            const { data: entries } = await sb.from('daily_run_entries')
+                .select('plate_index, plate, word, skipped')
+                .eq('run_id', run.id)
+                .order('plate_index', { ascending: true });
+
             const userName = await resolveUser(run.user_id);
             const initials = getInitials(userName || 'Anon');
             const colorIdx = Math.abs(hashStr(run.user_id)) % avatarColors.length;
-            const plateIdx = (count || 0); // they've completed this many, so they're ON the next one
             const completed = run.total_seconds != null;
-            dailyPlayerPositions[run.user_id] = {
+
+            const plateResults = {};
+            let maxIdx = -1;
+            for (const e of (entries || [])) {
+                plateResults[e.plate_index] = { word: e.word, skipped: e.skipped };
+                if (e.plate_index > maxIdx) maxIdx = e.plate_index;
+            }
+
+            dailyPlayers[run.user_id] = {
                 name: userName || 'Anon',
                 initials,
-                plateIndex: completed ? -1 : plateIdx, // -1 = finished
                 color: avatarColors[colorIdx],
+                plateResults,
+                currentPlate: completed ? -1 : maxIdx + 1,
                 completed,
                 time: run.total_seconds
             };
+            if (!dailyPlayerOrder.includes(run.user_id)) dailyPlayerOrder.push(run.user_id);
         }
     }
 
@@ -391,35 +401,39 @@
         return h;
     }
 
-    function updateDailyPosition(userId, plate) {
+    function updateDailyPosition(userId, plate, word, skipped) {
         if (dailyPlates.length === 0) return;
         const plateIdx = dailyPlates.indexOf(plate);
         if (plateIdx === -1) return;
 
-        if (!dailyPlayerPositions[userId]) {
+        if (!dailyPlayers[userId]) {
             const colorIdx = Math.abs(hashStr(userId)) % avatarColors.length;
             resolveUser(userId).then(name => {
-                dailyPlayerPositions[userId] = {
+                dailyPlayers[userId] = {
                     name: name || 'Anon',
                     initials: getInitials(name || 'Anon'),
-                    plateIndex: plateIdx + 1, // they solved/skipped this plate, now on the next
                     color: avatarColors[colorIdx],
+                    plateResults: {},
+                    currentPlate: plateIdx + 1,
                     completed: false
                 };
+                dailyPlayers[userId].plateResults[plateIdx] = { word: skipped ? null : word, skipped };
+                if (!dailyPlayerOrder.includes(userId)) dailyPlayerOrder.push(userId);
                 renderDailySidebar();
             });
             return;
         }
-        // Move to next plate
-        dailyPlayerPositions[userId].plateIndex = plateIdx + 1;
+        dailyPlayers[userId].plateResults[plateIdx] = { word: skipped ? null : word, skipped };
+        dailyPlayers[userId].currentPlate = plateIdx + 1;
+        if (!dailyPlayerOrder.includes(userId)) dailyPlayerOrder.push(userId);
         renderDailySidebar();
     }
 
     function markDailyCompleted(userId, time) {
-        if (dailyPlayerPositions[userId]) {
-            dailyPlayerPositions[userId].completed = true;
-            dailyPlayerPositions[userId].plateIndex = -1;
-            dailyPlayerPositions[userId].time = time;
+        if (dailyPlayers[userId]) {
+            dailyPlayers[userId].completed = true;
+            dailyPlayers[userId].currentPlate = -1;
+            dailyPlayers[userId].time = time;
         }
         renderDailySidebar();
     }
@@ -428,38 +442,82 @@
         const grid = document.getElementById('dailyPlateGrid');
         if (dailyPlates.length === 0) { grid.textContent = 'No plates loaded'; return; }
 
-        // Show first 20 plates (most people don't go beyond that)
-        const showCount = Math.min(20, dailyPlates.length);
-        let html = '';
+        // Only show players who are active (in progress or completed)
+        const activePlayers = dailyPlayerOrder.filter(uid => dailyPlayers[uid]);
+        if (activePlayers.length === 0) {
+            // Just show plates, no player columns
+            let html = '';
+            const showCount = Math.min(20, dailyPlates.length);
+            for (let i = 0; i < showCount; i++) {
+                html += `<div class="daily-plate-row"><span class="dp-num">${i + 1}</span><span class="dp-plate">${dailyPlates[i]}</span></div>`;
+            }
+            grid.innerHTML = html;
+            return;
+        }
 
         // Completed players at top
-        const completed = Object.values(dailyPlayerPositions).filter(p => p.completed);
+        const completed = activePlayers.filter(uid => dailyPlayers[uid].completed);
+        let html = '';
         if (completed.length > 0) {
+            const sorted = [...completed].sort((a, b) => (dailyPlayers[a].time || 999) - (dailyPlayers[b].time || 999));
             html += '<div style="margin-bottom:8px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;">';
             html += '<div style="font-size:0.65rem;color:#16a34a;font-weight:700;margin-bottom:4px;">FINISHED</div>';
             html += '<div style="display:flex;flex-wrap:wrap;gap:3px;">';
-            completed.sort((a, b) => (a.time || 999) - (b.time || 999));
-            for (const p of completed) {
+            for (const uid of sorted) {
+                const p = dailyPlayers[uid];
                 const timeStr = p.time ? p.time.toFixed(1) + 's' : '';
                 html += `<span class="dp-avatar" style="background:${p.color};" title="${p.name} ${timeStr}">${p.initials}</span>`;
             }
             html += '</div></div>';
         }
 
+        // In-progress players for columns (limit to ~6 most recent to keep it readable)
+        const inProgress = activePlayers.filter(uid => !dailyPlayers[uid].completed);
+        const showPlayers = inProgress.slice(-6);
+
+        // Header row with player initials
+        if (showPlayers.length > 0) {
+            html += '<div style="display:flex;align-items:center;padding:2px 8px;margin-bottom:2px;">';
+            html += '<span style="width:18px;"></span><span style="width:36px;"></span>';
+            for (const uid of showPlayers) {
+                const p = dailyPlayers[uid];
+                html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;" title="${p.name}">${p.initials}</span>`;
+            }
+            html += '</div>';
+        }
+
+        // Plate rows
+        const showCount = Math.min(20, dailyPlates.length);
         for (let i = 0; i < showCount; i++) {
             const plate = dailyPlates[i];
-            // Find players currently on this plate
-            const playersHere = Object.values(dailyPlayerPositions).filter(p => !p.completed && p.plateIndex === i);
-            const hasPlayers = playersHere.length > 0;
+            const anyoneHere = showPlayers.some(uid => dailyPlayers[uid].currentPlate === i);
 
-            html += `<div class="daily-plate-row" style="${hasPlayers ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
+            html += `<div class="daily-plate-row" style="${anyoneHere ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
             html += `<span class="dp-num">${i + 1}</span>`;
             html += `<span class="dp-plate">${plate}</span>`;
-            html += '<span class="dp-players">';
-            for (const p of playersHere) {
-                html += `<span class="dp-avatar" style="background:${p.color};" title="${p.name}">${p.initials}</span>`;
+
+            for (const uid of showPlayers) {
+                const p = dailyPlayers[uid];
+                const result = p.plateResults[i];
+                if (p.currentPlate === i) {
+                    // Player is currently on this plate — show their dot
+                    html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;" title="${p.name}">⏳</span>`;
+                } else if (result) {
+                    // Player already passed this plate — show result
+                    if (result.skipped) {
+                        html += '<span style="width:22px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 1px;color:#dc2626;">✕</span>';
+                    } else {
+                        const w = (result.word || '?').toLowerCase();
+                        const display = w.length > 3 ? w.substring(0, 3) : w;
+                        html += `<span style="width:22px;text-align:center;font-size:0.55rem;flex-shrink:0;margin:0 1px;color:#16a34a;font-weight:600;" title="${w}">${display}</span>`;
+                    }
+                } else {
+                    // Player hasn't reached this plate yet
+                    html += '<span style="width:22px;flex-shrink:0;margin:0 1px;"></span>';
+                }
             }
-            html += '</span></div>';
+
+            html += '</div>';
         }
         grid.innerHTML = html;
     }
@@ -596,7 +654,7 @@
 
         // Track daily challenge positions
         if (e.mode === 'daily' && e.userId) {
-            updateDailyPosition(e.userId, e.plate);
+            updateDailyPosition(e.userId, e.plate, e.word, e.skipped);
         }
     }
 
