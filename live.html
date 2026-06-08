@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v6</title>
+    <title>Live Tracker v7</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -347,8 +347,9 @@
             const { data } = await sb.from('daily_plates').select('plates').eq('date', today).single();
             if (data && data.plates) {
                 dailyPlates = data.plates;
-                // Load existing daily entries for today to populate positions
                 await loadDailyPositions();
+                // Also scan recent live_plays for in-progress daily runs not yet in daily_run_entries
+                await loadLiveDailyPositions();
                 renderDailySidebar();
             } else {
                 document.getElementById('dailyPlateGrid').textContent = 'No plates for today';
@@ -422,6 +423,47 @@
                 completed, time: run.total_seconds
             };
             if (!dailyPlayerOrder.includes(uid)) dailyPlayerOrder.push(uid);
+        }
+    }
+
+    async function loadLiveDailyPositions() {
+        // Scan today's live_plays for daily entries to catch in-progress runs
+        const today = getTodayStr();
+        const since = today + 'T00:00:00';
+        const { data } = await sb.from('live_plays')
+            .select('user_id, plate, word, skipped')
+            .eq('mode', 'daily')
+            .gte('created_at', since)
+            .order('created_at', { ascending: true });
+        if (!data || data.length === 0) return;
+
+        // Batch resolve profiles
+        const newUserIds = [...new Set(data.map(e => e.user_id).filter(uid => uid && !dailyPlayers[uid]))];
+        if (newUserIds.length > 0) {
+            const { data: profiles } = await sb.from('profiles').select('id, display_name, handle').in('id', newUserIds);
+            for (const p of (profiles || [])) {
+                profileCache[p.id] = p.display_name || (p.handle ? '@' + p.handle : 'Anon');
+            }
+        }
+
+        for (const e of data) {
+            const uid = e.user_id;
+            if (!uid) continue;
+            const plateIdx = dailyPlates.indexOf(e.plate.toUpperCase());
+            if (plateIdx === -1) continue;
+
+            if (!dailyPlayers[uid]) {
+                const name = profileCache[uid] || 'Anon';
+                const colorIdx = Math.abs(hashStr(uid)) % avatarColors.length;
+                dailyPlayers[uid] = {
+                    name, initials: getInitials(name), color: avatarColors[colorIdx],
+                    plateResults: {}, currentPlate: 0, completed: false
+                };
+                if (!dailyPlayerOrder.includes(uid)) dailyPlayerOrder.push(uid);
+            }
+
+            dailyPlayers[uid].plateResults[plateIdx] = { word: e.skipped ? null : e.word, skipped: e.skipped };
+            dailyPlayers[uid].currentPlate = plateIdx + 1;
         }
     }
 
@@ -518,7 +560,7 @@
             html += '<span style="width:18px;flex-shrink:0;"></span><span style="width:40px;flex-shrink:0;"></span>';
             for (const uid of showPlayers) {
                 const p = dailyPlayers[uid];
-                html += `<span class="dp-avatar" style="background:${p.color};cursor:pointer;flex-shrink:0;margin:0 2px;" title="${p.name}" onclick="selectDailyPlayer('${uid}')">${p.initials}</span>`;
+                html += `<span class="dp-avatar" style="background:${p.color};cursor:pointer;flex-shrink:0;margin:0 2px;" title="${p.name}" onclick="event.stopPropagation();selectDailyPlayer('${uid}')">${p.initials}</span>`;
             }
             html += '</div>';
         }
@@ -564,17 +606,17 @@
                     const solvedSoFar = Object.keys(p.plateResults).filter(k => !p.plateResults[k].skipped && parseInt(k) <= i).length;
                     // Each cell is 26px wide (matches avatar 22px + 4px margin)
                     if (p.currentPlate === i) {
-                        html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 2px;font-size:0.6rem;cursor:pointer;" title="${p.name}" onclick="selectDailyPlayer('${uid}')">${solvedSoFar}</span>`;
+                        html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 0px;font-size:0.6rem;cursor:pointer;" title="${p.name}" onclick="event.stopPropagation();selectDailyPlayer('${uid}')">${solvedSoFar}</span>`;
                     } else if (result) {
                         if (result.skipped) {
-                            html += '<span style="width:22px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 2px;color:#dc2626;">✕</span>';
+                            html += '<span style="width:26px;text-align:center;font-size:0.65rem;flex-shrink:0;margin:0 0px;color:#dc2626;">✕</span>';
                         } else {
                             const w = (result.word || '?').toLowerCase();
-                            const display = w.length > 3 ? w.substring(0, 3) : w;
-                            html += `<span style="width:22px;text-align:center;font-size:0.5rem;flex-shrink:0;margin:0 2px;color:#16a34a;font-weight:600;" title="${w}">${display}</span>`;
+                            const display = w.length > 4 ? w.substring(0, 4) : w;
+                            html += `<span style="width:26px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 0px;color:#16a34a;font-weight:600;" title="${w}">${display}</span>`;
                         }
                     } else {
-                        html += '<span style="width:22px;flex-shrink:0;margin:0 2px;"></span>';
+                        html += '<span style="width:26px;flex-shrink:0;margin:0 0px;"></span>';
                     }
                 }
 
