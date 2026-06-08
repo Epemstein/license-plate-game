@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v7</title>
+    <title>Live Tracker v8</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -18,7 +18,7 @@
         .container { max-width: 1300px; margin: 0 auto; padding: 20px; }
         .main-layout { display: flex; gap: 20px; }
         .main-left { flex: 1; min-width: 0; }
-        .daily-sidebar { width: 380px; flex-shrink: 0; position: sticky; top: 20px; align-self: flex-start; max-height: calc(100vh - 40px); overflow-y: auto; }
+        .daily-sidebar { width: 460px; flex-shrink: 0; position: sticky; top: 20px; align-self: flex-start; max-height: calc(100vh - 40px); overflow-y: auto; }
         .daily-sidebar h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
         .daily-plate-row { display: flex; align-items: center; padding: 5px 8px; border-radius: 6px; margin-bottom: 2px; background: #fff; border: 1px solid #e5e7eb; min-height: 30px; }
         .daily-plate-row .dp-num { font-size: 0.7rem; color: #9ca3af; width: 18px; flex-shrink: 0; }
@@ -555,12 +555,12 @@
             html += '</div>';
         } else if (inProgress.length > 0) {
             // Header row — fixed position per player column
-            const showPlayers = inProgress.slice(-6);
+            const showPlayers = inProgress.slice(-4);
             html += '<div style="display:flex;align-items:center;padding:2px 8px;margin-bottom:2px;">';
             html += '<span style="width:18px;flex-shrink:0;"></span><span style="width:40px;flex-shrink:0;"></span>';
             for (const uid of showPlayers) {
                 const p = dailyPlayers[uid];
-                html += `<span class="dp-avatar" style="background:${p.color};cursor:pointer;flex-shrink:0;margin:0 2px;" title="${p.name}" onclick="event.stopPropagation();selectDailyPlayer('${uid}')">${p.initials}</span>`;
+                html += `<span style="width:70px;text-align:center;flex-shrink:0;"><span class="dp-avatar" style="background:${p.color};cursor:pointer;" title="${p.name}" onclick="event.stopPropagation();selectDailyPlayer('${uid}')">${p.initials}</span></span>`;
             }
             html += '</div>';
         }
@@ -593,7 +593,7 @@
                 html += '</span></div>';
             } else {
                 // Overview — show all in-progress players
-                const showPlayers = inProgress.slice(-6);
+                const showPlayers = inProgress.slice(-4);
                 const anyoneHere = showPlayers.some(uid => dailyPlayers[uid].currentPlate === i);
 
                 html += `<div class="daily-plate-row" style="display:flex;align-items:center;${anyoneHere ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
@@ -606,17 +606,16 @@
                     const solvedSoFar = Object.keys(p.plateResults).filter(k => !p.plateResults[k].skipped && parseInt(k) <= i).length;
                     // Each cell is 26px wide (matches avatar 22px + 4px margin)
                     if (p.currentPlate === i) {
-                        html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 0px;font-size:0.6rem;cursor:pointer;" title="${p.name}" onclick="event.stopPropagation();selectDailyPlayer('${uid}')">${solvedSoFar}</span>`;
+                        html += `<span style="width:70px;text-align:center;flex-shrink:0;"><span class="dp-avatar" style="background:${p.color};font-size:0.6rem;cursor:pointer;" title="${p.name}" onclick="event.stopPropagation();selectDailyPlayer('${uid}')">${solvedSoFar}</span></span>`;
                     } else if (result) {
                         if (result.skipped) {
-                            html += '<span style="width:26px;text-align:center;font-size:0.65rem;flex-shrink:0;margin:0 0px;color:#dc2626;">✕</span>';
+                            html += '<span style="width:70px;text-align:center;font-size:0.7rem;flex-shrink:0;color:#dc2626;">✕</span>';
                         } else {
                             const w = (result.word || '?').toLowerCase();
-                            const display = w.length > 4 ? w.substring(0, 4) : w;
-                            html += `<span style="width:26px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 0px;color:#16a34a;font-weight:600;" title="${w}">${display}</span>`;
+                            html += `<span style="width:70px;text-align:center;font-size:0.65rem;flex-shrink:0;color:#16a34a;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${w}">${w}</span>`;
                         }
                     } else {
-                        html += '<span style="width:26px;flex-shrink:0;margin:0 0px;"></span>';
+                        html += '<span style="width:70px;flex-shrink:0;"></span>';
                     }
                 }
 
