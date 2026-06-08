@@ -358,34 +358,62 @@
             .eq('date', today);
         if (!runs || runs.length === 0) return;
 
-        for (const run of runs) {
-            const { data: entries } = await sb.from('daily_run_entries')
-                .select('plate_index, plate, word, skipped')
-                .eq('run_id', run.id)
-                .order('plate_index', { ascending: true });
+        // Batch fetch all entries for all runs at once
+        const runIds = runs.map(r => r.id);
+        const runMap = {};
+        for (const r of runs) runMap[r.id] = r;
 
-            const userName = await resolveUser(run.user_id);
-            const initials = getInitials(userName || 'Anon');
-            const colorIdx = Math.abs(hashStr(run.user_id)) % avatarColors.length;
+        let allEntries = [];
+        // Fetch in chunks of 50 run IDs
+        for (let i = 0; i < runIds.length; i += 50) {
+            const chunk = runIds.slice(i, i + 50);
+            const { data } = await sb.from('daily_run_entries')
+                .select('run_id, plate_index, word, skipped')
+                .in('run_id', chunk)
+                .order('plate_index', { ascending: true });
+            if (data) allEntries.push(...data);
+        }
+
+        // Batch fetch all profiles at once
+        const userIds = [...new Set(runs.map(r => r.user_id))];
+        const { data: profiles } = await sb.from('profiles')
+            .select('id, display_name, handle')
+            .in('id', userIds);
+        const profileMap = {};
+        for (const p of (profiles || [])) {
+            profileMap[p.id] = p.display_name || (p.handle ? '@' + p.handle : 'Anon');
+            profileCache[p.id] = profileMap[p.id];
+        }
+
+        // Group entries by run_id
+        const entriesByRun = {};
+        for (const e of allEntries) {
+            if (!entriesByRun[e.run_id]) entriesByRun[e.run_id] = [];
+            entriesByRun[e.run_id].push(e);
+        }
+
+        // Build player data
+        for (const run of runs) {
+            const uid = run.user_id;
+            const userName = profileMap[uid] || 'Anon';
+            const initials = getInitials(userName);
+            const colorIdx = Math.abs(hashStr(uid)) % avatarColors.length;
             const completed = run.total_seconds != null;
+            const runEntries = entriesByRun[run.id] || [];
 
             const plateResults = {};
             let maxIdx = -1;
-            for (const e of (entries || [])) {
+            for (const e of runEntries) {
                 plateResults[e.plate_index] = { word: e.word, skipped: e.skipped };
                 if (e.plate_index > maxIdx) maxIdx = e.plate_index;
             }
 
-            dailyPlayers[run.user_id] = {
-                name: userName || 'Anon',
-                initials,
-                color: avatarColors[colorIdx],
-                plateResults,
-                currentPlate: completed ? -1 : maxIdx + 1,
-                completed,
-                time: run.total_seconds
+            dailyPlayers[uid] = {
+                name: userName, initials, color: avatarColors[colorIdx],
+                plateResults, currentPlate: completed ? -1 : maxIdx + 1,
+                completed, time: run.total_seconds
             };
-            if (!dailyPlayerOrder.includes(run.user_id)) dailyPlayerOrder.push(run.user_id);
+            if (!dailyPlayerOrder.includes(uid)) dailyPlayerOrder.push(uid);
         }
     }
 
@@ -455,21 +483,8 @@
             return;
         }
 
-        // Completed players at top
         const completed = activePlayers.filter(uid => dailyPlayers[uid].completed);
         let html = '';
-        if (completed.length > 0) {
-            const sorted = [...completed].sort((a, b) => (dailyPlayers[a].time || 999) - (dailyPlayers[b].time || 999));
-            html += '<div style="margin-bottom:8px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;">';
-            html += '<div style="font-size:0.65rem;color:#16a34a;font-weight:700;margin-bottom:4px;">FINISHED</div>';
-            html += '<div style="display:flex;flex-wrap:wrap;gap:3px;">';
-            for (const uid of sorted) {
-                const p = dailyPlayers[uid];
-                const timeStr = p.time ? p.time.toFixed(1) + 's' : '';
-                html += `<span class="dp-avatar" style="background:${p.color};" title="${p.name} ${timeStr}">${p.initials}</span>`;
-            }
-            html += '</div></div>';
-        }
 
         // In-progress players for columns (limit to ~6 most recent to keep it readable)
         const inProgress = activePlayers.filter(uid => !dailyPlayers[uid].completed);
@@ -481,7 +496,7 @@
             html += '<span style="width:18px;"></span><span style="width:36px;"></span>';
             for (const uid of showPlayers) {
                 const p = dailyPlayers[uid];
-                html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;" title="${p.name}">${p.initials}</span>`;
+                html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;cursor:pointer;" title="${p.name}" onclick="showDailyPlayerDetail('${uid}')">${p.initials}</span>`;
             }
             html += '</div>';
         }
@@ -519,8 +534,71 @@
 
             html += '</div>';
         }
+
+        // Completed players at bottom
+        if (completed.length > 0) {
+            const sorted = [...completed].sort((a, b) => (dailyPlayers[a].time || 999) - (dailyPlayers[b].time || 999));
+            html += '<div style="margin-top:8px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;">';
+            html += '<div style="font-size:0.65rem;color:#16a34a;font-weight:700;margin-bottom:4px;">FINISHED</div>';
+            html += '<div style="display:flex;flex-wrap:wrap;gap:3px;">';
+            for (const uid of sorted) {
+                const p = dailyPlayers[uid];
+                const timeStr = p.time ? p.time.toFixed(1) + 's' : '';
+                html += `<span class="dp-avatar" style="background:${p.color};cursor:pointer;" title="${p.name} ${timeStr}" onclick="showDailyPlayerDetail('${uid}')">${p.initials}</span>`;
+            }
+            html += '</div></div>';
+        }
+
         grid.innerHTML = html;
     }
+
+    // Show detailed run info when clicking a player avatar
+    window.showDailyPlayerDetail = function(userId) {
+        const p = dailyPlayers[userId];
+        if (!p) return;
+
+        let detail = '<div style="padding:12px;">';
+        detail += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">`;
+        detail += `<span class="dp-avatar" style="background:${p.color};width:28px;height:28px;font-size:0.7rem;">${p.initials}</span>`;
+        detail += `<div><div style="font-weight:700;">${esc(p.name)}</div>`;
+        if (p.completed && p.time) {
+            detail += `<div style="font-size:0.8rem;color:#16a34a;font-weight:600;">${p.time.toFixed(2)}s</div>`;
+        } else {
+            detail += `<div style="font-size:0.8rem;color:#d97706;">In progress — plate ${p.currentPlate + 1}</div>`;
+        }
+        detail += '</div></div>';
+
+        // Plate-by-plate breakdown
+        const indices = Object.keys(p.plateResults).map(Number).sort((a, b) => a - b);
+        let solved = 0;
+        detail += '<div style="display:flex;flex-direction:column;gap:2px;">';
+        for (const idx of indices) {
+            const r = p.plateResults[idx];
+            const plate = dailyPlates[idx] || '???';
+            if (!r.skipped) solved++;
+            if (r.skipped) {
+                detail += `<div style="display:flex;align-items:center;padding:3px 6px;background:#1f2937;border-radius:4px;color:#ef4444;font-size:0.75rem;">`;
+                detail += `<span style="font-family:monospace;font-weight:700;width:30px;">${plate}</span>`;
+                detail += `<span style="margin-left:4px;">✕ skipped</span></div>`;
+            } else {
+                detail += `<div style="display:flex;align-items:center;padding:3px 6px;background:#f0fdf4;border-radius:4px;font-size:0.75rem;">`;
+                detail += `<span style="font-family:monospace;font-weight:700;width:30px;">${plate}</span>`;
+                detail += `<span style="margin-left:4px;color:#16a34a;">${r.word || '?'}</span></div>`;
+            }
+        }
+        detail += '</div>';
+        detail += `<div style="margin-top:6px;font-size:0.75rem;color:#6b7280;">Solved: ${solved}/${indices.length}</div>`;
+        detail += '</div>';
+
+        // Show in a popover
+        const existing = document.getElementById('dailyPlayerPopover');
+        if (existing) existing.remove();
+        const popover = document.createElement('div');
+        popover.id = 'dailyPlayerPopover';
+        popover.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-width:300px;max-height:80vh;overflow-y:auto;z-index:2000;';
+        popover.innerHTML = `<div style="display:flex;justify-content:flex-end;padding:8px 12px 0;"><button onclick="this.parentElement.parentElement.remove()" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">&times;</button></div>${detail}`;
+        document.body.appendChild(popover);
+    };
 
     function subscribe() {
         const channel = sb.channel('live-tracker');
