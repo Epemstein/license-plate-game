@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v19</title>
+    <title>Live Tracker v20</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1106,35 +1106,30 @@
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         const allTimestamps = await fetchAllEntryTimestamps(since);
 
-        // Bucket into 30-min intervals
-        const buckets = {};
+        // Bucket into 30-min intervals using epoch ms for reliable matching
+        const INTERVAL = 30 * 60 * 1000;
         const now = Date.now();
+        const startEpoch = now - 48 * INTERVAL;
+
+        // Initialize 48 buckets
+        const bucketCounts = new Array(48).fill(0);
+        const bucketLabels = [];
         for (let i = 0; i < 48; i++) {
-            const t = now - (47 - i) * 30 * 60 * 1000;
-            const key = new Date(t).toISOString().slice(0, 16);
-            buckets[key] = 0;
+            const t = startEpoch + i * INTERVAL;
+            bucketLabels.push(new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
         }
 
         let matched = 0;
-        for (let ts of allTimestamps) {
-            // Truncate microseconds to milliseconds for browser compatibility
-            if (typeof ts === 'string' && ts.includes('.')) {
-                ts = ts.replace(/\.(\d{3})\d*/, '.$1');
-            }
-            const t = new Date(ts);
-            if (isNaN(t.getTime())) continue;
-            const mins = t.getUTCMinutes();
-            t.setUTCMinutes(mins < 30 ? 0 : 30, 0, 0);
-            const key = t.toISOString().slice(0, 16);
-            if (key in buckets) { buckets[key]++; matched++; }
+        for (const ts of allTimestamps) {
+            const epoch = new Date(ts).getTime();
+            if (isNaN(epoch)) continue;
+            const idx = Math.floor((epoch - startEpoch) / INTERVAL);
+            if (idx >= 0 && idx < 48) { bucketCounts[idx]++; matched++; }
         }
         console.log('[Activity] Bucketed', matched, '/', allTimestamps.length, 'timestamps');
 
-        const labels = Object.keys(buckets).map(k => {
-            const d = new Date(k + ':00Z');
-            return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        });
-        const values = Object.values(buckets);
+        const labels = bucketLabels;
+        const values = bucketCounts;
 
         const ctx = document.getElementById('activityChart').getContext('2d');
         if (activityChart) activityChart.destroy();
