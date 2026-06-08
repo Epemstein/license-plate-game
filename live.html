@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v22</title>
+    <title>Live Tracker v23</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -819,8 +819,9 @@
             updateLiveRecords(e);
         }
 
-        // Update activity chart live
+        // Update activity chart and week grid live
         if (e.at) addToActivityBucket(e.at.getTime());
+        incrementWeekGridToday();
 
         // Track daily challenge positions
         if (e.mode === 'daily' && e.userId) {
@@ -1202,20 +1203,30 @@
         });
     }
 
+    let weekGridData = null;
+    let weekGridTodayKey = null;
+
     async function loadWeekGrid() {
         const grid = document.getElementById('weekGrid');
         const { data: counts } = await sb.rpc('plays_per_day_last7');
         if (!counts) { grid.innerHTML = '<p style="color:#9ca3af;">Failed to load</p>'; return; }
+        weekGridData = counts;
+        weekGridTodayKey = new Date().toISOString().slice(0, 10);
+        renderWeekGrid();
+    }
 
-        const days = Object.keys(counts).sort();
-        const maxCount = Math.max(...Object.values(counts), 1);
+    function renderWeekGrid() {
+        if (!weekGridData) return;
+        const grid = document.getElementById('weekGrid');
+        const days = Object.keys(weekGridData).sort();
+        const maxCount = Math.max(...Object.values(weekGridData), 1);
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
         let html = '';
         for (const d of days) {
             const dt = new Date(d + 'T12:00:00');
             const dayName = dayNames[dt.getDay()];
-            const count = counts[d];
+            const count = weekGridData[d];
             const intensity = count / maxCount;
             const bg = `rgba(124, 58, 237, ${0.08 + intensity * 0.35})`;
             html += `<div class="peak-cell" style="background:${bg};">
@@ -1224,6 +1235,14 @@
             </div>`;
         }
         grid.innerHTML = html;
+    }
+
+    function incrementWeekGridToday() {
+        if (!weekGridData || !weekGridTodayKey) return;
+        if (weekGridData[weekGridTodayKey] != null) {
+            weekGridData[weekGridTodayKey]++;
+            renderWeekGrid();
+        }
     }
 
     // ==================== UTILITY ====================
