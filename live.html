@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v17</title>
+    <title>Live Tracker v18</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -366,7 +366,7 @@
     async function loadDailyPositions() {
         const today = getTodayStr();
         const { data: runs } = await sb.from('daily_runs')
-            .select('id, user_id, total_seconds, created_at')
+            .select('id, user_id, total_seconds, completed_at')
             .eq('date', today);
         if (!runs || runs.length === 0) return;
 
@@ -424,7 +424,7 @@
                 name: userName, initials, color: avatarColors[colorIdx],
                 plateResults, currentPlate: completed ? -1 : maxIdx + 1,
                 completed, time: run.total_seconds,
-                lastActivity: new Date(run.created_at)
+                lastActivity: run.completed_at ? new Date(run.completed_at) : new Date()
             };
             if (!dailyPlayerOrder.includes(uid)) dailyPlayerOrder.push(uid);
         }
@@ -1118,8 +1118,9 @@
         let matched = 0;
         for (const ts of allTimestamps) {
             const t = new Date(ts);
-            const mins = t.getMinutes();
-            t.setMinutes(mins < 30 ? 0 : 30, 0, 0);
+            if (isNaN(t.getTime())) continue;
+            const mins = t.getUTCMinutes();
+            t.setUTCMinutes(mins < 30 ? 0 : 30, 0, 0);
             const key = t.toISOString().slice(0, 16);
             if (key in buckets) { buckets[key]++; matched++; }
         }
