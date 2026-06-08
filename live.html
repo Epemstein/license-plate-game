@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v14</title>
+    <title>Live Tracker v15</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -468,7 +468,10 @@
             }
 
             dailyPlayers[uid].plateResults[plateIdx] = { word: e.skipped ? null : e.word, skipped: e.skipped };
-            dailyPlayers[uid].currentPlate = plateIdx + 1;
+            // Don't overwrite completed players' state
+            if (!dailyPlayers[uid].completed) {
+                dailyPlayers[uid].currentPlate = plateIdx + 1;
+            }
             dailyPlayers[uid].lastActivity = new Date(e.created_at);
         }
     }
