@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v10</title>
+    <title>Live Tracker v11</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -167,7 +167,7 @@
                     <span class="h-mode">Mode</span>
                     <span class="h-ago"></span>
                 </div>
-                <div class="feed" id="feed">
+                <div class="feed" id="feed" onclick="if(event.target.id==='feed'){toggleRunHighlight(null);}">
                     <div class="empty">Waiting for plays...</div>
                 </div>
             </div>
@@ -230,6 +230,7 @@
     let profileCache = {};
     let activeFilter = 'all';
     let activeTab = 'feed';
+    let selectedRunId = null; // highlighted run in feed
     let statsLoaded = false;
     let activityChart = null;
     let todayCount = 0; // actual full-day count from DB
@@ -888,7 +889,11 @@
         const barColor = e.skipped ? '#111' : timeColor(e.time);
         const barW = timeBarWidth(e.time);
         const user = e.userName ? esc(e.userName) : '<span style="color:#d1d5db;">anon</span>';
-        return `<div class="entry entry-${e.mode}">
+        const rid = e.runId || '';
+        const dimmed = selectedRunId && rid !== selectedRunId;
+        const highlighted = selectedRunId && rid === selectedRunId;
+        const style = dimmed ? 'opacity:0.2;' : highlighted ? 'background:#eef2ff;border-color:#a5b4fc;' : '';
+        return `<div class="entry entry-${e.mode}" data-runid="${rid}" onclick="toggleRunHighlight('${rid}')" style="cursor:pointer;${style}">
             <span class="user">${user}</span>
             <span class="plate">${esc(e.plate)}</span>
             ${wordHtml}
@@ -900,6 +905,15 @@
             <span class="ago">${ago(e.at)}</span>
         </div>`;
     }
+
+    window.toggleRunHighlight = function(runId) {
+        if (!runId || selectedRunId === runId) {
+            selectedRunId = null;
+        } else {
+            selectedRunId = runId;
+        }
+        renderFeed();
+    };
 
     // Compute running solved/seen per run using run_id
     function computeRunningCounts() {
