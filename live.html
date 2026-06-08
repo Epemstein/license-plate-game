@@ -411,6 +411,7 @@
         if (e.mode in todaySplits) todaySplits[e.mode]++;
         updateStats(true, e.mode);
 
+        computeRunningCounts();
         if (activeFilter === 'all' || activeFilter === e.mode) {
             const feed = document.getElementById('feed');
             const empty = feed.querySelector('.empty');
@@ -510,9 +511,10 @@
     }
 
     function renderEntryHTML(e) {
+        const countHtml = e._seen ? `<span style="color:#b0b0b0;font-size:0.75rem;margin-left:6px;">${e._solved}/${e._seen}</span>` : '';
         const wordHtml = e.skipped
-            ? '<span class="word skipped">skipped</span>'
-            : `<span class="word">${highlightWord(e.word || '?', e.plate)}</span>`;
+            ? `<span class="word skipped">skipped${countHtml}</span>`
+            : `<span class="word">${highlightWord(e.word || '?', e.plate)}${countHtml}</span>`;
         const timeStr = e.time != null ? e.time.toFixed(2) : '--';
         const barColor = e.skipped ? '#111' : timeColor(e.time);
         const barW = timeBarWidth(e.time);
@@ -530,7 +532,23 @@
         </div>`;
     }
 
+    // Compute running solved/seen per user across all entries (chronological)
+    function computeRunningCounts() {
+        const userCounts = {}; // userId -> { solved, seen }
+        // Process oldest first
+        const chrono = [...entries].reverse();
+        for (const e of chrono) {
+            const uid = e.userId || 'anon';
+            if (!userCounts[uid]) userCounts[uid] = { solved: 0, seen: 0 };
+            userCounts[uid].seen++;
+            if (!e.skipped) userCounts[uid].solved++;
+            e._solved = userCounts[uid].solved;
+            e._seen = userCounts[uid].seen;
+        }
+    }
+
     function renderFeed() {
+        computeRunningCounts();
         const feed = document.getElementById('feed');
         const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.mode === activeFilter);
         if (filtered.length === 0) { feed.innerHTML = '<div class="empty">Waiting for plays...</div>'; return; }
