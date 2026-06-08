@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v15</title>
+    <title>Live Tracker v16</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -467,12 +467,14 @@
                 if (!dailyPlayerOrder.includes(uid)) dailyPlayerOrder.push(uid);
             }
 
-            dailyPlayers[uid].plateResults[plateIdx] = { word: e.skipped ? null : e.word, skipped: e.skipped };
-            // Don't overwrite completed players' state
+            // Only update plate results — don't overwrite completed players' currentPlate
+            if (!dailyPlayers[uid].plateResults[plateIdx]) {
+                dailyPlayers[uid].plateResults[plateIdx] = { word: e.skipped ? null : e.word, skipped: e.skipped };
+            }
             if (!dailyPlayers[uid].completed) {
                 dailyPlayers[uid].currentPlate = plateIdx + 1;
+                dailyPlayers[uid].lastActivity = new Date(e.created_at);
             }
-            dailyPlayers[uid].lastActivity = new Date(e.created_at);
         }
     }
 
