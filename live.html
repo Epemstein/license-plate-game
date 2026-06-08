@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v8</title>
+    <title>Live Tracker v9</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -20,11 +20,11 @@
         .main-left { flex: 1; min-width: 0; }
         .daily-sidebar { width: 460px; flex-shrink: 0; position: sticky; top: 20px; align-self: flex-start; max-height: calc(100vh - 40px); overflow-y: auto; }
         .daily-sidebar h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
-        .daily-plate-row { display: flex; align-items: center; padding: 5px 8px; border-radius: 6px; margin-bottom: 2px; background: #fff; border: 1px solid #e5e7eb; min-height: 30px; }
+        .daily-plate-row { display: flex; align-items: center; padding: 5px 8px; border-radius: 0; margin-bottom: 0; background: #fff; border-bottom: 1px solid #f0f0f0; min-height: 32px; }
         .daily-plate-row .dp-num { font-size: 0.7rem; color: #9ca3af; width: 18px; flex-shrink: 0; }
         .daily-plate-row .dp-plate { font-family: monospace; font-weight: 700; font-size: 0.9rem; width: 40px; flex-shrink: 0; }
         .daily-plate-row .dp-players { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
-        .dp-avatar { width: 22px; height: 22px; border-radius: 50%; font-size: 0.55rem; font-weight: 700; display: flex; align-items: center; justify-content: center; color: white; cursor: default; }
+        .dp-avatar { width: 22px; height: 22px; border-radius: 50%; font-size: 0.55rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; color: white; cursor: default; }
         @media (max-width: 1000px) { .daily-sidebar { display: none; } }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .header h1 { font-size: 1.3rem; }
@@ -282,9 +282,11 @@
         setInterval(updateRecentStat, 30000);
 
         // Refresh daily sidebar when tab becomes visible
-        document.addEventListener('visibilitychange', () => {
+        document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible') {
-                loadDailyPositions().then(() => renderDailySidebar());
+                await loadDailyPositions();
+                await loadLiveDailyPositions();
+                renderDailySidebar();
             }
         });
     }
