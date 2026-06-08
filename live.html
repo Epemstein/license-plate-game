@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v21</title>
+    <title>Live Tracker v22</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -819,6 +819,9 @@
             updateLiveRecords(e);
         }
 
+        // Update activity chart live
+        if (e.at) addToActivityBucket(e.at.getTime());
+
         // Track daily challenge positions
         if (e.mode === 'daily' && e.userId) {
             updateDailyPosition(e.userId, e.plate, e.word, e.skipped);
@@ -1113,41 +1116,67 @@
         return result;
     }
 
-    async function loadActivityChart() {
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const allTimestamps = await fetchAllEntryTimestamps(since);
+    // Store bucket data globally so we can update live
+    let activityBucketCounts = null;
+    let activityBucketLabels = null;
+    let activityStartEpoch = 0;
+    const ACTIVITY_INTERVAL = 30 * 60 * 1000;
 
-        // Bucket into 30-min intervals using epoch ms for reliable matching
-        const INTERVAL = 30 * 60 * 1000;
-        const now = Date.now();
-        const startEpoch = now - 48 * INTERVAL;
+    function getActivityBuckets() {
+        // Snap to half-hour boundaries (e.g. 7:00, 7:30, 8:00)
+        const now = new Date();
+        const currentSlot = new Date(now);
+        currentSlot.setMinutes(now.getMinutes() < 30 ? 30 : 60, 0, 0); // end of current slot
+        const endEpoch = currentSlot.getTime();
+        const startEpoch = endEpoch - 48 * ACTIVITY_INTERVAL;
 
-        // Initialize 48 buckets
-        const bucketCounts = new Array(48).fill(0);
-        const bucketLabels = [];
+        const counts = new Array(48).fill(0);
+        const labels = [];
         for (let i = 0; i < 48; i++) {
-            const t = startEpoch + i * INTERVAL;
-            bucketLabels.push(new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+            const t = startEpoch + i * ACTIVITY_INTERVAL;
+            labels.push(new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
         }
+        return { counts, labels, startEpoch };
+    }
+
+    function addToActivityBucket(epoch) {
+        if (!activityBucketCounts || isNaN(epoch)) return;
+        const idx = Math.floor((epoch - activityStartEpoch) / ACTIVITY_INTERVAL);
+        if (idx >= 0 && idx < 48) {
+            activityBucketCounts[idx]++;
+            if (activityChart) {
+                activityChart.data.datasets[0].data = [...activityBucketCounts];
+                activityChart.update('none');
+            }
+        }
+    }
+
+    async function loadActivityChart() {
+        const { counts, labels, startEpoch } = getActivityBuckets();
+        activityBucketCounts = counts;
+        activityBucketLabels = labels;
+        activityStartEpoch = startEpoch;
+
+        const since = new Date(startEpoch).toISOString();
+        const allTimestamps = await fetchAllEntryTimestamps(since);
 
         let matched = 0;
         for (const ts of allTimestamps) {
             const epoch = new Date(ts).getTime();
             if (isNaN(epoch)) continue;
-            const idx = Math.floor((epoch - startEpoch) / INTERVAL);
-            if (idx >= 0 && idx < 48) { bucketCounts[idx]++; matched++; }
+            const idx = Math.floor((epoch - startEpoch) / ACTIVITY_INTERVAL);
+            if (idx >= 0 && idx < 48) { activityBucketCounts[idx]++; matched++; }
         }
         console.log('[Activity] Bucketed', matched, '/', allTimestamps.length, 'timestamps');
 
-        const labels = bucketLabels;
-        const values = bucketCounts;
+        const values = activityBucketCounts;
 
         const ctx = document.getElementById('activityChart').getContext('2d');
         if (activityChart) activityChart.destroy();
         activityChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels,
+                labels: activityBucketLabels,
                 datasets: [{
                     data: values,
                     backgroundColor: '#a78bfa',
