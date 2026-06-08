@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v16</title>
+    <title>Live Tracker v17</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -439,6 +439,15 @@
             .eq('mode', 'daily')
             .gte('created_at', since)
             .order('created_at', { ascending: true });
+
+        // Also check for any completed runs we might have missed
+        const { data: completedRuns } = await sb.from('daily_runs')
+            .select('user_id, total_seconds')
+            .eq('date', today)
+            .not('total_seconds', 'is', null);
+        const completedSet = new Set((completedRuns || []).map(r => r.user_id));
+        const completedTimes = {};
+        for (const r of (completedRuns || [])) completedTimes[r.user_id] = r.total_seconds;
         if (!data || data.length === 0) return;
 
         // Batch resolve profiles
@@ -474,6 +483,14 @@
             if (!dailyPlayers[uid].completed) {
                 dailyPlayers[uid].currentPlate = plateIdx + 1;
                 dailyPlayers[uid].lastActivity = new Date(e.created_at);
+            }
+        }
+        // Mark completed players from daily_runs check
+        for (const uid of completedSet) {
+            if (dailyPlayers[uid] && !dailyPlayers[uid].completed) {
+                dailyPlayers[uid].completed = true;
+                dailyPlayers[uid].currentPlate = -1;
+                dailyPlayers[uid].time = completedTimes[uid];
             }
         }
     }
