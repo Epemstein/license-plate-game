@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v13</title>
+    <title>Live Tracker v14</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -911,7 +911,23 @@
         } else {
             selectedRunId = runId;
         }
-        renderFeed();
+        // Update styles in-place without re-rendering
+        document.querySelectorAll('#feed .entry').forEach(el => {
+            const rid = el.getAttribute('data-runid');
+            if (!selectedRunId) {
+                el.style.opacity = '';
+                el.style.background = '';
+                el.style.borderColor = '';
+            } else if (rid === selectedRunId) {
+                el.style.opacity = '1';
+                el.style.background = '#eef2ff';
+                el.style.borderColor = '#a5b4fc';
+            } else {
+                el.style.opacity = '0.15';
+                el.style.background = '';
+                el.style.borderColor = '';
+            }
+        });
     };
 
     // Compute running solved/seen per run using run_id
