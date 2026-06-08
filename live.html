@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v11</title>
+    <title>Live Tracker v13</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -366,7 +366,7 @@
     async function loadDailyPositions() {
         const today = getTodayStr();
         const { data: runs } = await sb.from('daily_runs')
-            .select('id, user_id, total_seconds')
+            .select('id, user_id, total_seconds, created_at')
             .eq('date', today);
         if (!runs || runs.length === 0) return;
 
@@ -420,13 +420,11 @@
                 if (e.plate_index > maxIdx) maxIdx = e.plate_index;
             }
 
-            // Find latest entry timestamp for this run
-            const lastEntryAt = runEntries.length > 0 ? new Date() : new Date();
             dailyPlayers[uid] = {
                 name: userName, initials, color: avatarColors[colorIdx],
                 plateResults, currentPlate: completed ? -1 : maxIdx + 1,
                 completed, time: run.total_seconds,
-                lastActivity: lastEntryAt
+                lastActivity: new Date(run.created_at)
             };
             if (!dailyPlayerOrder.includes(uid)) dailyPlayerOrder.push(uid);
         }
@@ -543,7 +541,8 @@
         const inProgress = activePlayers.filter(uid => {
             const p = dailyPlayers[uid];
             if (p.completed) return false;
-            if (p.lastActivity && (now - p.lastActivity.getTime()) > STALE_MS) return false;
+            // Hide players inactive for >10 min (uses run created_at as fallback)
+            if (!p.lastActivity || (now - p.lastActivity.getTime()) > STALE_MS) return false;
             return true;
         });
         const sel = dailySelectedPlayer;
