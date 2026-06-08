@@ -296,7 +296,7 @@
 
         // Fetch last hour for feed
         const feedRes = await sb.from('live_plays')
-            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id')
+            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id, run_id')
             .gte('created_at', since)
             .order('created_at', { ascending: false })
             .limit(MAX_ENTRIES);
@@ -309,7 +309,8 @@
             entries.push({
                 plate: e.plate, word: e.word, skipped: e.skipped,
                 time: e.thinking_seconds, mode: e.mode,
-                at: new Date(e.created_at), userId: e.user_id, userName: null
+                at: new Date(e.created_at), userId: e.user_id, userName: null,
+                runId: e.run_id || null
             });
         }
         resolveAllUserNames();
@@ -568,7 +569,8 @@
         const e = {
             plate: row.plate, word: row.word, skipped: row.skipped,
             time: row.thinking_seconds, mode: row.mode,
-            at: new Date(row.created_at || Date.now()), userId: row.user_id || null, userName: null
+            at: new Date(row.created_at || Date.now()), userId: row.user_id || null, userName: null,
+            runId: row.run_id || null
         };
         if (e.userId) e.userName = await resolveUser(e.userId);
 
@@ -704,18 +706,18 @@
         </div>`;
     }
 
-    // Compute running solved/seen per user across all entries (chronological)
+    // Compute running solved/seen per run using run_id
     function computeRunningCounts() {
-        const userCounts = {}; // userId -> { solved, seen }
+        const runState = {}; // run_id -> { solved, seen }
         // Process oldest first
         const chrono = [...entries].reverse();
         for (const e of chrono) {
-            const uid = e.userId || 'anon';
-            if (!userCounts[uid]) userCounts[uid] = { solved: 0, seen: 0 };
-            userCounts[uid].seen++;
-            if (!e.skipped) userCounts[uid].solved++;
-            e._solved = userCounts[uid].solved;
-            e._seen = userCounts[uid].seen;
+            const key = e.runId || (e.userId || 'anon') + '_' + e.at?.getTime();
+            if (!runState[key]) runState[key] = { solved: 0, seen: 0 };
+            runState[key].seen++;
+            if (!e.skipped) runState[key].solved++;
+            e._solved = runState[key].solved;
+            e._seen = runState[key].seen;
         }
     }
 

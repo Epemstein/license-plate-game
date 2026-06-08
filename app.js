@@ -429,6 +429,7 @@
     let currentUser = null;
     let dailyPlateSequence = null;
     let currentViewingDate = null;
+    let currentLiveRunId = crypto.randomUUID();
 
     // Endless mode state
     let endlessSessionId = null;
@@ -823,7 +824,8 @@
             word: skipped ? null : (word || '').toLowerCase(),
             skipped,
             thinking_seconds: Math.floor(thinkingSeconds * 100) / 100,
-            mode: gameMode === 'endless' ? 'endless' : gameMode === 'h2h_challenge' ? 'h2h' : gameMode
+            mode: gameMode === 'endless' ? 'endless' : gameMode === 'h2h_challenge' ? 'h2h' : gameMode,
+            run_id: currentLiveRunId
         }).then(({ error }) => {
             if (error) console.warn('[Live]', error.message);
         });
@@ -2094,6 +2096,7 @@
     async function beginNewRun() {
         startButtonEl.classList.remove('pulse-button');
         resetGameState();
+        currentLiveRunId = crypto.randomUUID();
         gameStarted = true;
         gameOver = false;
 
