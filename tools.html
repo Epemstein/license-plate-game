@@ -649,7 +649,7 @@
                 items.forEach(item => {
                     const pct = (item.count / total * 100).toFixed(1);
                     const wordHtml = item.isSkip
-                        ? '<span style="color:#ef4444;font-weight:600;">skipped</span>'
+                        ? `<span style="color:#ef4444;font-weight:600;cursor:pointer;text-decoration:underline;text-decoration-color:#fca5a5;" onclick="openSkipDetail('${plate}')">skipped</span>`
                         : `<span style="font-size:1rem;cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;" onclick="openWordDetail('${plate}','${item.word}')">${highlightPlate(item.word, plate)}</span>`;
                     html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
                     html += `<div style="flex:1;">${wordHtml}</div>`;
@@ -710,35 +710,112 @@
                     return;
                 }
 
-                let html = '<div style="display:flex;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:0.8rem;color:#9ca3af;font-weight:600;">';
-                html += '<div style="flex:1;">Player</div>';
-                html += '<div style="width:70px;text-align:right;">Time</div>';
-                html += '<div style="width:70px;text-align:center;">Mode</div>';
-                html += '<div style="width:90px;text-align:right;">When</div>';
-                html += '</div>';
+                window._wordDetailPlays = plays;
+                window._wordDetailNameMap = nameMap;
+                renderWordDetailList('time-asc');
 
-                const modeColors = {
-                    daily: 'background:#fef3c7;color:#92400e;',
-                    practice: 'background:#ede9fe;color:#6d28d9;',
-                    endless: 'background:#d1fae5;color:#047857;',
-                    h2h: 'background:#1f2937;color:#f9fafb;',
-                    group: 'background:#dbeafe;color:#1e40af;'
-                };
+            } catch (e) {
+                content.innerHTML = '<p style="color:#dc2626;">Error: ' + e.message + '</p>';
+            }
+        }
 
-                plays.forEach(p => {
-                    const name = nameMap[p.userId] || 'anon';
-                    const timeStr = p.time != null ? p.time.toFixed(1) + 's' : '--';
-                    const modeStyle = modeColors[p.mode] || '';
-                    const when = p.at ? formatWhen(p.at) : '--';
-                    html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
-                    html += `<div style="flex:1;font-weight:500;">${name}</div>`;
-                    html += `<div style="width:70px;text-align:right;font-variant-numeric:tabular-nums;">${timeStr}</div>`;
-                    html += `<div style="width:70px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;text-transform:uppercase;${modeStyle}">${p.mode}</span></div>`;
-                    html += `<div style="width:90px;text-align:right;font-size:0.8rem;color:#6b7280;">${when}</div>`;
-                    html += `</div>`;
-                });
+        function renderWordDetailList(sortKey) {
+            const content = document.getElementById('plateUsedContent');
+            const plays = window._wordDetailPlays || [];
+            const nameMap = window._wordDetailNameMap || {};
 
-                content.innerHTML = html;
+            const sorted = [...plays];
+            switch (sortKey) {
+                case 'time-asc': sorted.sort((a, b) => (a.time || 999) - (b.time || 999)); break;
+                case 'time-desc': sorted.sort((a, b) => (b.time || 0) - (a.time || 0)); break;
+                case 'name-asc': sorted.sort((a, b) => (nameMap[a.userId] || '').localeCompare(nameMap[b.userId] || '')); break;
+                case 'when-desc': sorted.sort((a, b) => new Date(b.at) - new Date(a.at)); break;
+                case 'when-asc': sorted.sort((a, b) => new Date(a.at) - new Date(b.at)); break;
+            }
+
+            const modeColors = {
+                daily: 'background:#fef3c7;color:#92400e;',
+                practice: 'background:#ede9fe;color:#6d28d9;',
+                endless: 'background:#d1fae5;color:#047857;',
+                h2h: 'background:#1f2937;color:#f9fafb;',
+                group: 'background:#dbeafe;color:#1e40af;'
+            };
+
+            const nextSort = (col) => {
+                if (col === 'time') return sortKey === 'time-asc' ? 'time-desc' : 'time-asc';
+                if (col === 'name') return 'name-asc';
+                if (col === 'when') return sortKey === 'when-desc' ? 'when-asc' : 'when-desc';
+                return 'time-asc';
+            };
+
+            let html = '<div style="display:flex;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:0.8rem;color:#9ca3af;font-weight:600;">';
+            html += `<div style="flex:1;cursor:pointer;" onclick="renderWordDetailList('${nextSort('name')}')">Player</div>`;
+            html += `<div style="width:70px;text-align:right;cursor:pointer;" onclick="renderWordDetailList('${nextSort('time')}')">Time${sortKey.startsWith('time') ? (sortKey === 'time-asc' ? ' ▲' : ' ▼') : ''}</div>`;
+            html += '<div style="width:70px;text-align:center;">Mode</div>';
+            html += `<div style="width:90px;text-align:right;cursor:pointer;" onclick="renderWordDetailList('${nextSort('when')}')">When${sortKey.startsWith('when') ? (sortKey === 'when-desc' ? ' ▼' : ' ▲') : ''}</div>`;
+            html += '</div>';
+
+            sorted.forEach(p => {
+                const name = nameMap[p.userId] || 'anon';
+                const timeStr = p.time != null ? p.time.toFixed(2) : '--';
+                const modeStyle = modeColors[p.mode] || '';
+                const when = p.at ? formatWhen(p.at) : '--';
+                html += `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">`;
+                html += `<div style="flex:1;font-weight:500;">${name}</div>`;
+                html += `<div style="width:70px;text-align:right;font-variant-numeric:tabular-nums;">${timeStr}</div>`;
+                html += `<div style="width:70px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;text-transform:uppercase;${modeStyle}">${p.mode}</span></div>`;
+                html += `<div style="width:90px;text-align:right;font-size:0.8rem;color:#6b7280;">${when}</div>`;
+                html += `</div>`;
+            });
+
+            content.innerHTML = html;
+        }
+
+        async function openSkipDetail(plate) {
+            const content = document.getElementById('plateUsedContent');
+            const titleEl = document.getElementById('plateUsedTitle');
+            titleEl.innerHTML = `<span style="cursor:pointer;color:#7c3aed;" onclick="openPlateUsed('${plate}')">&larr; ${plate}</span> &nbsp; <span style="color:#ef4444;font-weight:600;">skipped</span>`;
+            content.innerHTML = '<p style="color:#6b7280;">Loading skips...</p>';
+
+            try {
+                const [dailyRes, practiceRes, h2hRes, groupRes] = await Promise.all([
+                    sb.from('daily_run_entries').select('thinking_seconds, run:daily_runs!inner(user_id, date, completed_at)').eq('plate', plate).eq('skipped', true),
+                    sb.from('practice_plate_stats').select('thinking_seconds, user_id, created_at, source').eq('plate', plate).eq('skipped', true),
+                    sb.from('h2h_run_entries').select('thinking_seconds, run:h2h_runs!inner(user_id, created_at)').eq('plate', plate).eq('skipped', true),
+                    sb.from('group_daily_run_entries').select('thinking_seconds, run:group_daily_runs!inner(user_id, date, completed_at)').eq('plate', plate).eq('skipped', true),
+                ]);
+
+                let plays = [];
+                for (const r of (dailyRes.data || [])) {
+                    plays.push({ userId: r.run?.user_id, time: r.thinking_seconds, mode: 'daily', at: r.run?.completed_at || r.run?.date });
+                }
+                for (const r of (practiceRes.data || [])) {
+                    plays.push({ userId: r.user_id, time: r.thinking_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', at: r.created_at });
+                }
+                for (const r of (h2hRes.data || [])) {
+                    plays.push({ userId: r.run?.user_id, time: r.thinking_seconds, mode: 'h2h', at: r.run?.created_at });
+                }
+                for (const r of (groupRes.data || [])) {
+                    plays.push({ userId: r.run?.user_id, time: r.thinking_seconds, mode: 'group', at: r.run?.completed_at || r.run?.date });
+                }
+
+                const userIds = [...new Set(plays.map(p => p.userId).filter(Boolean))];
+                const nameMap = {};
+                if (userIds.length > 0) {
+                    const { data: profiles } = await sb.from('profiles').select('id, display_name, handle').in('id', userIds);
+                    for (const p of (profiles || [])) {
+                        nameMap[p.id] = p.display_name || (p.handle ? '@' + p.handle : p.id.slice(0, 8));
+                    }
+                }
+
+                if (plays.length === 0) {
+                    content.innerHTML = '<p style="color:#6b7280;">No skips found.</p>';
+                    return;
+                }
+
+                window._wordDetailPlays = plays;
+                window._wordDetailNameMap = nameMap;
+                renderWordDetailList('time-asc');
             } catch (e) {
                 content.innerHTML = '<p style="color:#dc2626;">Error: ' + e.message + '</p>';
             }
