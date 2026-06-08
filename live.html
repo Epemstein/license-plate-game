@@ -279,6 +279,13 @@
         subscribe();
         setInterval(updateAgos, 1000);
         setInterval(updateRecentStat, 30000);
+
+        // Refresh daily sidebar when tab becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                loadDailyPositions().then(() => renderDailySidebar());
+            }
+        });
     }
 
     async function resolveUser(userId) {
@@ -431,7 +438,9 @@
 
     function updateDailyPosition(userId, plate, word, skipped) {
         if (dailyPlates.length === 0) return;
-        const plateIdx = dailyPlates.indexOf(plate);
+        const upperPlate = plate.toUpperCase();
+        let plateIdx = dailyPlates.indexOf(upperPlate);
+        if (plateIdx === -1) plateIdx = dailyPlates.indexOf(plate);
         if (plateIdx === -1) return;
 
         if (!dailyPlayers[userId]) {
