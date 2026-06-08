@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v5</title>
+    <title>Live Tracker v6</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -210,7 +210,7 @@
 
             <!-- Daily Challenge Sidebar -->
             <div class="daily-sidebar" id="dailySidebar">
-                <h3>Daily Challenge</h3>
+                <h3 style="cursor:pointer;" onclick="selectDailyPlayer(null)">Daily Challenge</h3>
                 <div id="dailyPlateGrid" style="font-size:0.8rem;color:#9ca3af;">Loading plates...</div>
             </div>
 
@@ -495,20 +495,30 @@
 
         // Selected player name or in-progress avatars
         if (selPlayer) {
-            html += `<div style="text-align:center;padding:6px 0;margin-bottom:6px;">`;
+            // Compute rank for completed players
+            let rankStr = '';
+            if (selPlayer.completed && selPlayer.time) {
+                const sortedTimes = completed.map(uid => dailyPlayers[uid].time).filter(t => t != null).sort((a, b) => a - b);
+                const rank = sortedTimes.indexOf(selPlayer.time) + 1;
+                rankStr = ` — #${rank} of ${completed.length}`;
+            }
+            html += `<div style="text-align:center;padding:6px 0;margin-bottom:6px;cursor:pointer;" onclick="selectDailyPlayer(null)">`;
             html += `<div style="font-weight:700;font-size:0.95rem;">${esc(selPlayer.name)}</div>`;
             if (selPlayer.completed && selPlayer.time) {
-                html += `<div style="font-size:0.8rem;color:#16a34a;">${selPlayer.time.toFixed(2)}s</div>`;
+                html += `<div style="font-size:0.8rem;color:#16a34a;">${selPlayer.time.toFixed(2)}s${rankStr}</div>`;
             } else {
                 html += `<div style="font-size:0.8rem;color:#d97706;">Plate ${selPlayer.currentPlate + 1}</div>`;
             }
-            html += `<div style="font-size:0.7rem;color:#9ca3af;cursor:pointer;margin-top:2px;" onclick="selectDailyPlayer(null)">× clear</div>`;
+            html += `<div style="font-size:0.7rem;color:#9ca3af;margin-top:2px;">× clear</div>`;
             html += '</div>';
         } else if (inProgress.length > 0) {
-            html += '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:3px;padding:4px 0;margin-bottom:6px;">';
-            for (const uid of inProgress) {
+            // Header row — fixed position per player column
+            const showPlayers = inProgress.slice(-6);
+            html += '<div style="display:flex;align-items:center;padding:2px 8px;margin-bottom:2px;">';
+            html += '<span style="width:18px;flex-shrink:0;"></span><span style="width:40px;flex-shrink:0;"></span>';
+            for (const uid of showPlayers) {
                 const p = dailyPlayers[uid];
-                html += `<span class="dp-avatar" style="background:${p.color};cursor:pointer;" title="${p.name}" onclick="selectDailyPlayer('${uid}')">${p.initials}</span>`;
+                html += `<span class="dp-avatar" style="background:${p.color};cursor:pointer;flex-shrink:0;margin:0 2px;" title="${p.name}" onclick="selectDailyPlayer('${uid}')">${p.initials}</span>`;
             }
             html += '</div>';
         }
@@ -544,30 +554,31 @@
                 const showPlayers = inProgress.slice(-6);
                 const anyoneHere = showPlayers.some(uid => dailyPlayers[uid].currentPlate === i);
 
-                html += `<div class="daily-plate-row" style="${anyoneHere ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
+                html += `<div class="daily-plate-row" style="display:flex;align-items:center;${anyoneHere ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
                 html += `<span class="dp-num">${i + 1}</span>`;
                 html += `<span class="dp-plate">${plate}</span>`;
-                html += '<span class="dp-players">';
 
                 for (const uid of showPlayers) {
                     const p = dailyPlayers[uid];
                     const result = p.plateResults[i];
                     const solvedSoFar = Object.keys(p.plateResults).filter(k => !p.plateResults[k].skipped && parseInt(k) <= i).length;
+                    // Each cell is 26px wide (matches avatar 22px + 4px margin)
                     if (p.currentPlate === i) {
-                        html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;font-size:0.6rem;cursor:pointer;" title="${p.name}" onclick="selectDailyPlayer('${uid}')">${solvedSoFar}</span>`;
+                        html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 2px;font-size:0.6rem;cursor:pointer;" title="${p.name}" onclick="selectDailyPlayer('${uid}')">${solvedSoFar}</span>`;
                     } else if (result) {
                         if (result.skipped) {
-                            html += '<span style="width:40px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 1px;color:#dc2626;">✕</span>';
+                            html += '<span style="width:22px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 2px;color:#dc2626;">✕</span>';
                         } else {
                             const w = (result.word || '?').toLowerCase();
-                            html += `<span style="width:40px;text-align:center;font-size:0.55rem;flex-shrink:0;margin:0 1px;color:#16a34a;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${w}">${w}</span>`;
+                            const display = w.length > 3 ? w.substring(0, 3) : w;
+                            html += `<span style="width:22px;text-align:center;font-size:0.5rem;flex-shrink:0;margin:0 2px;color:#16a34a;font-weight:600;" title="${w}">${display}</span>`;
                         }
                     } else {
-                        html += '<span style="width:40px;flex-shrink:0;margin:0 1px;"></span>';
+                        html += '<span style="width:22px;flex-shrink:0;margin:0 2px;"></span>';
                     }
                 }
 
-                html += '</span></div>';
+                html += '</div>';
             }
         }
 
