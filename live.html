@@ -240,6 +240,7 @@
     // dailyPlayers: userId -> { name, initials, color, plateResults: { plateIndex -> { word, skipped } }, currentPlate, completed, time }
     let dailyPlayers = {};
     let dailyPlayerOrder = []; // ordered list of userIds for consistent column assignment
+    let dailySelectedPlayer = null; // userId of selected player for focus view
     const avatarColors = ['#7c3aed','#dc2626','#2563eb','#16a34a','#d97706','#ec4899','#0891b2','#4f46e5','#059669','#b91c1c','#7c2d12','#6d28d9'];
 
     function doLogin() {
@@ -475,37 +476,39 @@
         renderDailySidebar();
     }
 
+    window.selectDailyPlayer = function(uid) {
+        dailySelectedPlayer = dailySelectedPlayer === uid ? null : uid;
+        renderDailySidebar();
+    };
+
     function renderDailySidebar() {
         const grid = document.getElementById('dailyPlateGrid');
         if (dailyPlates.length === 0) { grid.textContent = 'No plates loaded'; return; }
 
-        // Only show players who are active (in progress or completed)
         const activePlayers = dailyPlayerOrder.filter(uid => dailyPlayers[uid]);
-        if (activePlayers.length === 0) {
-            // Just show plates, no player columns
-            let html = '';
-            const showCount = Math.min(20, dailyPlates.length);
-            for (let i = 0; i < showCount; i++) {
-                html += `<div class="daily-plate-row"><span class="dp-num">${i + 1}</span><span class="dp-plate">${dailyPlates[i]}</span></div>`;
-            }
-            grid.innerHTML = html;
-            return;
-        }
-
         const completed = activePlayers.filter(uid => dailyPlayers[uid].completed);
+        const inProgress = activePlayers.filter(uid => !dailyPlayers[uid].completed);
+        const sel = dailySelectedPlayer;
+        const selPlayer = sel ? dailyPlayers[sel] : null;
+
         let html = '';
 
-        // In-progress players for columns (limit to ~6 most recent to keep it readable)
-        const inProgress = activePlayers.filter(uid => !dailyPlayers[uid].completed);
-        const showPlayers = inProgress.slice(-6);
-
-        // Header row with player initials
-        if (showPlayers.length > 0) {
-            html += '<div style="display:flex;align-items:center;padding:2px 8px;margin-bottom:2px;">';
-            html += '<span style="width:18px;"></span><span style="width:36px;"></span>';
-            for (const uid of showPlayers) {
+        // Selected player name or in-progress avatars
+        if (selPlayer) {
+            html += `<div style="text-align:center;padding:6px 0;margin-bottom:6px;">`;
+            html += `<div style="font-weight:700;font-size:0.95rem;">${esc(selPlayer.name)}</div>`;
+            if (selPlayer.completed && selPlayer.time) {
+                html += `<div style="font-size:0.8rem;color:#16a34a;">${selPlayer.time.toFixed(2)}s</div>`;
+            } else {
+                html += `<div style="font-size:0.8rem;color:#d97706;">Plate ${selPlayer.currentPlate + 1}</div>`;
+            }
+            html += `<div style="font-size:0.7rem;color:#9ca3af;cursor:pointer;margin-top:2px;" onclick="selectDailyPlayer(null)">× clear</div>`;
+            html += '</div>';
+        } else if (inProgress.length > 0) {
+            html += '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:3px;padding:4px 0;margin-bottom:6px;">';
+            for (const uid of inProgress) {
                 const p = dailyPlayers[uid];
-                html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;cursor:pointer;" title="${p.name}" onclick="showDailyPlayerDetail('${uid}')">${p.initials}</span>`;
+                html += `<span class="dp-avatar" style="background:${p.color};cursor:pointer;" title="${p.name}" onclick="selectDailyPlayer('${uid}')">${p.initials}</span>`;
             }
             html += '</div>';
         }
@@ -514,34 +517,58 @@
         const showCount = Math.min(20, dailyPlates.length);
         for (let i = 0; i < showCount; i++) {
             const plate = dailyPlates[i];
-            const anyoneHere = showPlayers.some(uid => dailyPlayers[uid].currentPlate === i);
 
-            html += `<div class="daily-plate-row" style="${anyoneHere ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
-            html += `<span class="dp-num">${i + 1}</span>`;
-            html += `<span class="dp-plate">${plate}</span>`;
-
-            for (const uid of showPlayers) {
-                const p = dailyPlayers[uid];
+            if (sel) {
+                // Focused view — show only selected player's results
+                const p = selPlayer;
                 const result = p.plateResults[i];
+                const isHere = p.currentPlate === i;
                 const solvedSoFar = Object.keys(p.plateResults).filter(k => !p.plateResults[k].skipped && parseInt(k) <= i).length;
-                if (p.currentPlate === i) {
-                    // Player is currently on this plate — show solved count
-                    html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;font-size:0.6rem;" title="${p.name} — solving plate ${i+1}">${solvedSoFar}</span>`;
-                } else if (result) {
-                    // Player already passed this plate — show result
-                    if (result.skipped) {
-                        html += '<span style="width:40px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 1px;color:#dc2626;" title="skipped">✕</span>';
-                    } else {
-                        const w = (result.word || '?').toLowerCase();
-                        html += `<span style="width:40px;text-align:center;font-size:0.55rem;flex-shrink:0;margin:0 1px;color:#16a34a;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${w}">${w}</span>`;
-                    }
-                } else {
-                    // Player hasn't reached this plate yet
-                    html += '<span style="width:40px;flex-shrink:0;margin:0 1px;"></span>';
-                }
-            }
 
-            html += '</div>';
+                html += `<div class="daily-plate-row" style="${isHere ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
+                html += `<span class="dp-num">${i + 1}</span>`;
+                html += `<span class="dp-plate">${plate}</span>`;
+                html += '<span class="dp-players" style="flex:1;">';
+                if (isHere) {
+                    html += `<span class="dp-avatar" style="background:${p.color};font-size:0.6rem;">${solvedSoFar}</span>`;
+                } else if (result) {
+                    if (result.skipped) {
+                        html += '<span style="color:#dc2626;font-size:0.8rem;font-weight:600;">✕ skipped</span>';
+                    } else {
+                        html += `<span style="color:#16a34a;font-size:0.8rem;font-weight:600;">${(result.word || '?').toLowerCase()}</span>`;
+                    }
+                }
+                html += '</span></div>';
+            } else {
+                // Overview — show all in-progress players
+                const showPlayers = inProgress.slice(-6);
+                const anyoneHere = showPlayers.some(uid => dailyPlayers[uid].currentPlate === i);
+
+                html += `<div class="daily-plate-row" style="${anyoneHere ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
+                html += `<span class="dp-num">${i + 1}</span>`;
+                html += `<span class="dp-plate">${plate}</span>`;
+                html += '<span class="dp-players">';
+
+                for (const uid of showPlayers) {
+                    const p = dailyPlayers[uid];
+                    const result = p.plateResults[i];
+                    const solvedSoFar = Object.keys(p.plateResults).filter(k => !p.plateResults[k].skipped && parseInt(k) <= i).length;
+                    if (p.currentPlate === i) {
+                        html += `<span class="dp-avatar" style="background:${p.color};flex-shrink:0;margin:0 1px;font-size:0.6rem;cursor:pointer;" title="${p.name}" onclick="selectDailyPlayer('${uid}')">${solvedSoFar}</span>`;
+                    } else if (result) {
+                        if (result.skipped) {
+                            html += '<span style="width:40px;text-align:center;font-size:0.6rem;flex-shrink:0;margin:0 1px;color:#dc2626;">✕</span>';
+                        } else {
+                            const w = (result.word || '?').toLowerCase();
+                            html += `<span style="width:40px;text-align:center;font-size:0.55rem;flex-shrink:0;margin:0 1px;color:#16a34a;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${w}">${w}</span>`;
+                        }
+                    } else {
+                        html += '<span style="width:40px;flex-shrink:0;margin:0 1px;"></span>';
+                    }
+                }
+
+                html += '</span></div>';
+            }
         }
 
         // Completed players at bottom
@@ -552,8 +579,9 @@
             html += '<div style="display:flex;flex-wrap:wrap;gap:3px;">';
             for (const uid of sorted) {
                 const p = dailyPlayers[uid];
+                const grey = sel && sel !== uid;
                 const timeStr = p.time ? p.time.toFixed(1) + 's' : '';
-                html += `<span class="dp-avatar" style="background:${p.color};cursor:pointer;" title="${p.name} ${timeStr}" onclick="showDailyPlayerDetail('${uid}')">${p.initials}</span>`;
+                html += `<span class="dp-avatar" style="background:${grey ? '#ccc' : p.color};cursor:pointer;" title="${p.name} ${timeStr}" onclick="selectDailyPlayer('${uid}')">${p.initials}</span>`;
             }
             html += '</div></div>';
         }
@@ -561,53 +589,8 @@
         grid.innerHTML = html;
     }
 
-    // Show detailed run info when clicking a player avatar
-    window.showDailyPlayerDetail = function(userId) {
-        const p = dailyPlayers[userId];
-        if (!p) return;
-
-        let detail = '<div style="padding:12px;">';
-        detail += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">`;
-        detail += `<span class="dp-avatar" style="background:${p.color};width:28px;height:28px;font-size:0.7rem;">${p.initials}</span>`;
-        detail += `<div><div style="font-weight:700;">${esc(p.name)}</div>`;
-        if (p.completed && p.time) {
-            detail += `<div style="font-size:0.8rem;color:#16a34a;font-weight:600;">${p.time.toFixed(2)}s</div>`;
-        } else {
-            detail += `<div style="font-size:0.8rem;color:#d97706;">In progress — plate ${p.currentPlate + 1}</div>`;
-        }
-        detail += '</div></div>';
-
-        // Plate-by-plate breakdown
-        const indices = Object.keys(p.plateResults).map(Number).sort((a, b) => a - b);
-        let solved = 0;
-        detail += '<div style="display:flex;flex-direction:column;gap:2px;">';
-        for (const idx of indices) {
-            const r = p.plateResults[idx];
-            const plate = dailyPlates[idx] || '???';
-            if (!r.skipped) solved++;
-            if (r.skipped) {
-                detail += `<div style="display:flex;align-items:center;padding:3px 6px;background:#1f2937;border-radius:4px;color:#ef4444;font-size:0.75rem;">`;
-                detail += `<span style="font-family:monospace;font-weight:700;width:30px;">${plate}</span>`;
-                detail += `<span style="margin-left:4px;">✕ skipped</span></div>`;
-            } else {
-                detail += `<div style="display:flex;align-items:center;padding:3px 6px;background:#f0fdf4;border-radius:4px;font-size:0.75rem;">`;
-                detail += `<span style="font-family:monospace;font-weight:700;width:30px;">${plate}</span>`;
-                detail += `<span style="margin-left:4px;color:#16a34a;">${r.word || '?'}</span></div>`;
-            }
-        }
-        detail += '</div>';
-        detail += `<div style="margin-top:6px;font-size:0.75rem;color:#6b7280;">Solved: ${solved}/${indices.length}</div>`;
-        detail += '</div>';
-
-        // Show in a popover
-        const existing = document.getElementById('dailyPlayerPopover');
-        if (existing) existing.remove();
-        const popover = document.createElement('div');
-        popover.id = 'dailyPlayerPopover';
-        popover.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-width:300px;max-height:80vh;overflow-y:auto;z-index:2000;';
-        popover.innerHTML = `<div style="display:flex;justify-content:flex-end;padding:8px 12px 0;"><button onclick="this.parentElement.parentElement.remove()" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">&times;</button></div>${detail}`;
-        document.body.appendChild(popover);
-    };
+    // Legacy — replaced by selectDailyPlayer focus view
+    window.showDailyPlayerDetail = function(uid) { window.selectDailyPlayer(uid); };
 
     function subscribe() {
         const channel = sb.channel('live-tracker');
