@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v23</title>
+    <title>Live Tracker v24</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -25,6 +25,9 @@
         .daily-plate-row .dp-plate { font-family: monospace; font-weight: 700; font-size: 0.9rem; width: 40px; flex-shrink: 0; }
         .daily-plate-row .dp-players { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
         .dp-avatar { width: 22px; height: 22px; border-radius: 50%; font-size: 0.55rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; color: white; cursor: default; }
+        .activity-mode-btn { padding:4px 10px;border-radius:14px;font-size:11px;font-weight:600;border:1px solid #ddd;background:#fff;color:#6b7280;cursor:pointer; }
+        .activity-mode-btn.active { background:#7c3aed;color:white;border-color:#7c3aed; }
+        .activity-mode-btn:hover { border-color:#7c3aed; }
         @media (max-width: 1000px) { .daily-sidebar { display: none; } }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .header h1 { font-size: 1.3rem; }
@@ -203,8 +206,19 @@
             <!-- Activity Tab -->
             <div class="feed-panel" id="activityPanel">
                 <div class="chart-container">
-                    <h3>Activity — Last 24 Hours</h3>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <h3 style="margin:0;">Activity</h3>
+                        <div style="display:flex;gap:4px;">
+                            <button class="activity-mode-btn active" onclick="switchActivityMode('24h',this)">Last 24h</button>
+                            <button class="activity-mode-btn" onclick="switchActivityMode('avg7',this)">Avg Day (7d)</button>
+                            <button class="activity-mode-btn" onclick="switchActivityMode('avg30',this)">Avg Day (30d)</button>
+                        </div>
+                    </div>
                     <canvas id="activityChart" height="80"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Heatmap — Last 7 Days</h3>
+                    <div id="heatmapGrid" style="overflow-x:auto;"></div>
                 </div>
                 <div class="chart-container">
                     <h3>Plays Per Day — Last 7 Days</h3>
@@ -1029,6 +1043,7 @@
 
     async function loadActivityData() {
         await loadActivityChart();
+        await loadHeatmap();
         await loadWeekGrid();
     }
 
@@ -1201,6 +1216,138 @@
                 }
             }
         });
+    }
+
+    // ==================== AVERAGE DAY & HEATMAP ====================
+    let activityMode = '24h';
+    let avgDayCache = {}; // '7' or '30' -> array of 48 averages
+
+    window.switchActivityMode = async function(mode, btn) {
+        activityMode = mode;
+        document.querySelectorAll('.activity-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        if (mode === '24h') {
+            // Re-render the live 24h chart
+            await loadActivityChart();
+        } else {
+            const days = mode === 'avg7' ? 7 : 30;
+            if (!avgDayCache[days]) {
+                avgDayCache[days] = await computeAverageDay(days);
+            }
+            renderAverageDayChart(avgDayCache[days], days);
+        }
+    };
+
+    async function computeAverageDay(numDays) {
+        const since = new Date(Date.now() - numDays * 24 * 60 * 60 * 1000).toISOString();
+        const allTimestamps = await fetchAllEntryTimestamps(since);
+
+        // Bucket by half-hour slot within a day (0-47)
+        const slotTotals = new Array(48).fill(0);
+        for (const ts of allTimestamps) {
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) continue;
+            const slot = d.getHours() * 2 + (d.getMinutes() < 30 ? 0 : 1);
+            slotTotals[slot]++;
+        }
+        // Average per day
+        return slotTotals.map(t => Math.round(t / numDays * 10) / 10);
+    }
+
+    function renderAverageDayChart(avgData, numDays) {
+        const labels = [];
+        for (let i = 0; i < 48; i++) {
+            const h = Math.floor(i / 2);
+            const m = i % 2 === 0 ? '00' : '30';
+            const ampm = h < 12 ? 'AM' : 'PM';
+            const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+            labels.push(`${h12}:${m} ${ampm}`);
+        }
+
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        if (activityChart) activityChart.destroy();
+        activityChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    data: avgData,
+                    backgroundColor: '#34d399',
+                    borderRadius: 4,
+                    barPercentage: 0.8,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y} avg plays` } }
+                },
+                scales: {
+                    x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false } },
+                    y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: '#f3f4f6' } }
+                }
+            }
+        });
+    }
+
+    async function loadHeatmap() {
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const allTimestamps = await fetchAllEntryTimestamps(since);
+
+        // Build 7-day x 48-slot grid
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const grid = {}; // "YYYY-MM-DD" -> array of 48
+        const dates = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+            const key = d.toISOString().slice(0, 10);
+            grid[key] = new Array(48).fill(0);
+            dates.push(key);
+        }
+
+        let maxVal = 1;
+        for (const ts of allTimestamps) {
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) continue;
+            const key = d.toISOString().slice(0, 10);
+            if (!grid[key]) continue;
+            const slot = d.getHours() * 2 + (d.getMinutes() < 30 ? 0 : 1);
+            grid[key][slot]++;
+            if (grid[key][slot] > maxVal) maxVal = grid[key][slot];
+        }
+
+        // Render as HTML table
+        let html = '<table style="border-collapse:collapse;width:100%;font-size:0.65rem;">';
+        // Header: time slots (show every 4th = every 2 hours)
+        html += '<tr><td style="width:40px;"></td>';
+        for (let i = 0; i < 48; i++) {
+            if (i % 4 === 0) {
+                const h = Math.floor(i / 2);
+                const ampm = h < 12 ? 'a' : 'p';
+                const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                html += `<td colspan="4" style="text-align:left;color:#9ca3af;padding:2px 0;font-size:0.6rem;">${h12}${ampm}</td>`;
+            }
+        }
+        html += '</tr>';
+
+        // Rows: one per day
+        for (const dateKey of dates) {
+            const dt = new Date(dateKey + 'T12:00:00');
+            const dayName = dayNames[dt.getDay()];
+            html += `<tr><td style="font-weight:600;color:#6b7280;padding:1px 4px;white-space:nowrap;">${dayName}</td>`;
+            for (let i = 0; i < 48; i++) {
+                const val = grid[dateKey][i];
+                const intensity = val / maxVal;
+                const bg = val === 0 ? '#f9fafb' : `rgba(124, 58, 237, ${0.1 + intensity * 0.7})`;
+                const textColor = intensity > 0.5 ? 'white' : '#6b7280';
+                html += `<td style="background:${bg};text-align:center;padding:3px 0;min-width:8px;border:1px solid #f0f0f0;color:${textColor};font-size:0.55rem;" title="${dayName} ${Math.floor(i/2)}:${i%2===0?'00':'30'} — ${val} plays">${val || ''}</td>`;
+            }
+            html += '</tr>';
+        }
+        html += '</table>';
+        document.getElementById('heatmapGrid').innerHTML = html;
     }
 
     let weekGridData = null;
