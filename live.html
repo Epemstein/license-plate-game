@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v26</title>
+    <title>Live Tracker v27</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1013,30 +1013,38 @@
     let todayFastest = [];
 
     async function loadStats() {
-        const today = new Date().toISOString().slice(0, 10);
-        const dayStart = today + 'T00:00:00Z';
+        const today = new Date();
+        const dayStart = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}T00:00:00`;
 
-        // Fetch today's plays for records
-        const { data: todayPlays } = await sb.from('live_plays')
-            .select('plate, word, skipped, thinking_seconds, user_id, created_at')
-            .gte('created_at', dayStart)
-            .eq('skipped', false)
-            .order('created_at', { ascending: false })
-            .limit(2000);
+        // Fetch from all real game tables for today
+        const [dailyRes, practiceRes, h2hRes] = await Promise.all([
+            sb.from('daily_run_entries').select('plate, word, skipped, thinking_seconds, run:daily_runs!inner(user_id, date)').eq('run.date', today.toISOString().slice(0, 10)).eq('skipped', false),
+            sb.from('practice_plate_stats').select('plate, word, skipped, thinking_seconds, user_id, created_at').gte('created_at', dayStart).eq('skipped', false),
+            sb.from('h2h_run_entries').select('plate, word, skipped, thinking_seconds, run:h2h_runs!inner(user_id, created_at)').gte('run.created_at', dayStart).eq('skipped', false),
+        ]);
 
-        if (todayPlays) {
-            // Longest words
-            todayLongest = todayPlays
-                .filter(p => p.word)
-                .sort((a, b) => b.word.length - a.word.length)
-                .slice(0, 10);
-
-            // Fastest solves (min 4 char word)
-            todayFastest = todayPlays
-                .filter(p => p.word && p.word.length >= 4 && p.thinking_seconds != null && p.thinking_seconds > 0)
-                .sort((a, b) => a.thinking_seconds - b.thinking_seconds)
-                .slice(0, 10);
+        let allPlays = [];
+        for (const r of (dailyRes.data || [])) {
+            allPlays.push({ plate: r.plate, word: r.word, thinking_seconds: r.thinking_seconds, user_id: r.run?.user_id });
         }
+        for (const r of (practiceRes.data || [])) {
+            allPlays.push({ plate: r.plate, word: r.word, thinking_seconds: r.thinking_seconds, user_id: r.user_id });
+        }
+        for (const r of (h2hRes.data || [])) {
+            allPlays.push({ plate: r.plate, word: r.word, thinking_seconds: r.thinking_seconds, user_id: r.run?.user_id });
+        }
+
+        // Longest words
+        todayLongest = allPlays
+            .filter(p => p.word)
+            .sort((a, b) => b.word.length - a.word.length)
+            .slice(0, 10);
+
+        // Fastest solves (min 4 char word)
+        todayFastest = allPlays
+            .filter(p => p.word && p.word.length >= 4 && p.thinking_seconds != null && p.thinking_seconds > 0)
+            .sort((a, b) => a.thinking_seconds - b.thinking_seconds)
+            .slice(0, 10);
 
         await renderRecords();
     }
@@ -1398,7 +1406,8 @@
         const { data: counts } = await sb.rpc('plays_per_day_last7');
         if (!counts) { grid.innerHTML = '<p style="color:#9ca3af;">Failed to load</p>'; return; }
         weekGridData = counts;
-        weekGridTodayKey = new Date().toISOString().slice(0, 10);
+        const t = new Date();
+        weekGridTodayKey = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
         renderWeekGrid();
     }
 
