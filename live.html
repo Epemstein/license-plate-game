@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v24</title>
+    <title>Live Tracker v25</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1318,35 +1318,66 @@
             if (grid[key][slot] > maxVal) maxVal = grid[key][slot];
         }
 
-        // Render as HTML table
-        let html = '<table style="border-collapse:collapse;width:100%;font-size:0.65rem;">';
-        // Header: time slots (show every 4th = every 2 hours)
-        html += '<tr><td style="width:40px;"></td>';
+        // Render heatmap with color gradient: transparent → yellow → orange → red → dark red
+        function heatColor(val, max) {
+            if (val === 0) return '#f3f4f6';
+            const t = Math.min(val / max, 1);
+            if (t < 0.25) {
+                const f = t / 0.25;
+                return `rgb(${Math.round(255)},${Math.round(255 - f * 30)},${Math.round(200 - f * 100)})`;
+            } else if (t < 0.5) {
+                const f = (t - 0.25) / 0.25;
+                return `rgb(255,${Math.round(225 - f * 80)},${Math.round(100 - f * 60)})`;
+            } else if (t < 0.75) {
+                const f = (t - 0.5) / 0.25;
+                return `rgb(${Math.round(255 - f * 30)},${Math.round(145 - f * 90)},${Math.round(40 - f * 20)})`;
+            } else {
+                const f = (t - 0.75) / 0.25;
+                return `rgb(${Math.round(225 - f * 75)},${Math.round(55 - f * 35)},${Math.round(20 - f * 10)})`;
+            }
+        }
+
+        let html = '<div style="display:flex;flex-direction:column;gap:2px;">';
+        // Header row
+        html += '<div style="display:flex;align-items:center;">';
+        html += '<div style="width:36px;flex-shrink:0;"></div>';
         for (let i = 0; i < 48; i++) {
             if (i % 4 === 0) {
                 const h = Math.floor(i / 2);
                 const ampm = h < 12 ? 'a' : 'p';
                 const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-                html += `<td colspan="4" style="text-align:left;color:#9ca3af;padding:2px 0;font-size:0.6rem;">${h12}${ampm}</td>`;
+                html += `<div style="flex:4;font-size:0.55rem;color:#9ca3af;text-align:left;">${h12}${ampm}</div>`;
             }
         }
-        html += '</tr>';
+        html += '</div>';
 
-        // Rows: one per day
         for (const dateKey of dates) {
             const dt = new Date(dateKey + 'T12:00:00');
             const dayName = dayNames[dt.getDay()];
-            html += `<tr><td style="font-weight:600;color:#6b7280;padding:1px 4px;white-space:nowrap;">${dayName}</td>`;
+            html += '<div style="display:flex;align-items:center;gap:1px;">';
+            html += `<div style="width:36px;flex-shrink:0;font-size:0.7rem;font-weight:600;color:#6b7280;">${dayName}</div>`;
             for (let i = 0; i < 48; i++) {
                 const val = grid[dateKey][i];
-                const intensity = val / maxVal;
-                const bg = val === 0 ? '#f9fafb' : `rgba(124, 58, 237, ${0.1 + intensity * 0.7})`;
-                const textColor = intensity > 0.5 ? 'white' : '#6b7280';
-                html += `<td style="background:${bg};text-align:center;padding:3px 0;min-width:8px;border:1px solid #f0f0f0;color:${textColor};font-size:0.55rem;" title="${dayName} ${Math.floor(i/2)}:${i%2===0?'00':'30'} — ${val} plays">${val || ''}</td>`;
+                const bg = heatColor(val, maxVal);
+                const h = Math.floor(i / 2);
+                const ampm = h < 12 ? 'AM' : 'PM';
+                const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                const timeStr = `${h12}:${i%2===0?'00':'30'} ${ampm}`;
+                html += `<div style="flex:1;height:18px;background:${bg};border-radius:2px;cursor:default;" title="${dayName} ${timeStr} — ${val} plays"></div>`;
             }
-            html += '</tr>';
+            html += '</div>';
         }
-        html += '</table>';
+
+        // Legend
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:flex-end;">';
+        html += '<span style="font-size:0.6rem;color:#9ca3af;">Less</span>';
+        for (const v of [0, 0.25, 0.5, 0.75, 1]) {
+            html += `<div style="width:14px;height:14px;border-radius:2px;background:${heatColor(v * maxVal, maxVal)};"></div>`;
+        }
+        html += '<span style="font-size:0.6rem;color:#9ca3af;">More</span>';
+        html += '</div>';
+
+        html += '</div>';
         document.getElementById('heatmapGrid').innerHTML = html;
     }
 
