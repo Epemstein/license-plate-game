@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v27</title>
+    <title>Live Tracker v28</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -205,6 +205,10 @@
 
             <!-- Activity Tab -->
             <div class="feed-panel" id="activityPanel">
+                <div style="display:flex;gap:4px;margin-bottom:12px;">
+                    <button class="activity-mode-btn active" id="srcAllBtn" onclick="setActivitySource('all',this)">All Plates</button>
+                    <button class="activity-mode-btn" id="srcDailyBtn" onclick="setActivitySource('daily',this)">Daily Only</button>
+                </div>
                 <div class="chart-container">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                         <h3 style="margin:0;">Activity</h3>
@@ -1132,11 +1136,32 @@
     }
 
     async function fetchAllEntryTimestamps(sinceDate) {
+        if (activitySource === 'daily') {
+            // For daily only: query daily_runs completed_at as proxy timestamps
+            // Each run completion = ~10 plates played at that time
+            const { data: runs } = await sb.from('daily_runs')
+                .select('completed_at, total_seconds')
+                .gte('completed_at', sinceDate)
+                .not('total_seconds', 'is', null);
+            if (!runs) return [];
+            // Spread each run into ~10-12 plate timestamps by subtracting thinking time
+            const timestamps = [];
+            for (const r of runs) {
+                const completedAt = new Date(r.completed_at).getTime();
+                // Approximate: the run took total_seconds, spread entries over that window
+                const numPlates = 12; // approximate
+                const interval = (r.total_seconds * 1000) / numPlates;
+                for (let i = 0; i < numPlates; i++) {
+                    timestamps.push(new Date(completedAt - r.total_seconds * 1000 + i * interval).toISOString());
+                }
+            }
+            console.log('[Activity] Got', timestamps.length, 'daily timestamps from', runs.length, 'runs');
+            return timestamps;
+        }
         const { data, error } = await sb.rpc('activity_timestamps', { since_ts: sinceDate });
         if (error) { console.error('[Activity] RPC error:', error); return []; }
-        // RPC returns jsonb — could be array directly or nested
         const result = Array.isArray(data) ? data : (data || []);
-        console.log('[Activity] Got', result.length, 'timestamps, first:', result[0]);
+        console.log('[Activity] Got', result.length, 'timestamps');
         return result;
     }
 
@@ -1228,7 +1253,18 @@
 
     // ==================== AVERAGE DAY & HEATMAP ====================
     let activityMode = '24h';
+    let activitySource = 'all'; // 'all' or 'daily'
     let avgDayCache = {}; // '7' or '30' -> array of 48 averages
+    let timestampCache = {}; // 'all' or 'daily' -> { since, timestamps }
+
+    window.setActivitySource = function(src, btn) {
+        activitySource = src;
+        document.querySelectorAll('#activityPanel > div:first-child .activity-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        avgDayCache = {}; // clear avg cache since source changed
+        activityLoaded = false;
+        loadActivityData();
+    };
 
     window.switchActivityMode = async function(mode, btn) {
         activityMode = mode;
