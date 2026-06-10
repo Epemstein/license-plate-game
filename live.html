@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v33</title>
+    <title>Live Tracker v34</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -655,7 +655,7 @@
                     } else {
                         rowBg = `background:${sidebarTimeColor(result.time)};`;
                         const timeStr = result.time != null ? result.time.toFixed(2) : '';
-                        rowContent = `<span style="font-size:0.8rem;font-weight:600;">${(result.word || '?').toLowerCase()}</span><span style="flex:1;"></span><span style="font-size:0.75rem;font-weight:600;">${timeStr}</span>`;
+                        rowContent = `<span style="font-size:0.8rem;font-weight:600;color:#000;">${(result.word || '?').toLowerCase()}</span><span style="flex:1;"></span><span style="font-size:0.75rem;font-weight:600;color:#000;">${timeStr}</span>`;
                     }
                 }
 
