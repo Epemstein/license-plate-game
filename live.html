@@ -909,20 +909,34 @@
     // ==================== RUNS TAB ====================
 
     let runs = [];
+    let knownRunKeys = new Set(); // dedupe: "userId|mode|time|atMs"
+
+    function runKey(r) {
+        return `${r.userId}|${r.mode}|${r.time}|${Math.round(r.at.getTime() / 5000)}`;
+    }
+
+    function parseH2HRun(r) {
+        // Use challenge created_at if available, otherwise approximate from created_at + total_seconds
+        const challengeAt = r.h2h_challenges?.created_at;
+        const at = challengeAt
+            ? new Date(new Date(challengeAt).getTime() + (r.total_seconds || 0) * 1000)
+            : new Date(new Date(r.created_at).getTime() + (r.total_seconds || 0) * 1000);
+        return { userId: r.user_id, time: r.total_seconds, mode: 'h2h', difficulty: r.h2h_challenges?.difficulty ?? 50, at };
+    }
 
     async function loadRecentRuns() {
         const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
         const [daily, h2h, group, practice] = await Promise.all([
             sb.from('daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
-            sb.from('h2h_runs').select('user_id, total_seconds, created_at, h2h_challenges(difficulty)').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(50),
+            sb.from('h2h_runs').select('user_id, total_seconds, created_at, h2h_challenges(difficulty, created_at)').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(50),
             sb.from('group_daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
             sb.from('practice_runs').select('user_id, total_seconds, difficulty, source, plates_solved, plates_seen, completed_at').eq('plates_seen', 10).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
         ]);
 
         const all = [
             ...(daily.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'daily', at: new Date(r.completed_at) })),
-            ...(h2h.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'h2h', difficulty: r.h2h_challenges?.difficulty ?? 50, at: new Date(new Date(r.created_at).getTime() + (r.total_seconds || 0) * 1000) })),
+            ...(h2h.data || []).map(parseH2HRun),
             ...(group.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'group', at: new Date(r.completed_at) })),
             ...(practice.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at) })),
         ];
@@ -930,10 +944,41 @@
 
         for (const r of all) {
             r.userName = null;
+            const k = runKey(r);
+            knownRunKeys.add(k);
             runs.push(r);
         }
         resolveRunUserNames();
         renderRuns();
+
+        // Poll every 30s to catch runs that realtime misses (e.g. H2H RPCs)
+        setInterval(pollForNewRuns, 30000);
+    }
+
+    async function pollForNewRuns() {
+        const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const [daily, h2h, group, practice] = await Promise.all([
+            sb.from('daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(20),
+            sb.from('h2h_runs').select('user_id, total_seconds, created_at, h2h_challenges(difficulty, created_at)').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(20),
+            sb.from('group_daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(20),
+            sb.from('practice_runs').select('user_id, total_seconds, difficulty, source, plates_solved, plates_seen, completed_at').eq('plates_seen', 10).gte('completed_at', since).order('completed_at', { ascending: false }).limit(20),
+        ]);
+        const fresh = [
+            ...(daily.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'daily', at: new Date(r.completed_at) })),
+            ...(h2h.data || []).map(parseH2HRun),
+            ...(group.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'group', at: new Date(r.completed_at) })),
+            ...(practice.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at) })),
+        ];
+        let added = 0;
+        for (const r of fresh) {
+            const k = runKey(r);
+            if (!knownRunKeys.has(k)) {
+                knownRunKeys.add(k);
+                addRun(r);
+                added++;
+            }
+        }
+        if (added > 0) console.log('[Runs] Poll found', added, 'new runs');
     }
 
     async function resolveRunUserNames() {
@@ -945,6 +990,9 @@
     }
 
     async function addRun(r) {
+        const k = runKey(r);
+        if (knownRunKeys.has(k)) return;
+        knownRunKeys.add(k);
         r.userName = r.userId ? await resolveUser(r.userId) : null;
         runs.unshift(r);
         if (runs.length > 100) runs.pop();
