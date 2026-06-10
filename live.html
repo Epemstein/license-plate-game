@@ -865,9 +865,14 @@
                 markDailyCompleted(payload.new.user_id, payload.new.total_seconds);
             }
         });
-        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'h2h_runs' }, (payload) => {
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'h2h_runs' }, async (payload) => {
             if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
-                addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'h2h', at: new Date() });
+                let diff = 50;
+                if (payload.new.challenge_id) {
+                    const { data: ch } = await sb.from('h2h_challenges').select('difficulty').eq('id', payload.new.challenge_id).single();
+                    if (ch) diff = ch.difficulty ?? 50;
+                }
+                addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'h2h', difficulty: diff, at: new Date() });
             }
         });
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_daily_runs' }, (payload) => {
@@ -896,14 +901,14 @@
 
         const [daily, h2h, group, practice] = await Promise.all([
             sb.from('daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
-            sb.from('h2h_runs').select('user_id, total_seconds, created_at').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(50),
+            sb.from('h2h_runs').select('user_id, total_seconds, created_at, h2h_challenges(difficulty)').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(50),
             sb.from('group_daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
             sb.from('practice_runs').select('user_id, total_seconds, difficulty, source, plates_solved, plates_seen, completed_at').eq('plates_seen', 10).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
         ]);
 
         const all = [
             ...(daily.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'daily', at: new Date(r.completed_at) })),
-            ...(h2h.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'h2h', at: new Date(r.created_at) })),
+            ...(h2h.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'h2h', difficulty: r.h2h_challenges?.difficulty ?? 50, at: new Date(r.created_at) })),
             ...(group.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'group', at: new Date(r.completed_at) })),
             ...(practice.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at) })),
         ];
