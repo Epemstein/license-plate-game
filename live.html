@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v31</title>
+    <title>Live Tracker v32</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -797,10 +797,29 @@
         }
         html += '</div>';
 
+        // Check for new plates (first-ever-seen)
+        const plateNames = entries.map(e => e.plate);
+        const { data: existingPlates } = await sb.rpc('check_new_plates', { p_plates: plateNames });
+        const knownPlates = new Set((existingPlates || []).map(p => p.plate));
+        const newPlates = plateNames.filter(p => !knownPlates.has(p));
+        if (newPlates.length > 0) {
+            html += `<div style="margin-top:8px;padding:6px 8px;background:#fef3c7;border-radius:6px;font-size:0.75rem;">`;
+            html += `<span style="font-weight:700;color:#92400e;">🆕 ${newPlates.length} new plates:</span> `;
+            html += `<span style="color:#92400e;">${newPlates.join(', ')}</span></div>`;
+        }
+        html += '</div>';
+
+        // Backdrop + popover
+        const backdrop = document.createElement('div');
+        backdrop.id = 'runDetailBackdrop';
+        backdrop.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1999;';
+        backdrop.onclick = () => { backdrop.remove(); popover.remove(); };
+
         const popover = document.createElement('div');
         popover.id = 'runDetailPopover';
         popover.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-width:400px;width:90%;max-height:80vh;overflow-y:auto;z-index:2000;';
-        popover.innerHTML = `<div style="display:flex;justify-content:flex-end;padding:8px 12px 0;"><button onclick="this.parentElement.parentElement.remove()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#6b7280;">&times;</button></div>${html}`;
+        popover.innerHTML = `<div style="display:flex;justify-content:flex-end;padding:8px 12px 0;"><button onclick="document.getElementById('runDetailBackdrop')?.remove();this.parentElement.parentElement.remove()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#6b7280;">&times;</button></div>${html}`;
+        document.body.appendChild(backdrop);
         document.body.appendChild(popover);
     };
 
@@ -886,16 +905,16 @@
 
     function renderRunHTML(r) {
         const user = r.userName ? esc(r.userName) : '<span style="color:#d1d5db;">anon</span>';
-        const tc = timeColor(r.time);
         const solved = r.solved || 10;
         const seen = r.seen || solved;
         const plateStr = `${solved}/${seen}`;
+        const diffLabel = r.difficulty != null ? ` ${r.difficulty}` : '';
         const clickAttr = r.userId ? `onclick="showRunDetail('${r.userId}','${r.mode}','${r.at?.toISOString() || ''}')"` : '';
-        return `<div class="entry entry-${r.mode}" style="padding:6px 14px;cursor:pointer;" ${clickAttr}>
-            <span class="user">${user}</span>
-            <span style="width:60px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:${tc};">${r.time.toFixed(2)}</span>
-            <span style="width:50px;text-align:center;font-size:0.8rem;color:#6b7280;">${plateStr}</span>
-            <span class="mode mode-${r.mode}">${r.mode}</span>
+        return `<div class="entry entry-${r.mode}" style="padding:5px 14px;cursor:pointer;font-size:0.8rem;" ${clickAttr}>
+            <span class="user" style="font-size:0.8rem;">${user}</span>
+            <span style="width:55px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${r.time.toFixed(2)}</span>
+            <span style="width:45px;text-align:center;font-size:0.75rem;color:#6b7280;">${plateStr}</span>
+            <span class="mode mode-${r.mode}">${r.mode}${diffLabel}</span>
             <span class="ago">${ago(r.at)}</span>
         </div>`;
     }
