@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v30</title>
+    <title>Live Tracker v31</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -50,8 +50,8 @@
         .filters button { padding: 6px 14px; border-radius: 20px; font-size: 12px; border: 1px solid #ddd; background: #fff; color: #6b7280; cursor: pointer; }
         .filters button.active { background: #7c3aed; color: white; border-color: #7c3aed; }
         .filters button:hover { border-color: #7c3aed; }
-        .feed { display: flex; flex-direction: column; gap: 4px; }
-        .entry { display: flex; align-items: center; gap: 16px; padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; animation: slideIn 0.3s ease-out; }
+        .feed { display: flex; flex-direction: column; gap: 3px; }
+        .entry { display: flex; align-items: center; gap: 12px; padding: 7px 14px; border-radius: 8px; border: 1px solid #e5e7eb; animation: slideIn 0.3s ease-out; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
         .entry .user { font-size: 0.85rem; color: #374151; font-weight: 600; flex: 1; min-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .entry .plate { font-family: monospace; font-size: 1.1rem; font-weight: 700; color: #111; width: 60px; }
@@ -180,7 +180,8 @@
             <div class="feed-panel" id="runsPanel">
                 <div class="feed-header">
                     <span class="h-user">Player</span>
-                    <span class="h-time" style="flex:1.5;min-width:80px;text-align:left;">Total Time</span>
+                    <span style="width:60px;text-align:right;font-size:0.7rem;color:#9ca3af;">Time</span>
+                    <span style="width:50px;text-align:center;font-size:0.7rem;color:#9ca3af;">Plates</span>
                     <span class="h-mode">Mode</span>
                     <span class="h-ago"></span>
                 </div>
@@ -732,6 +733,77 @@
 
     window.showDailyPlayerDetail = function(uid) { window.selectDailyPlayer(uid); };
 
+    // Show run detail popover when clicking a run row
+    window.showRunDetail = async function(userId, mode, atStr) {
+        const existing = document.getElementById('runDetailPopover');
+        if (existing) existing.remove();
+
+        const name = await resolveUser(userId) || 'Unknown';
+
+        // Fetch entries based on mode
+        let entries = [];
+        let totalTime = null;
+        if (mode === 'daily') {
+            const today = getTodayStr();
+            const { data: runs } = await sb.from('daily_runs').select('id, total_seconds').eq('user_id', userId).eq('date', today);
+            if (runs && runs.length > 0) {
+                totalTime = runs[0].total_seconds;
+                const { data } = await sb.from('daily_run_entries')
+                    .select('plate_index, plate, word, skipped, thinking_seconds, penalty_seconds')
+                    .eq('run_id', runs[0].id).order('plate_index');
+                entries = data || [];
+            }
+        } else if (mode === 'h2h') {
+            // Find the most recent h2h run for this user
+            const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+            const { data: runs } = await sb.from('h2h_runs').select('id, total_seconds').eq('user_id', userId).gte('created_at', since).order('created_at', { ascending: false }).limit(1);
+            if (runs && runs.length > 0) {
+                totalTime = runs[0].total_seconds;
+                const { data } = await sb.from('h2h_run_entries')
+                    .select('plate_index, plate, word, skipped, thinking_seconds, penalty_seconds')
+                    .eq('run_id', runs[0].id).order('plate_index');
+                entries = data || [];
+            }
+        }
+
+        if (entries.length === 0) {
+            return; // no data
+        }
+
+        const solved = entries.filter(e => !e.skipped).length;
+        const seen = entries.length;
+
+        let html = '<div style="padding:14px;">';
+        html += `<div style="font-weight:700;font-size:1rem;margin-bottom:2px;">${esc(name)}</div>`;
+        html += `<div style="font-size:0.8rem;color:#6b7280;margin-bottom:10px;">`;
+        if (totalTime) html += `${totalTime.toFixed(2)}s · `;
+        html += `${solved}/${seen} solved · ${mode}</div>`;
+
+        for (const e of entries) {
+            const bg = e.skipped ? '#1f2937' : sidebarTimeColor(e.thinking_seconds);
+            const textColor = e.skipped ? '#ef4444' : '#000';
+            const penaltyStr = e.skipped && e.penalty_seconds ? ` (+${e.penalty_seconds}s)` : '';
+            html += `<div style="display:flex;align-items:center;padding:5px 8px;margin-bottom:2px;border-radius:6px;background:${bg};color:${textColor};">`;
+            html += `<span style="font-family:monospace;font-weight:700;width:36px;font-size:0.85rem;">${e.plate}</span>`;
+            html += `<span style="margin:0 6px;color:${e.skipped ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)'};">|</span>`;
+            if (e.skipped) {
+                html += `<span style="font-weight:600;">✕ skipped</span>`;
+            } else {
+                html += `<span style="font-weight:600;">${(e.word || '?').toLowerCase()}</span>`;
+            }
+            html += '<span style="flex:1;"></span>';
+            html += `<span style="font-size:0.8rem;font-weight:600;font-variant-numeric:tabular-nums;">${e.thinking_seconds.toFixed(2)}${penaltyStr}</span>`;
+            html += '</div>';
+        }
+        html += '</div>';
+
+        const popover = document.createElement('div');
+        popover.id = 'runDetailPopover';
+        popover.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-width:400px;width:90%;max-height:80vh;overflow-y:auto;z-index:2000;';
+        popover.innerHTML = `<div style="display:flex;justify-content:flex-end;padding:8px 12px 0;"><button onclick="this.parentElement.parentElement.remove()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#6b7280;">&times;</button></div>${html}`;
+        document.body.appendChild(popover);
+    };
+
     function subscribe() {
         const channel = sb.channel('live-tracker');
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_plays' }, (payload) => {
@@ -814,14 +886,15 @@
 
     function renderRunHTML(r) {
         const user = r.userName ? esc(r.userName) : '<span style="color:#d1d5db;">anon</span>';
-        const barColor = timeColor(r.time);
-        const barW = timeBarWidth(r.time);
-        return `<div class="entry entry-${r.mode}">
+        const tc = timeColor(r.time);
+        const solved = r.solved || 10;
+        const seen = r.seen || solved;
+        const plateStr = `${solved}/${seen}`;
+        const clickAttr = r.userId ? `onclick="showRunDetail('${r.userId}','${r.mode}','${r.at?.toISOString() || ''}')"` : '';
+        return `<div class="entry entry-${r.mode}" style="padding:6px 14px;cursor:pointer;" ${clickAttr}>
             <span class="user">${user}</span>
-            <span class="time-col">
-                <span class="time-val" style="color:${barColor}">${r.time.toFixed(2)}</span>
-                <span class="time-bar" style="width:${barW}%;background:${barColor};"></span>
-            </span>
+            <span style="width:60px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:${tc};">${r.time.toFixed(2)}</span>
+            <span style="width:50px;text-align:center;font-size:0.8rem;color:#6b7280;">${plateStr}</span>
             <span class="mode mode-${r.mode}">${r.mode}</span>
             <span class="ago">${ago(r.at)}</span>
         </div>`;
