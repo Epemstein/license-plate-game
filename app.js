@@ -835,14 +835,17 @@
     // Fire-and-forget live play for the realtime tracker
     function emitLivePlay(plate, word, skipped, thinkingSeconds) {
         if (!currentUser) return;
+        const mode = gameMode === 'endless' ? 'endless' : gameMode === 'h2h_challenge' ? 'h2h' : gameMode;
+        const diff = mode === 'practice' ? practiceDifficulty : mode === 'endless' ? 50 : mode === 'h2h' ? (currentH2HDifficulty || 50) : null;
         sb.from('live_plays').insert({
             user_id: currentUser.id,
             plate,
             word: skipped ? null : (word || '').toLowerCase(),
             skipped,
             thinking_seconds: Math.floor(thinkingSeconds * 100) / 100,
-            mode: gameMode === 'endless' ? 'endless' : gameMode === 'h2h_challenge' ? 'h2h' : gameMode,
-            run_id: currentLiveRunId
+            mode,
+            run_id: currentLiveRunId,
+            difficulty: diff
         }).then(({ error }) => {
             if (error) console.warn('[Live]', error.message);
         });

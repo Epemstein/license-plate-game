@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v32</title>
+    <title>Live Tracker v33</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -335,7 +335,7 @@
 
         // Fetch last hour for feed
         const feedRes = await sb.from('live_plays')
-            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id, run_id')
+            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id, run_id, difficulty')
             .gte('created_at', since)
             .order('created_at', { ascending: false })
             .limit(MAX_ENTRIES);
@@ -347,7 +347,7 @@
         for (const e of (data || [])) {
             entries.push({
                 plate: e.plate, word: e.word, skipped: e.skipped,
-                time: e.thinking_seconds, mode: e.mode,
+                time: e.thinking_seconds, mode: e.mode, difficulty: e.difficulty || null,
                 at: new Date(e.created_at), userId: e.user_id, userName: null,
                 runId: e.run_id || null
             });
@@ -754,7 +754,6 @@
                 entries = data || [];
             }
         } else if (mode === 'h2h') {
-            // Find the most recent h2h run for this user
             const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
             const { data: runs } = await sb.from('h2h_runs').select('id, total_seconds').eq('user_id', userId).gte('created_at', since).order('created_at', { ascending: false }).limit(1);
             if (runs && runs.length > 0) {
@@ -763,6 +762,25 @@
                     .select('plate_index, plate, word, skipped, thinking_seconds, penalty_seconds')
                     .eq('run_id', runs[0].id).order('plate_index');
                 entries = data || [];
+            }
+        } else if (mode === 'practice' || mode === 'endless') {
+            // Find most recent practice_run for this user
+            const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+            const src = mode === 'endless' ? 'unlimited' : 'practice';
+            const { data: runs } = await sb.from('practice_runs').select('id, total_seconds, completed_at').eq('user_id', userId).eq('source', src).gte('completed_at', since).order('completed_at', { ascending: false }).limit(1);
+            if (runs && runs.length > 0) {
+                totalTime = runs[0].total_seconds;
+                // Get plate entries from practice_plate_stats near that timestamp
+                const completedAt = runs[0].completed_at;
+                const windowStart = new Date(new Date(completedAt).getTime() - 5000).toISOString();
+                const { data } = await sb.from('practice_plate_stats')
+                    .select('plate, word, skipped, thinking_seconds')
+                    .eq('user_id', userId)
+                    .eq('source', src)
+                    .gte('created_at', windowStart)
+                    .lte('created_at', completedAt)
+                    .order('created_at', { ascending: true });
+                entries = (data || []).map((e, i) => ({ plate_index: i, plate: e.plate, word: e.word, skipped: e.skipped, thinking_seconds: e.thinking_seconds, penalty_seconds: 0 }));
             }
         }
 
@@ -913,13 +931,13 @@
         const solved = r.solved || 10;
         const seen = r.seen || solved;
         const plateStr = `${solved}/${seen}`;
-        const diffLabel = r.difficulty != null ? ` ${r.difficulty}` : '';
+        const modeLabel = r.difficulty != null ? `${r.mode} ${r.difficulty}` : r.mode;
         const clickAttr = r.userId ? `onclick="showRunDetail('${r.userId}','${r.mode}','${r.at?.toISOString() || ''}')"` : '';
         return `<div class="entry entry-${r.mode}" style="padding:5px 14px;cursor:pointer;font-size:0.8rem;" ${clickAttr}>
             <span class="user" style="font-size:0.8rem;">${user}</span>
             <span style="width:55px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${r.time.toFixed(2)}</span>
             <span style="width:45px;text-align:center;font-size:0.75rem;color:#6b7280;">${plateStr}</span>
-            <span class="mode mode-${r.mode}">${r.mode}${diffLabel}</span>
+            <span class="mode mode-${r.mode}" style="white-space:nowrap;font-size:8px;">${modeLabel}</span>
             <span class="ago">${ago(r.at)}</span>
         </div>`;
     }
@@ -933,7 +951,7 @@
     async function addEntry(row) {
         const e = {
             plate: row.plate, word: row.word, skipped: row.skipped,
-            time: row.thinking_seconds, mode: row.mode,
+            time: row.thinking_seconds, mode: row.mode, difficulty: row.difficulty || null,
             at: new Date(row.created_at || Date.now()), userId: row.user_id || null, userName: null,
             runId: row.run_id || null
         };
@@ -1074,7 +1092,7 @@
                 <span class="time-val" style="color:${barColor}">${timeStr}</span>
                 <span class="time-bar" style="width:${barW}%;background:${barColor};"></span>
             </span>
-            <span class="mode mode-${e.mode}">${e.mode}</span>
+            <span class="mode mode-${e.mode}" style="white-space:nowrap;font-size:8px;">${e.mode}${e.difficulty != null ? ' ' + e.difficulty : ''}</span>
             <span class="ago">${ago(e.at)}</span>
         </div>`;
     }
