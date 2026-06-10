@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v34</title>
+    <title>Live Tracker v35</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -764,15 +764,26 @@
                 entries = data || [];
             }
         } else if (mode === 'practice' || mode === 'endless') {
-            // Find most recent practice_run for this user
-            const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
             const src = mode === 'endless' ? 'unlimited' : 'practice';
-            const { data: runs } = await sb.from('practice_runs').select('id, total_seconds, completed_at').eq('user_id', userId).eq('source', src).gte('completed_at', since).order('completed_at', { ascending: false }).limit(1);
+            // Find the specific practice_run matching the clicked timestamp
+            let query = sb.from('practice_runs').select('id, total_seconds, completed_at').eq('user_id', userId).eq('source', src);
+            if (atStr) {
+                // Match within 2 seconds of the clicked run's timestamp
+                const clickedAt = new Date(atStr);
+                const lo = new Date(clickedAt.getTime() - 2000).toISOString();
+                const hi = new Date(clickedAt.getTime() + 2000).toISOString();
+                query = query.gte('completed_at', lo).lte('completed_at', hi);
+            } else {
+                const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+                query = query.gte('completed_at', since);
+            }
+            const { data: runs } = await query.order('completed_at', { ascending: false }).limit(1);
             if (runs && runs.length > 0) {
                 totalTime = runs[0].total_seconds;
-                // Get plate entries from practice_plate_stats near that timestamp
+                // Get plate entries — window = run duration + buffer
                 const completedAt = runs[0].completed_at;
-                const windowStart = new Date(new Date(completedAt).getTime() - 5000).toISOString();
+                const duration = (runs[0].total_seconds || 60) * 1000 + 10000;
+                const windowStart = new Date(new Date(completedAt).getTime() - duration).toISOString();
                 const { data } = await sb.from('practice_plate_stats')
                     .select('plate, word, skipped, thinking_seconds')
                     .eq('user_id', userId)
@@ -933,9 +944,9 @@
         const plateStr = `${solved}/${seen}`;
         const modeLabel = r.difficulty != null ? `${r.mode} ${r.difficulty}` : r.mode;
         const clickAttr = r.userId ? `onclick="showRunDetail('${r.userId}','${r.mode}','${r.at?.toISOString() || ''}')"` : '';
-        return `<div class="entry entry-${r.mode}" style="padding:5px 14px;cursor:pointer;font-size:0.8rem;" ${clickAttr}>
-            <span class="user" style="font-size:0.8rem;">${user}</span>
-            <span style="width:55px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${r.time.toFixed(2)}</span>
+        return `<div class="entry entry-${r.mode}" style="cursor:pointer;" ${clickAttr}>
+            <span class="user">${user}</span>
+            <span style="width:55px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:0.85rem;">${r.time.toFixed(2)}</span>
             <span style="width:45px;text-align:center;font-size:0.75rem;color:#6b7280;">${plateStr}</span>
             <span class="mode mode-${r.mode}" style="white-space:nowrap;font-size:8px;">${modeLabel}</span>
             <span class="ago">${ago(r.at)}</span>
