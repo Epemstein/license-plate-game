@@ -875,7 +875,8 @@
             }
         });
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'h2h_runs' }, async (payload) => {
-            if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
+            console.log('[Live] h2h_runs UPDATE', payload.new?.total_seconds, payload.old);
+            if (payload.new.total_seconds != null) {
                 let diff = 50;
                 if (payload.new.challenge_id) {
                     const { data: ch } = await sb.from('h2h_challenges').select('difficulty').eq('id', payload.new.challenge_id).single();
@@ -883,6 +884,10 @@
                 }
                 addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'h2h', difficulty: diff, at: new Date() });
             }
+        });
+        // Also watch for h2h_runs INSERT in case run is created with total_seconds already set
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'h2h_runs' }, (payload) => {
+            console.log('[Live] h2h_runs INSERT', payload.new?.total_seconds);
         });
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_daily_runs' }, (payload) => {
             if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
@@ -917,7 +922,7 @@
 
         const all = [
             ...(daily.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'daily', at: new Date(r.completed_at) })),
-            ...(h2h.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'h2h', difficulty: r.h2h_challenges?.difficulty ?? 50, at: new Date(r.created_at) })),
+            ...(h2h.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'h2h', difficulty: r.h2h_challenges?.difficulty ?? 50, at: new Date(new Date(r.created_at).getTime() + (r.total_seconds || 0) * 1000) })),
             ...(group.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'group', at: new Date(r.completed_at) })),
             ...(practice.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at) })),
         ];
