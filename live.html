@@ -964,7 +964,7 @@
             <span style="width:55px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:0.85rem;">${r.time.toFixed(2)}</span>
             <span style="width:45px;text-align:center;font-size:0.75rem;color:#6b7280;">${plateStr}</span>
             <span class="mode mode-${r.mode}" style="white-space:nowrap;font-size:8px;">${modeLabel}</span>
-            <span class="ago">${ago(r.at)}</span>
+            <span class="run-ago">${ago(r.at)}</span>
         </div>`;
     }
 
@@ -1221,9 +1221,13 @@
     }
 
     function updateAgos() {
-        const agoEls = document.querySelectorAll('.entry .ago');
+        // Update feed agos
+        const feedEls = document.querySelectorAll('#feed .entry .ago');
         const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.mode === activeFilter);
-        agoEls.forEach((el, i) => { if (filtered[i]) el.textContent = ago(filtered[i].at); });
+        feedEls.forEach((el, i) => { if (filtered[i]) el.textContent = ago(filtered[i].at); });
+        // Update runs agos
+        const runEls = document.querySelectorAll('#runsFeed .run-ago');
+        runEls.forEach((el, i) => { if (runs[i]) el.textContent = ago(runs[i].at); });
     }
 
     // ==================== STATS TAB ====================
