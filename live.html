@@ -298,7 +298,7 @@
         document.getElementById('statsPanel').className = tab === 'stats' ? 'stats-panel active' : 'stats-panel';
         document.getElementById('activityPanel').className = tab === 'activity' ? 'feed-panel active' : 'feed-panel';
         if (tab === 'stats' && !statsLoaded) { loadStats(); statsLoaded = true; }
-        if (tab === 'runs' && !runsLoaded) { loadRecentRuns(); runsLoaded = true; }
+        if (tab === 'runs') { loadRecentRuns(); }
         if (tab === 'activity' && !activityLoaded) { loadActivityData(); activityLoaded = true; }
     }
 
@@ -889,8 +889,17 @@
     let completedRunIds = new Set();
 
     async function loadRecentRuns() {
-        // Build runs from existing feed entries
+        runs = [];
+        completedRunIds = new Set();
         buildRunsFromEntries();
+        // Also seed runTracker for live detection
+        for (const e of entries) {
+            const rid = e.runId;
+            if (!rid || e.mode === 'endless') continue;
+            if (!runTracker[rid]) runTracker[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
+            if (e.difficulty != null) runTracker[rid].difficulty = e.difficulty;
+            runTracker[rid].plates.push(e);
+        }
         renderRuns();
     }
 
