@@ -2380,7 +2380,7 @@
             // Also create a practice_runs entry
             const solved = gameHistory.filter(e => !e.skipped).length;
             const totalTime = gameHistory.reduce((s, e) => s + (e.thinkingSeconds || 0) + (e.penaltySeconds || 0), 0);
-            await sb.from('practice_runs').insert({
+            const { error: runErr } = await sb.from('practice_runs').insert({
                 user_id: currentUser.id,
                 total_seconds: Math.floor(totalTime * 100) / 100,
                 difficulty: diff,
@@ -2388,7 +2388,8 @@
                 plates_solved: solved,
                 plates_seen: gameHistory.length
             });
-            console.log('[Practice] Created practice_runs entry');
+            if (runErr) console.error('[Practice] practice_runs insert FAILED:', runErr.message);
+            else console.log('[Practice] Created practice_runs entry, solved:', solved, 'seen:', gameHistory.length);
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
         }

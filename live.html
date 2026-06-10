@@ -755,8 +755,17 @@
                 entries = data || [];
             }
         } else if (mode === 'h2h') {
-            const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-            const { data: runs } = await sb.from('h2h_runs').select('id, total_seconds').eq('user_id', userId).gte('created_at', since).order('created_at', { ascending: false }).limit(1);
+            let query = sb.from('h2h_runs').select('id, total_seconds').eq('user_id', userId);
+            if (atStr) {
+                const clickedAt = new Date(atStr);
+                const lo = new Date(clickedAt.getTime() - 2000).toISOString();
+                const hi = new Date(clickedAt.getTime() + 2000).toISOString();
+                query = query.gte('created_at', lo).lte('created_at', hi);
+            } else {
+                const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+                query = query.gte('created_at', since);
+            }
+            const { data: runs } = await query.order('created_at', { ascending: false }).limit(1);
             if (runs && runs.length > 0) {
                 totalTime = runs[0].total_seconds;
                 const { data } = await sb.from('h2h_run_entries')
