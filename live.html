@@ -215,7 +215,7 @@
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                         <h3 style="margin:0;">Activity</h3>
                         <div style="display:flex;gap:4px;">
-                            <button class="activity-mode-btn active" onclick="switchActivityMode('24h',this)">Last 24h</button>
+                            <button class="activity-mode-btn active" onclick="switchActivityMode('24h',this)">Today</button>
                             <button class="activity-mode-btn" onclick="switchActivityMode('avg7',this)">Avg Day (7d)</button>
                             <button class="activity-mode-btn" onclick="switchActivityMode('avg30',this)">Avg Day (30d)</button>
                         </div>
@@ -1397,19 +1397,17 @@
     let activityBucketCounts = null;
     let activityBucketLabels = null;
     let activityStartEpoch = 0;
-    const ACTIVITY_INTERVAL = 30 * 60 * 1000;
+    const ACTIVITY_INTERVAL = 60 * 60 * 1000; // 1 hour buckets
 
     function getActivityBuckets() {
-        // Snap to half-hour boundaries (e.g. 7:00, 7:30, 8:00)
+        // Midnight to midnight (24 hourly buckets)
         const now = new Date();
-        const currentSlot = new Date(now);
-        currentSlot.setMinutes(now.getMinutes() < 30 ? 30 : 60, 0, 0); // end of current slot
-        const endEpoch = currentSlot.getTime();
-        const startEpoch = endEpoch - 48 * ACTIVITY_INTERVAL;
+        const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const startEpoch = midnight.getTime();
 
-        const counts = new Array(48).fill(0);
+        const counts = new Array(24).fill(0);
         const labels = [];
-        for (let i = 0; i < 48; i++) {
+        for (let i = 0; i < 24; i++) {
             const t = startEpoch + i * ACTIVITY_INTERVAL;
             labels.push(new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
         }
@@ -1419,7 +1417,7 @@
     function addToActivityBucket(epoch) {
         if (!activityBucketCounts || isNaN(epoch)) return;
         const idx = Math.floor((epoch - activityStartEpoch) / ACTIVITY_INTERVAL);
-        if (idx >= 0 && idx < 48) {
+        if (idx >= 0 && idx < 24) {
             activityBucketCounts[idx]++;
             if (activityChart) {
                 activityChart.data.datasets[0].data = [...activityBucketCounts];
@@ -1442,28 +1440,71 @@
             const epoch = new Date(ts).getTime();
             if (isNaN(epoch)) continue;
             const idx = Math.floor((epoch - startEpoch) / ACTIVITY_INTERVAL);
-            if (idx >= 0 && idx < 48) { activityBucketCounts[idx]++; matched++; }
+            if (idx >= 0 && idx < 24) { activityBucketCounts[idx]++; matched++; }
         }
         console.log('[Activity] Bucketed', matched, '/', allTimestamps.length, 'timestamps');
 
         const values = activityBucketCounts;
 
+        // Fetch last 6 days for background lines
+        const prevDaysSince = new Date(startEpoch - 6 * 24 * 60 * 60 * 1000).toISOString();
+        const prevTimestamps = await fetchAllEntryTimestamps(prevDaysSince);
+        const dayBuckets = {}; // 'YYYY-MM-DD' -> [24 counts]
+        for (const ts of prevTimestamps) {
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) continue;
+            const dayKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            const todayKey = new Date(startEpoch).toISOString().slice(0, 10);
+            if (dayKey === todayKey) continue; // skip today (already shown)
+            if (!dayBuckets[dayKey]) dayBuckets[dayKey] = new Array(24).fill(0);
+            dayBuckets[dayKey][d.getHours()]++;
+        }
+
+        const datasets = [];
+        // Previous days as faded grey lines (behind today)
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        for (const [dayKey, counts] of Object.entries(dayBuckets).sort()) {
+            const dayDate = new Date(dayKey + 'T12:00:00');
+            const label = `${dayNames[dayDate.getDay()]} ${dayDate.getMonth()+1}/${dayDate.getDate()}`;
+            datasets.push({
+                data: counts,
+                borderColor: 'rgba(180, 180, 180, 0.35)',
+                backgroundColor: 'transparent',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 1.5,
+                label,
+            });
+        }
+        // Today on top
+        datasets.push({
+            data: values,
+            borderColor: '#7c3aed',
+            backgroundColor: 'rgba(124, 58, 237, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            pointBackgroundColor: '#7c3aed',
+            borderWidth: 2.5,
+            label: 'Today',
+        });
+
         const ctx = document.getElementById('activityChart').getContext('2d');
         if (activityChart) activityChart.destroy();
         activityChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: activityBucketLabels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: '#a78bfa',
-                    borderRadius: 4,
-                    barPercentage: 0.8,
-                }]
-            },
+            type: 'line',
+            data: { labels: activityBucketLabels, datasets },
             options: {
                 responsive: true,
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'nearest',
+                        intersect: false,
+                        filter: (item) => item.dataset.label === 'Today',
+                    }
+                },
                 scales: {
                     x: {
                         ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' },
@@ -1471,7 +1512,7 @@
                     },
                     y: {
                         beginAtZero: true,
-                        ticks: { stepSize: 1, font: { size: 10 }, color: '#9ca3af' },
+                        ticks: { font: { size: 10 }, color: '#9ca3af' },
                         grid: { color: '#f3f4f6' }
                     }
                 }
@@ -1515,13 +1556,12 @@
         const since = new Date(Date.now() - numDays * 24 * 60 * 60 * 1000).toISOString();
         const allTimestamps = await fetchAllEntryTimestamps(since);
 
-        // Bucket by half-hour slot within a day (0-47)
-        const slotTotals = new Array(48).fill(0);
+        // Bucket by hour slot within a day (0-23)
+        const slotTotals = new Array(24).fill(0);
         for (const ts of allTimestamps) {
             const d = new Date(ts);
             if (isNaN(d.getTime())) continue;
-            const slot = d.getHours() * 2 + (d.getMinutes() < 30 ? 0 : 1);
-            slotTotals[slot]++;
+            slotTotals[d.getHours()]++;
         }
         // Average per day
         return slotTotals.map(t => Math.round(t / numDays * 10) / 10);
@@ -1529,25 +1569,27 @@
 
     function renderAverageDayChart(avgData, numDays) {
         const labels = [];
-        for (let i = 0; i < 48; i++) {
-            const h = Math.floor(i / 2);
-            const m = i % 2 === 0 ? '00' : '30';
-            const ampm = h < 12 ? 'AM' : 'PM';
-            const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-            labels.push(`${h12}:${m} ${ampm}`);
+        for (let i = 0; i < 24; i++) {
+            const ampm = i < 12 ? 'AM' : 'PM';
+            const h12 = i === 0 ? 12 : i > 12 ? i - 12 : i;
+            labels.push(`${h12}:00 ${ampm}`);
         }
 
         const ctx = document.getElementById('activityChart').getContext('2d');
         if (activityChart) activityChart.destroy();
         activityChart = new Chart(ctx, {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels,
                 datasets: [{
                     data: avgData,
-                    backgroundColor: '#34d399',
-                    borderRadius: 4,
-                    barPercentage: 0.8,
+                    borderColor: '#34d399',
+                    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#34d399',
+                    borderWidth: 2,
                 }]
             },
             options: {
