@@ -348,7 +348,7 @@
         for (const e of (data || [])) {
             entries.push({
                 plate: e.plate, word: e.word, skipped: e.skipped,
-                time: e.thinking_seconds, mode: e.mode, difficulty: e.difficulty || null,
+                time: e.thinking_seconds, mode: e.mode, difficulty: e.difficulty != null ? e.difficulty : null,
                 at: new Date(e.created_at), userId: e.user_id, userName: null,
                 runId: e.run_id || null
             });
@@ -877,7 +877,7 @@
         });
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'practice_runs' }, (payload) => {
             const r = payload.new;
-            if (r.plates_seen !== 10) return; // only show completed 10-plate runs
+            if (r.plates_seen != 10) return; // only show completed 10-plate runs
             addRun({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at || Date.now()) });
         });
         channel.subscribe((status) => {
@@ -965,7 +965,7 @@
     async function addEntry(row) {
         const e = {
             plate: row.plate, word: row.word, skipped: row.skipped,
-            time: row.thinking_seconds, mode: row.mode, difficulty: row.difficulty || null,
+            time: row.thinking_seconds, mode: row.mode, difficulty: row.difficulty != null ? row.difficulty : null,
             at: new Date(row.created_at || Date.now()), userId: row.user_id || null, userName: null,
             runId: row.run_id || null
         };
