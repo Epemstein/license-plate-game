@@ -867,24 +867,13 @@
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_plays' }, (payload) => {
             addEntry(payload.new);
         });
-        // Watch for completed runs (UPDATE with total_seconds set)
+        // Watch for completed daily runs (for sidebar update only)
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_runs' }, (payload) => {
-            if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
-                addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'daily', at: new Date(payload.new.completed_at || Date.now()) });
+            if (payload.new.total_seconds != null) {
                 markDailyCompleted(payload.new.user_id, payload.new.total_seconds);
             }
         });
-        // H2H runs are picked up by 30s poll (realtime UPDATE unreliable from RPCs)
-        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_daily_runs' }, (payload) => {
-            if (payload.new.total_seconds != null && payload.old?.total_seconds == null) {
-                addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'group', at: new Date(payload.new.completed_at || Date.now()) });
-            }
-        });
-        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'practice_runs' }, (payload) => {
-            const r = payload.new;
-            if (r.plates_seen != 10) return; // only show completed 10-plate runs
-            addRun({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at || Date.now()) });
-        });
+        // Runs tab is driven by detecting the 10th plate per run_id in the feed
         channel.subscribe((status) => {
             const dot = document.getElementById('statusDot');
             if (status === 'SUBSCRIBED') { dot.className = 'dot'; }
@@ -893,102 +882,73 @@
     }
 
     // ==================== RUNS TAB ====================
+    // Runs are built from the feed: when we see 10 plates for a run_id, it's complete.
 
     let runs = [];
-    let knownRunKeys = new Set(); // dedupe: "userId|mode|time|atMs"
-
-    function runKey(r) {
-        return `${r.userId}|${r.mode}|${r.time}|${Math.round(r.at.getTime() / 5000)}`;
-    }
-
-    function parseH2HRun(r) {
-        // Use challenge created_at if available, otherwise approximate from created_at + total_seconds
-        const challengeAt = r.h2h_challenges?.created_at;
-        const at = challengeAt
-            ? new Date(new Date(challengeAt).getTime() + (r.total_seconds || 0) * 1000)
-            : new Date(new Date(r.created_at).getTime() + (r.total_seconds || 0) * 1000);
-        return { userId: r.user_id, time: r.total_seconds, mode: 'h2h', difficulty: r.h2h_challenges?.difficulty ?? 50, at };
-    }
+    let runTracker = {}; // run_id -> { plates: [{...}], userId, mode, difficulty }
+    let completedRunIds = new Set();
 
     async function loadRecentRuns() {
-        const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-
-        const [daily, h2h, group, practice] = await Promise.all([
-            sb.from('daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
-            sb.from('h2h_runs').select('user_id, total_seconds, created_at, h2h_challenges(difficulty, created_at)').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(50),
-            sb.from('group_daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
-            sb.from('practice_runs').select('user_id, total_seconds, difficulty, source, plates_solved, plates_seen, completed_at').eq('plates_seen', 10).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
-        ]);
-
-        const all = [
-            ...(daily.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'daily', at: new Date(r.completed_at) })),
-            ...(h2h.data || []).map(parseH2HRun),
-            ...(group.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'group', at: new Date(r.completed_at) })),
-            ...(practice.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at) })),
-        ];
-        all.sort((a, b) => b.at - a.at);
-
-        for (const r of all) {
-            r.userName = null;
-            const k = runKey(r);
-            knownRunKeys.add(k);
-            runs.push(r);
-        }
-        resolveRunUserNames();
+        // Build runs from existing feed entries
+        buildRunsFromEntries();
         renderRuns();
-
-        // Poll every 30s to catch runs that realtime misses (e.g. H2H RPCs)
-        setInterval(pollForNewRuns, 30000);
     }
 
-    async function pollForNewRuns() {
-        const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-        const [daily, h2h, group, practice] = await Promise.all([
-            sb.from('daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(20),
-            sb.from('h2h_runs').select('user_id, total_seconds, created_at, h2h_challenges(difficulty, created_at)').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(20),
-            sb.from('group_daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(20),
-            sb.from('practice_runs').select('user_id, total_seconds, difficulty, source, plates_solved, plates_seen, completed_at').eq('plates_seen', 10).gte('completed_at', since).order('completed_at', { ascending: false }).limit(20),
-        ]);
-        const fresh = [
-            ...(daily.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'daily', at: new Date(r.completed_at) })),
-            ...(h2h.data || []).map(parseH2HRun),
-            ...(group.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'group', at: new Date(r.completed_at) })),
-            ...(practice.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at) })),
-        ];
-        let added = 0;
-        for (const r of fresh) {
-            const k = runKey(r);
-            if (!knownRunKeys.has(k)) {
-                knownRunKeys.add(k);
-                addRun(r);
-                added++;
+    function buildRunsFromEntries() {
+        // Scan all feed entries and group by runId
+        const byRun = {};
+        for (const e of entries) {
+            const rid = e.runId;
+            if (!rid) continue;
+            if (!byRun[rid]) byRun[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
+            byRun[rid].plates.push(e);
+        }
+        // Any run with 10+ plates is complete
+        for (const [rid, info] of Object.entries(byRun)) {
+            if (info.plates.length >= 10 && !completedRunIds.has(rid)) {
+                completedRunIds.add(rid);
+                const sorted = info.plates.sort((a, b) => a.at - b.at);
+                const totalTime = sorted.reduce((s, p) => s + (p.time || 0), 0);
+                const solved = sorted.filter(p => !p.skipped).length;
+                runs.push({
+                    userId: info.userId, userName: info.userName,
+                    time: Math.round(totalTime * 100) / 100,
+                    mode: info.mode, difficulty: info.difficulty,
+                    solved, seen: sorted.length,
+                    at: sorted[sorted.length - 1].at // timestamp of last plate
+                });
             }
         }
-        if (added > 0) console.log('[Runs] Poll found', added, 'new runs');
+        runs.sort((a, b) => b.at - a.at);
     }
 
-    async function resolveRunUserNames() {
-        for (const r of runs) {
-            if (r.userName || !r.userId) continue;
-            r.userName = await resolveUser(r.userId);
-        }
-        renderRuns();
-    }
-
-    async function addRun(r) {
-        const k = runKey(r);
-        if (knownRunKeys.has(k)) return;
-        knownRunKeys.add(k);
-        r.userName = r.userId ? await resolveUser(r.userId) : null;
-        runs.unshift(r);
-        if (runs.length > 100) runs.pop();
-
-        if (activeTab === 'runs') {
-            const feed = document.getElementById('runsFeed');
-            const empty = feed.querySelector('.empty');
-            if (empty) empty.remove();
-            feed.insertAdjacentHTML('afterbegin', renderRunHTML(r));
-            while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+    function checkRunComplete(e) {
+        // Called after each new feed entry — check if this run just hit 10 plates
+        const rid = e.runId;
+        if (!rid || completedRunIds.has(rid)) return;
+        if (!runTracker[rid]) runTracker[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
+        const rt = runTracker[rid];
+        rt.plates.push(e);
+        if (rt.plates.length >= 10) {
+            completedRunIds.add(rid);
+            const totalTime = rt.plates.reduce((s, p) => s + (p.time || 0), 0);
+            const solved = rt.plates.filter(p => !p.skipped).length;
+            const r = {
+                userId: rt.userId, userName: rt.userName,
+                time: Math.round(totalTime * 100) / 100,
+                mode: rt.mode, difficulty: rt.difficulty,
+                solved, seen: rt.plates.length,
+                at: new Date() // just completed now
+            };
+            runs.unshift(r);
+            if (runs.length > 100) runs.pop();
+            if (activeTab === 'runs') {
+                const feed = document.getElementById('runsFeed');
+                const empty = feed.querySelector('.empty');
+                if (empty) empty.remove();
+                feed.insertAdjacentHTML('afterbegin', renderRunHTML(r));
+                while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+            }
         }
     }
 
@@ -1052,6 +1012,9 @@
         if (e.mode === 'daily' && e.userId) {
             updateDailyPosition(e.userId, e.plate, e.word, e.skipped);
         }
+
+        // Check if this plate completes a run (10 plates)
+        checkRunComplete(e);
     }
 
     const splitElMap = { daily: 'splitDaily', practice: 'splitPractice', endless: 'splitEndless', h2h: 'splitH2h', group: 'splitGroup' };
