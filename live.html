@@ -660,8 +660,8 @@
                 }
 
                 html += `<div class="daily-plate-row" style="${rowBg}">`;
-                html += `<span class="dp-num" style="${result?.skipped ? 'color:#ef4444;' : ''}">${i + 1}</span>`;
-                html += `<span class="dp-plate" style="${result?.skipped ? 'color:#ef4444;' : ''}">${plate}</span>`;
+                html += `<span class="dp-num" style="color:${result?.skipped ? '#ef4444' : '#000'};">${i + 1}</span>`;
+                html += `<span class="dp-plate" style="color:${result?.skipped ? '#ef4444' : '#000'};">${plate}</span>`;
                 html += `<span style="display:flex;align-items:center;flex:1;gap:4px;">${rowContent}</span>`;
                 html += '</div>';
             } else {
