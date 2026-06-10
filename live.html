@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v28</title>
+    <title>Live Tracker v29</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -406,7 +406,7 @@
         for (let i = 0; i < runIds.length; i += 50) {
             const chunk = runIds.slice(i, i + 50);
             const { data } = await sb.from('daily_run_entries')
-                .select('run_id, plate_index, word, skipped')
+                .select('run_id, plate_index, word, skipped, thinking_seconds, penalty_seconds')
                 .in('run_id', chunk)
                 .order('plate_index', { ascending: true });
             if (data) allEntries.push(...data);
@@ -442,7 +442,7 @@
             const plateResults = {};
             let maxIdx = -1;
             for (const e of runEntries) {
-                plateResults[e.plate_index] = { word: e.word, skipped: e.skipped };
+                plateResults[e.plate_index] = { word: e.word, skipped: e.skipped, time: e.thinking_seconds, penalty: e.penalty_seconds || 0 };
                 if (e.plate_index > maxIdx) maxIdx = e.plate_index;
             }
 
@@ -634,26 +634,35 @@
             const plate = dailyPlates[i];
 
             if (sel) {
-                // Focused view — show only selected player's results
+                // Focused view — show color-coded plate-by-plate with times
                 const p = selPlayer;
                 const result = p.plateResults[i];
                 const isHere = p.currentPlate === i;
                 const solvedSoFar = Object.keys(p.plateResults).filter(k => !p.plateResults[k].skipped && parseInt(k) <= i).length;
 
-                html += `<div class="daily-plate-row" style="${isHere ? 'background:#fefce8;border-color:#fde68a;' : ''}">`;
-                html += `<span class="dp-num">${i + 1}</span>`;
-                html += `<span class="dp-plate">${plate}</span>`;
-                html += '<span class="dp-players" style="flex:1;">';
+                let rowBg = '';
+                let rowContent = '';
                 if (isHere) {
-                    html += `<span class="dp-avatar" style="background:${p.color};font-size:0.6rem;">${solvedSoFar}</span>`;
+                    rowBg = 'background:#fefce8;';
+                    rowContent = `<span class="dp-avatar" style="background:${p.color};font-size:0.6rem;">${solvedSoFar}</span>`;
                 } else if (result) {
                     if (result.skipped) {
-                        html += '<span style="color:#dc2626;font-size:0.8rem;font-weight:600;">✕ skipped</span>';
+                        rowBg = 'background:#1f2937;';
+                        const penaltyStr = result.penalty ? ` (+${result.penalty}s)` : '';
+                        const timeStr = result.time != null ? `${result.time.toFixed(2)}${penaltyStr}` : '';
+                        rowContent = `<span style="color:#ef4444;font-size:0.8rem;font-weight:600;">✕ skipped</span><span style="flex:1;"></span><span style="color:#ef4444;font-size:0.75rem;font-weight:600;">${timeStr}</span>`;
                     } else {
-                        html += `<span style="color:#16a34a;font-size:0.8rem;font-weight:600;">${(result.word || '?').toLowerCase()}</span>`;
+                        rowBg = `background:${sidebarTimeColor(result.time)};`;
+                        const timeStr = result.time != null ? result.time.toFixed(2) : '';
+                        rowContent = `<span style="font-size:0.8rem;font-weight:600;">${(result.word || '?').toLowerCase()}</span><span style="flex:1;"></span><span style="font-size:0.75rem;font-weight:600;">${timeStr}</span>`;
                     }
                 }
-                html += '</span></div>';
+
+                html += `<div class="daily-plate-row" style="${rowBg}">`;
+                html += `<span class="dp-num" style="${result?.skipped ? 'color:#ef4444;' : ''}">${i + 1}</span>`;
+                html += `<span class="dp-plate" style="${result?.skipped ? 'color:#ef4444;' : ''}">${plate}</span>`;
+                html += `<span style="display:flex;align-items:center;flex:1;gap:4px;">${rowContent}</span>`;
+                html += '</div>';
             } else {
                 // Overview — show all in-progress players
                 const showPlayers = inProgress.slice(-4);
@@ -686,25 +695,41 @@
             }
         }
 
-        // Completed players at bottom
+        // Leaderboard at bottom — ranked completed players
         if (completed.length > 0) {
             const sorted = [...completed].sort((a, b) => (dailyPlayers[a].time || 999) - (dailyPlayers[b].time || 999));
-            html += '<div style="margin-top:8px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;">';
-            html += '<div style="font-size:0.65rem;color:#16a34a;font-weight:700;margin-bottom:4px;">FINISHED</div>';
-            html += '<div style="display:flex;flex-wrap:wrap;gap:3px;">';
-            for (const uid of sorted) {
+            html += '<div style="margin-top:10px;border-top:2px solid #e5e7eb;padding-top:8px;">';
+            html += '<div style="font-size:0.7rem;font-weight:700;color:#16a34a;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Leaderboard</div>';
+            sorted.forEach((uid, rank) => {
                 const p = dailyPlayers[uid];
-                const grey = sel && sel !== uid;
-                const timeStr = p.time ? p.time.toFixed(1) + 's' : '';
-                html += `<span class="dp-avatar" style="background:${grey ? '#ccc' : p.color};cursor:pointer;" title="${p.name} ${timeStr}" onclick="selectDailyPlayer('${uid}')">${p.initials}</span>`;
-            }
-            html += '</div></div>';
+                const timeStr = p.time ? p.time.toFixed(2) : '--';
+                const isSel = sel === uid;
+                const medal = rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}.`;
+                html += `<div onclick="event.stopPropagation();selectDailyPlayer('${uid}')" style="display:flex;align-items:center;padding:4px 6px;margin-bottom:2px;border-radius:6px;cursor:pointer;${isSel ? 'background:#eef2ff;border:1px solid #a5b4fc;' : 'border:1px solid transparent;'}">`;
+                html += `<span style="width:24px;font-size:0.75rem;flex-shrink:0;">${medal}</span>`;
+                html += `<span style="flex:1;font-size:0.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</span>`;
+                html += `<span style="font-size:0.8rem;font-weight:700;font-variant-numeric:tabular-nums;color:#16a34a;">${timeStr}</span>`;
+                html += '</div>';
+            });
+            html += '</div>';
         }
 
         grid.innerHTML = html;
     }
 
-    // Legacy — replaced by selectDailyPlayer focus view
+    // Color for time-based conditional formatting (matches iOS timeColor)
+    function sidebarTimeColor(seconds) {
+        if (seconds == null) return '#f3f4f6';
+        if (seconds <= 2) return 'rgb(34,197,94)';
+        if (seconds >= 30) return 'rgb(252,165,165)';
+        if (seconds <= 6) {
+            const r = (seconds - 2) / 4;
+            return `rgb(${Math.round(34 + (255-34)*r)},${Math.round(197 + (255-197)*r)},${Math.round(94 + (255-94)*r)})`;
+        }
+        const r = (seconds - 6) / 24;
+        return `rgb(255,${Math.round(255 - r*90)},${Math.round(255 - r*90)})`;
+    }
+
     window.showDailyPlayerDetail = function(uid) { window.selectDailyPlayer(uid); };
 
     function subscribe() {
