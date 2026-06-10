@@ -876,6 +876,7 @@
         });
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'practice_runs' }, (payload) => {
             const r = payload.new;
+            if (r.plates_seen !== 10) return; // only show completed 10-plate runs
             addRun({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at || Date.now()) });
         });
         channel.subscribe((status) => {
@@ -896,7 +897,7 @@
             sb.from('daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
             sb.from('h2h_runs').select('user_id, total_seconds, created_at').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(50),
             sb.from('group_daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
-            sb.from('practice_runs').select('user_id, total_seconds, difficulty, source, plates_solved, plates_seen, completed_at').gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
+            sb.from('practice_runs').select('user_id, total_seconds, difficulty, source, plates_solved, plates_seen, completed_at').eq('plates_seen', 10).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
         ]);
 
         const all = [
