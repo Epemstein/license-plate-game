@@ -2373,6 +2373,19 @@
             }));
             await sb.from('practice_plate_stats').insert(rows);
             console.log('[Practice] Submitted', rows.length, 'plate stats at difficulty', diff);
+
+            // Also create a practice_runs entry
+            const solved = gameHistory.filter(e => !e.skipped).length;
+            const totalTime = gameHistory.reduce((s, e) => s + (e.thinkingSeconds || 0) + (e.penaltySeconds || 0), 0);
+            await sb.from('practice_runs').insert({
+                user_id: currentUser.id,
+                total_seconds: Math.floor(totalTime * 100) / 100,
+                difficulty: diff,
+                source: 'practice',
+                plates_solved: solved,
+                plates_seen: gameHistory.length
+            });
+            console.log('[Practice] Created practice_runs entry');
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
         }

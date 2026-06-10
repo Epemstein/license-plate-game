@@ -845,6 +845,10 @@
                 addRun({ userId: payload.new.user_id, time: payload.new.total_seconds, mode: 'group', at: new Date(payload.new.completed_at || Date.now()) });
             }
         });
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'practice_runs' }, (payload) => {
+            const r = payload.new;
+            addRun({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at || Date.now()) });
+        });
         channel.subscribe((status) => {
             const dot = document.getElementById('statusDot');
             if (status === 'SUBSCRIBED') { dot.className = 'dot'; }
@@ -857,19 +861,20 @@
     let runs = [];
 
     async function loadRecentRuns() {
-        const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-        const today = new Date().toISOString().slice(0, 10);
+        const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
-        const [daily, h2h, group] = await Promise.all([
+        const [daily, h2h, group, practice] = await Promise.all([
             sb.from('daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
             sb.from('h2h_runs').select('user_id, total_seconds, created_at').not('total_seconds', 'is', null).gte('created_at', since).order('created_at', { ascending: false }).limit(50),
             sb.from('group_daily_runs').select('user_id, total_seconds, completed_at').not('total_seconds', 'is', null).gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
+            sb.from('practice_runs').select('user_id, total_seconds, difficulty, source, plates_solved, plates_seen, completed_at').gte('completed_at', since).order('completed_at', { ascending: false }).limit(50),
         ]);
 
         const all = [
             ...(daily.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'daily', at: new Date(r.completed_at) })),
             ...(h2h.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'h2h', at: new Date(r.created_at) })),
             ...(group.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: 'group', at: new Date(r.completed_at) })),
+            ...(practice.data || []).map(r => ({ userId: r.user_id, time: r.total_seconds, mode: r.source === 'unlimited' ? 'endless' : 'practice', difficulty: r.difficulty, solved: r.plates_solved, seen: r.plates_seen, at: new Date(r.completed_at) })),
         ];
         all.sort((a, b) => b.at - a.at);
 
