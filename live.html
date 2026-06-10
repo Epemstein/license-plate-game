@@ -899,7 +899,7 @@
         const byRun = {};
         for (const e of entries) {
             const rid = e.runId;
-            if (!rid) continue;
+            if (!rid || e.mode === 'endless') continue;
             if (!byRun[rid]) byRun[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
             byRun[rid].plates.push(e);
         }
@@ -925,7 +925,7 @@
     function checkRunComplete(e) {
         // Called after each new feed entry — check if this run just hit 10 plates
         const rid = e.runId;
-        if (!rid || completedRunIds.has(rid)) return;
+        if (!rid || completedRunIds.has(rid) || e.mode === 'endless') return;
         if (!runTracker[rid]) runTracker[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
         const rt = runTracker[rid];
         rt.plates.push(e);
