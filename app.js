@@ -437,6 +437,18 @@
     let endlessTotalSolved = 0;
     let endlessPendingEntries = []; // accumulated locally, flushed on end
 
+    function cleanupLocalStorage() {
+        // Remove large cached data to free space
+        try {
+            const keys = Object.keys(localStorage);
+            for (const k of keys) {
+                if (k.startsWith('lb_') || k.startsWith('plateRaw_') || k.startsWith('plateAnalysisCache')) {
+                    localStorage.removeItem(k);
+                }
+            }
+        } catch (e) { /* ignore */ }
+    }
+
     function saveEndlessStateLocally() {
         if (endlessPendingEntries.length === 0 && endlessTotalSeen === 0) return;
         // Save the current plate index so we resume on the same plate
@@ -451,10 +463,11 @@
             cursor: Math.max(0, currentIdx - 1) // back up to unsolved plate
         };
         try {
-            localStorage.setItem('pendingEndlessState', JSON.stringify(state));
-            console.log('[Endless] Saved state:', endlessPendingEntries.length, 'entries, seen:', endlessTotalSeen, 'cursor:', state.cursor);
+            // Don't save full plate sequence — too large, fills localStorage
+            const saveState = { ...state, plateSequence: state.plateSequence.slice(state.cursor, state.cursor + 50) };
+            localStorage.setItem('pendingEndlessState', JSON.stringify(saveState));
         } catch (e) {
-            console.error('[Endless] localStorage save error:', e);
+            console.warn('[Endless] localStorage save failed (quota), entries still in memory');
         }
     }
 
@@ -755,8 +768,12 @@
         }));
 
         // Save pending submission to localStorage so we can retry if the page closes
-        const pending = { runId, date: today, totalSeconds, entries };
-        localStorage.setItem('pendingDailySubmission', JSON.stringify(pending));
+        try {
+            const pending = { runId, date: today, totalSeconds, entries };
+            localStorage.setItem('pendingDailySubmission', JSON.stringify(pending));
+        } catch (e) {
+            console.warn('[Submit] localStorage save failed (quota exceeded), submitting directly');
+        }
 
         const success = await submitDailyRun(runId, totalSeconds, entries);
 
