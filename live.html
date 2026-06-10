@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Tracker v29</title>
+    <title>Live Tracker v30</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -248,7 +248,7 @@
         auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const MAX_ENTRIES = 200;
+    const MAX_ENTRIES = 500;
     let entries = [];
     let profileCache = {};
     let activeFilter = 'all';
