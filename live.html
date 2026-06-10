@@ -895,27 +895,27 @@
     }
 
     function buildRunsFromEntries() {
-        // Scan all feed entries and group by runId
         const byRun = {};
         for (const e of entries) {
             const rid = e.runId;
             if (!rid || e.mode === 'endless') continue;
             if (!byRun[rid]) byRun[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
+            if (e.difficulty != null) byRun[rid].difficulty = e.difficulty;
             byRun[rid].plates.push(e);
         }
-        // Any run with 10+ plates is complete
         for (const [rid, info] of Object.entries(byRun)) {
-            if (info.plates.length >= 10 && !completedRunIds.has(rid)) {
+            const solved = info.plates.filter(p => !p.skipped).length;
+            if (solved >= 10 && !completedRunIds.has(rid)) {
                 completedRunIds.add(rid);
                 const sorted = info.plates.sort((a, b) => a.at - b.at);
                 const totalTime = sorted.reduce((s, p) => s + (p.time || 0), 0);
-                const solved = sorted.filter(p => !p.skipped).length;
                 runs.push({
+                    runId: rid,
                     userId: info.userId, userName: info.userName,
                     time: Math.round(totalTime * 100) / 100,
                     mode: info.mode, difficulty: info.difficulty,
                     solved, seen: sorted.length,
-                    at: sorted[sorted.length - 1].at // timestamp of last plate
+                    at: sorted[sorted.length - 1].at
                 });
             }
         }
@@ -923,22 +923,23 @@
     }
 
     function checkRunComplete(e) {
-        // Called after each new feed entry — check if this run just hit 10 plates
         const rid = e.runId;
         if (!rid || completedRunIds.has(rid) || e.mode === 'endless') return;
         if (!runTracker[rid]) runTracker[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
         const rt = runTracker[rid];
+        if (e.difficulty != null) rt.difficulty = e.difficulty;
         rt.plates.push(e);
-        if (rt.plates.length >= 10) {
+        const solved = rt.plates.filter(p => !p.skipped).length;
+        if (solved >= 10) {
             completedRunIds.add(rid);
             const totalTime = rt.plates.reduce((s, p) => s + (p.time || 0), 0);
-            const solved = rt.plates.filter(p => !p.skipped).length;
             const r = {
+                runId: rid,
                 userId: rt.userId, userName: rt.userName,
                 time: Math.round(totalTime * 100) / 100,
                 mode: rt.mode, difficulty: rt.difficulty,
                 solved, seen: rt.plates.length,
-                at: new Date() // just completed now
+                at: new Date()
             };
             runs.unshift(r);
             if (runs.length > 100) runs.pop();
@@ -954,11 +955,9 @@
 
     function renderRunHTML(r) {
         const user = r.userName ? esc(r.userName) : '<span style="color:#d1d5db;">anon</span>';
-        const solved = r.solved || 10;
-        const seen = r.seen || solved;
-        const plateStr = `${solved}/${seen}`;
+        const plateStr = `${r.solved}/${r.seen}`;
         const modeLabel = r.difficulty != null ? `${r.mode} ${r.difficulty}` : r.mode;
-        const clickAttr = r.userId ? `onclick="showRunDetail('${r.userId}','${r.mode}','${r.at?.toISOString() || ''}')"` : '';
+        const clickAttr = r.runId ? `onclick="showRunFromFeed('${r.runId}')"` : (r.userId ? `onclick="showRunDetail('${r.userId}','${r.mode}','${r.at?.toISOString() || ''}')"` : '');
         return `<div class="entry entry-${r.mode}" style="cursor:pointer;" ${clickAttr}>
             <span class="user" style="flex:none;width:auto;min-width:0;max-width:180px;">${user}</span>
             <span style="flex:1;"></span>
@@ -974,6 +973,52 @@
         if (runs.length === 0) { feed.innerHTML = '<div class="empty">Waiting for completed runs...</div>'; return; }
         feed.innerHTML = runs.slice(0, 100).map(r => renderRunHTML(r)).join('');
     }
+
+    window.showRunFromFeed = function(runId) {
+        // Build detail popover from feed entries
+        const plates = entries.filter(e => e.runId === runId).sort((a, b) => a.at - b.at);
+        if (plates.length === 0) return;
+        const name = plates[0].userName || 'Unknown';
+        const solved = plates.filter(p => !p.skipped).length;
+        const totalTime = plates.reduce((s, p) => s + (p.time || 0), 0);
+        const mode = plates[0].mode;
+
+        let html = '<div style="padding:14px;">';
+        html += `<div style="font-weight:700;font-size:1rem;margin-bottom:2px;">${esc(name)}</div>`;
+        html += `<div style="font-size:0.8rem;color:#6b7280;margin-bottom:10px;">${totalTime.toFixed(2)}s · ${solved}/${plates.length} solved · ${mode}</div>`;
+        for (const e of plates) {
+            const bg = e.skipped ? '#1f2937' : sidebarTimeColor(e.time);
+            const textColor = e.skipped ? '#ef4444' : '#000';
+            html += `<div style="display:flex;align-items:center;padding:5px 8px;margin-bottom:2px;border-radius:6px;background:${bg};color:${textColor};">`;
+            html += `<span style="font-family:monospace;font-weight:700;width:36px;font-size:0.85rem;">${e.plate}</span>`;
+            html += `<span style="margin:0 6px;color:${e.skipped ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)'};">|</span>`;
+            if (e.skipped) {
+                html += `<span style="font-weight:600;">✕ skipped</span>`;
+            } else {
+                html += `<span style="font-weight:600;color:#000;">${(e.word || '?').toLowerCase()}</span>`;
+            }
+            html += '<span style="flex:1;"></span>';
+            html += `<span style="font-size:0.8rem;font-weight:600;font-variant-numeric:tabular-nums;color:${textColor};">${e.time.toFixed(2)}</span>`;
+            html += '</div>';
+        }
+        html += '</div>';
+
+        const existing = document.getElementById('runDetailPopover');
+        if (existing) existing.remove();
+        const existingBd = document.getElementById('runDetailBackdrop');
+        if (existingBd) existingBd.remove();
+
+        const backdrop = document.createElement('div');
+        backdrop.id = 'runDetailBackdrop';
+        backdrop.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1999;';
+        backdrop.onclick = () => { backdrop.remove(); popover.remove(); };
+        const popover = document.createElement('div');
+        popover.id = 'runDetailPopover';
+        popover.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-width:400px;width:90%;max-height:80vh;overflow-y:auto;z-index:2000;';
+        popover.innerHTML = `<div style="display:flex;justify-content:flex-end;padding:8px 12px 0;"><button onclick="document.getElementById('runDetailBackdrop')?.remove();this.parentElement.parentElement.remove()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#6b7280;">&times;</button></div>${html}`;
+        document.body.appendChild(backdrop);
+        document.body.appendChild(popover);
+    };
 
     async function addEntry(row) {
         const e = {
