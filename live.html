@@ -234,7 +234,7 @@
 
             <!-- Daily Challenge Sidebar -->
             <div class="daily-sidebar" id="dailySidebar">
-                <h3 style="cursor:pointer;" onclick="selectDailyPlayer(null)">Daily Challenge</h3>
+                <h3 style="cursor:pointer;" onclick="selectDailyPlayer(null)">Daily Challenge <span id="dailyCompletedCount"></span></h3>
                 <div id="dailyPlateGrid" style="font-size:0.8rem;color:#9ca3af;">Loading plates...</div>
             </div>
 
@@ -597,6 +597,8 @@
 
         const activePlayers = dailyPlayerOrder.filter(uid => dailyPlayers[uid]);
         const completed = activePlayers.filter(uid => dailyPlayers[uid].completed);
+        const countEl = document.getElementById('dailyCompletedCount');
+        if (countEl) countEl.textContent = `(${completed.length})`;
         const now = Date.now();
         const STALE_MS = 10 * 60 * 1000; // 10 minutes
         const inProgress = activePlayers.filter(uid => {
