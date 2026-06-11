@@ -917,8 +917,12 @@
             if (solved >= 10 && !completedRunIds.has(rid)) {
                 completedRunIds.add(rid);
                 const sorted = info.plates.sort((a, b) => a.at - b.at);
-                const skips = sorted.filter(p => p.skipped).length;
-                const totalTime = sorted.reduce((s, p) => s + (p.time || 0), 0) + skips * 5;
+                let skipCount = 0;
+                let totalTime = 0;
+                for (const p of sorted) {
+                    totalTime += p.time || 0;
+                    if (p.skipped) { skipCount++; totalTime += skipCount * 5; }
+                }
                 runs.push({
                     runId: rid,
                     userId: info.userId, userName: info.userName,
@@ -942,8 +946,11 @@
         const solved = rt.plates.filter(p => !p.skipped).length;
         if (solved >= 10) {
             completedRunIds.add(rid);
-            const skips = rt.plates.filter(p => p.skipped).length;
-            const totalTime = rt.plates.reduce((s, p) => s + (p.time || 0), 0) + skips * 5;
+            let skipCount = 0, totalTime = 0;
+            for (const p of rt.plates) {
+                totalTime += p.time || 0;
+                if (p.skipped) { skipCount++; totalTime += skipCount * 5; }
+            }
             const r = {
                 runId: rid,
                 userId: rt.userId, userName: rt.userName,
