@@ -50,7 +50,7 @@
         .filters button { padding: 6px 14px; border-radius: 20px; font-size: 12px; border: 1px solid #ddd; background: #fff; color: #6b7280; cursor: pointer; }
         .filters button.active { background: #7c3aed; color: white; border-color: #7c3aed; }
         .filters button:hover { border-color: #7c3aed; }
-        .feed { display: flex; flex-direction: column; gap: 3px; }
+        .feed { display: flex; flex-direction: column; gap: 3px; max-height: calc(100vh - 280px); overflow-y: auto; }
         .entry { display: flex; align-items: center; gap: 12px; padding: 7px 14px; border-radius: 8px; border: 1px solid #e5e7eb; animation: slideIn 0.3s ease-out; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
         .entry .user { font-size: 0.85rem; color: #374151; font-weight: 600; flex: 1; min-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -334,12 +334,23 @@
         const now = new Date();
         const since = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
 
-        // Fetch all plates from today
-        const feedRes = await sb.from('live_plays')
-            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id, run_id, difficulty')
-            .gte('created_at', since)
-            .order('created_at', { ascending: false })
-            .limit(MAX_ENTRIES);
+        // Fetch all plates from today (paginate past Supabase 1000-row default)
+        let allData = [];
+        let page = 0;
+        const PAGE_SIZE = 1000;
+        while (true) {
+            const { data } = await sb.from('live_plays')
+                .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id, run_id, difficulty')
+                .gte('created_at', since)
+                .order('created_at', { ascending: false })
+                .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+            if (!data || data.length === 0) break;
+            allData = allData.concat(data);
+            if (data.length < PAGE_SIZE) break;
+            page++;
+        }
+        const feedRes = { data: allData };
+        console.log('[Feed] Loaded', allData.length, 'plates from today');
 
         // Today counts from real entry tables (accurate, includes non-live users)
         await loadTodayCounts();
