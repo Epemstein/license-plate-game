@@ -893,13 +893,14 @@
     let knownRunIds = new Set();
 
     async function loadRecentRuns() {
-        const since = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+        const now = new Date();
+        const since = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
         const { data } = await sb.from('completed_runs')
             .select('id, user_id, mode, total_seconds, difficulty, plates_solved, plates_seen, live_run_id, completed_at')
             .neq('mode', 'endless')
             .gte('completed_at', since)
             .order('completed_at', { ascending: false })
-            .limit(100);
+            .limit(500);
 
         runs = [];
         knownRunIds = new Set();
