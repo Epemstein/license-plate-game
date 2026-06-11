@@ -951,7 +951,6 @@
             const empty = feed.querySelector('.empty');
             if (empty) empty.remove();
             feed.insertAdjacentHTML('afterbegin', renderRunHTML(r));
-            while (feed.children.length > 500) feed.removeChild(feed.lastChild);
         }
     }
 
@@ -1047,7 +1046,6 @@
             const empty = feed.querySelector('.empty');
             if (empty) empty.remove();
             feed.insertAdjacentHTML('afterbegin', renderEntryHTML(e));
-            while (feed.children.length > 500) feed.removeChild(feed.lastChild);
         }
 
         // Update stats tab live records if visible
@@ -1221,7 +1219,7 @@
         const feed = document.getElementById('feed');
         const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.mode === activeFilter);
         if (filtered.length === 0) { feed.innerHTML = '<div class="empty">Waiting for plays...</div>'; return; }
-        feed.innerHTML = filtered.slice(0, 500).map(e => renderEntryHTML(e)).join('');
+        feed.innerHTML = filtered.map(e => renderEntryHTML(e)).join('');
     }
 
     function updateAgos() {
