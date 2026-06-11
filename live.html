@@ -163,17 +163,21 @@
                     <button data-mode="h2h" onclick="setFilter('h2h',this)">H2H</button>
                     <button data-mode="group" onclick="setFilter('group',this)">Group</button>
                 </div>
-                <div class="feed-header">
-                    <span class="h-user">Player</span>
-                    <span class="h-plate">Plate</span>
-                    <span class="h-word">Word</span>
-                    <span class="h-time">Time</span>
-                    <span class="h-mode">Mode</span>
-                    <span class="h-ago"></span>
-                </div>
-                <div class="feed" id="feed" onclick="if(event.target.id==='feed'){toggleRunHighlight(null);}">
-                    <div class="empty">Waiting for plays...</div>
-                </div>
+                <table style="width:100%;border-collapse:separate;border-spacing:0 2px;font-size:0.85rem;">
+                    <thead>
+                        <tr style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">
+                            <th style="text-align:left;padding:6px 14px;font-weight:600;width:140px;">Player</th>
+                            <th style="text-align:left;padding:6px 8px;font-weight:600;width:50px;">Plate</th>
+                            <th style="text-align:left;padding:6px 8px;font-weight:600;">Word</th>
+                            <th style="text-align:right;padding:6px 8px;font-weight:600;width:120px;">Time</th>
+                            <th style="text-align:center;padding:6px 8px;font-weight:600;width:90px;">Mode</th>
+                            <th style="text-align:right;padding:6px 14px;font-weight:600;width:40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="feed">
+                        <tr><td colspan="6" class="empty" style="text-align:center;padding:60px 20px;color:#9ca3af;">Waiting for plays...</td></tr>
+                    </tbody>
+                </table>
             </div>
 
             <!-- Runs Tab -->
@@ -1037,10 +1041,10 @@
         computeRunningCounts();
         if (activeFilter === 'all' || activeFilter === e.mode) {
             const feed = document.getElementById('feed');
-            const empty = feed.querySelector('.empty');
-            if (empty) empty.remove();
+            const emptyRow = feed.querySelector('.empty');
+            if (emptyRow) emptyRow.parentElement.remove();
             feed.insertAdjacentHTML('afterbegin', renderEntryHTML(e));
-            while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+            while (feed.children.length > 500) feed.removeChild(feed.lastChild);
         }
 
         // Update stats tab live records if visible
@@ -1144,10 +1148,10 @@
     }
 
     function renderEntryHTML(e) {
-        const countHtml = e._seen ? `<span style="color:#b0b0b0;font-size:0.75rem;margin-left:6px;">${e._solved}/${e._seen}</span>` : '';
-        const wordHtml = e.skipped
-            ? `<span class="word skipped">skipped${countHtml}</span>`
-            : `<span class="word">${highlightWord(e.word || '?', e.plate)}${countHtml}</span>`;
+        const countHtml = e._seen ? `<span style="color:#b0b0b0;font-size:0.7rem;margin-left:4px;">${e._solved}/${e._seen}</span>` : '';
+        const wordContent = e.skipped
+            ? `<span style="color:#dc2626;font-style:italic;">skipped</span>${countHtml}`
+            : `${highlightWord(e.word || '?', e.plate)}${countHtml}`;
         const timeStr = e.time != null ? e.time.toFixed(2) : '--';
         const barColor = e.skipped ? '#111' : timeColor(e.time);
         const barW = timeBarWidth(e.time);
@@ -1155,18 +1159,20 @@
         const rid = e.runId || '';
         const dimmed = selectedRunId && rid !== selectedRunId;
         const highlighted = selectedRunId && rid === selectedRunId;
-        const style = dimmed ? 'opacity:0.2;' : highlighted ? 'background:#eef2ff;border-color:#a5b4fc;' : '';
-        return `<div class="entry entry-${e.mode}" data-runid="${rid}" onclick="toggleRunHighlight('${rid}')" style="cursor:pointer;${style}">
-            <span class="user">${user}</span>
-            <span class="plate">${esc(e.plate)}</span>
-            ${wordHtml}
-            <span class="time-col">
-                <span class="time-val" style="color:${barColor}">${timeStr}</span>
-                <span class="time-bar" style="width:${barW}%;background:${barColor};"></span>
-            </span>
-            <span class="mode mode-${e.mode}" style="white-space:nowrap;font-size:8px;">${e.mode}${e.difficulty != null ? ' ' + e.difficulty : ''}</span>
-            <span class="ago">${ago(e.at)}</span>
-        </div>`;
+        const opacity = dimmed ? 'opacity:0.15;' : '';
+        const bgStyle = highlighted ? 'background:#eef2ff;' : '';
+        const borderColor = { daily: '#f59e0b', practice: '#a78bfa', endless: '#34d399', h2h: '#1f2937', group: '#3b82f6' }[e.mode] || '#e5e7eb';
+        return `<tr data-runid="${rid}" onclick="toggleRunHighlight('${rid}')" style="cursor:pointer;border:1px solid ${borderColor};${opacity}${bgStyle}">
+            <td style="padding:5px 14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">${user}</td>
+            <td style="padding:5px 8px;font-family:monospace;font-weight:700;font-size:1rem;">${esc(e.plate)}</td>
+            <td style="padding:5px 8px;">${wordContent}</td>
+            <td style="padding:5px 8px;text-align:right;white-space:nowrap;">
+                <span style="color:${barColor};font-weight:600;font-variant-numeric:tabular-nums;">${timeStr}</span>
+                <span style="display:inline-block;height:6px;border-radius:3px;width:${barW}%;max-width:80px;background:${barColor};vertical-align:middle;margin-left:4px;"></span>
+            </td>
+            <td style="padding:5px 8px;text-align:center;"><span class="mode mode-${e.mode}" style="white-space:nowrap;font-size:8px;">${e.mode}${e.difficulty != null ? ' ' + e.difficulty : ''}</span></td>
+            <td style="padding:5px 14px;text-align:right;font-size:0.75rem;color:#9ca3af;" class="ago">${ago(e.at)}</td>
+        </tr>`;
     }
 
     window.toggleRunHighlight = function(runId) {
@@ -1176,7 +1182,7 @@
             selectedRunId = runId;
         }
         // Update styles in-place without re-rendering
-        document.querySelectorAll('#feed .entry').forEach(el => {
+        document.querySelectorAll('#feed tr[data-runid]').forEach(el => {
             const rid = el.getAttribute('data-runid');
             if (!selectedRunId) {
                 el.style.opacity = '';
@@ -1213,13 +1219,13 @@
         computeRunningCounts();
         const feed = document.getElementById('feed');
         const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.mode === activeFilter);
-        if (filtered.length === 0) { feed.innerHTML = '<div class="empty">Waiting for plays...</div>'; return; }
-        feed.innerHTML = filtered.slice(0, 100).map(e => renderEntryHTML(e)).join('');
+        if (filtered.length === 0) { feed.innerHTML = '<tr><td colspan="6" class="empty" style="text-align:center;padding:60px 20px;color:#9ca3af;">Waiting for plays...</td></tr>'; return; }
+        feed.innerHTML = filtered.slice(0, 500).map(e => renderEntryHTML(e)).join('');
     }
 
     function updateAgos() {
         // Update feed agos
-        const feedEls = document.querySelectorAll('#feed .entry .ago');
+        const feedEls = document.querySelectorAll('#feed .ago');
         const filtered = activeFilter === 'all' ? entries : entries.filter(e => e.mode === activeFilter);
         feedEls.forEach((el, i) => { if (filtered[i]) el.textContent = ago(filtered[i].at); });
         // Update runs agos
