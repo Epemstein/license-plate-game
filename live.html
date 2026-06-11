@@ -215,9 +215,9 @@
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                         <h3 style="margin:0;">Activity</h3>
                         <div style="display:flex;gap:4px;">
-                            <button class="activity-mode-btn active" onclick="switchActivityMode('24h',this)">Today</button>
-                            <button class="activity-mode-btn" onclick="switchActivityMode('avg7',this)">Avg Day (7d)</button>
-                            <button class="activity-mode-btn" onclick="switchActivityMode('avg30',this)">Avg Day (30d)</button>
+                            <button class="activity-mode-btn active" onclick="switchActivityMode('1d',this)">Today</button>
+                            <button class="activity-mode-btn" onclick="switchActivityMode('7d',this)">7 Days</button>
+                            <button class="activity-mode-btn" onclick="switchActivityMode('30d',this)">30 Days</button>
                         </div>
                     </div>
                     <canvas id="activityChart" height="80"></canvas>
@@ -1420,6 +1420,9 @@
     }
 
     async function loadActivityChart() {
+        if (activityMode === '7d') return loadMultiDayChart(7);
+        if (activityMode === '30d') return loadMultiDayChart(30);
+
         const now = new Date();
         const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
         const currentMinute = Math.floor((now.getTime() - todayMidnight) / 60000);
@@ -1547,17 +1550,14 @@
         });
     }
 
-    // ==================== AVERAGE DAY & HEATMAP ====================
-    let activityMode = '24h';
+    // ==================== ACTIVITY MODE SWITCHING ====================
+    let activityMode = '1d';
     let activitySource = 'all'; // 'all' or 'daily'
-    let avgDayCache = {}; // '7' or '30' -> array of 48 averages
-    let timestampCache = {}; // 'all' or 'daily' -> { since, timestamps }
 
     window.setActivitySource = function(src, btn) {
         activitySource = src;
         document.querySelectorAll('#activityPanel > div:first-child .activity-mode-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        avgDayCache = {}; // clear avg cache since source changed
         activityLoaded = false;
         loadActivityData();
     };
@@ -1566,41 +1566,51 @@
         activityMode = mode;
         document.querySelectorAll('.activity-mode-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-
-        if (mode === '24h') {
-            // Re-render the live 24h chart
-            await loadActivityChart();
-        } else {
-            const days = mode === 'avg7' ? 7 : 30;
-            if (!avgDayCache[days]) {
-                avgDayCache[days] = await computeAverageDay(days);
-            }
-            renderAverageDayChart(avgDayCache[days], days);
-        }
+        await loadActivityChart();
     };
 
-    async function computeAverageDay(numDays) {
-        const since = new Date(Date.now() - numDays * 24 * 60 * 60 * 1000).toISOString();
-        const allTimestamps = await fetchAllEntryTimestamps(since);
+    async function loadMultiDayChart(numDays) {
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+        const rangeStart = todayMidnight - (numDays - 1) * 24 * 60 * 60 * 1000;
+        const currentMinute = Math.floor((now.getTime() - todayMidnight) / 60000);
 
-        // Bucket by hour slot within a day (0-23)
-        const slotTotals = new Array(24).fill(0);
-        for (const ts of allTimestamps) {
-            const d = new Date(ts);
-            if (isNaN(d.getTime())) continue;
-            slotTotals[d.getHours()]++;
-        }
-        // Average per day
-        return slotTotals.map(t => Math.round(t / numDays * 10) / 10);
-    }
+        // Use coarser resolution for longer periods: 15min for 7d, 60min for 30d
+        const stepMin = numDays <= 7 ? 15 : 60;
+        const totalSteps = Math.ceil((numDays * 24 * 60) / stepMin);
+        const stepMs = stepMin * 60000;
 
-    function renderAverageDayChart(avgData, numDays) {
+        // Fetch timestamps
+        const fetchSince = new Date(rangeStart - ROLLING_WINDOW).toISOString();
+        const allTimestamps = await fetchAllEntryTimestamps(fetchSince);
+        const epochs = allTimestamps.map(t => new Date(t).getTime()).filter(e => !isNaN(e)).sort((a, b) => a - b);
+
+        // Compute rolling counts at each step
+        const data = new Array(totalSteps).fill(null);
         const labels = [];
-        for (let i = 0; i < 24; i++) {
-            const ampm = i < 12 ? 'AM' : 'PM';
-            const h12 = i === 0 ? 12 : i > 12 ? i - 12 : i;
-            labels.push(`${h12}:00 ${ampm}`);
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        let lo = 0;
+        for (let i = 0; i < totalSteps; i++) {
+            const t = rangeStart + i * stepMs;
+            if (t > now.getTime()) break; // stop at current time
+            const windowStart = t - ROLLING_WINDOW;
+            while (lo < epochs.length && epochs[lo] < windowStart) lo++;
+            let hi = lo;
+            while (hi < epochs.length && epochs[hi] < t) hi++;
+            data[i] = hi - lo;
+
+            // Label: show day name at midnight boundaries
+            const d = new Date(t);
+            if (stepMin >= 60) {
+                if (d.getHours() === 0) labels.push(`${dayNames[d.getDay()]} ${d.getMonth()+1}/${d.getDate()}`);
+                else labels.push('');
+            } else {
+                if (d.getHours() === 0 && d.getMinutes() === 0) labels.push(`${dayNames[d.getDay()]} ${d.getMonth()+1}/${d.getDate()}`);
+                else labels.push('');
+            }
         }
+        // Fill remaining labels
+        while (labels.length < totalSteps) labels.push('');
 
         const ctx = document.getElementById('activityChart').getContext('2d');
         if (activityChart) activityChart.destroy();
@@ -1609,24 +1619,36 @@
             data: {
                 labels,
                 datasets: [{
-                    data: avgData,
-                    borderColor: '#34d399',
-                    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                    data,
+                    borderColor: '#7c3aed',
+                    backgroundColor: 'rgba(124, 58, 237, 0.08)',
                     fill: true,
                     tension: 0.3,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#34d399',
+                    pointRadius: 0,
                     borderWidth: 2,
+                    spanGaps: false,
                 }]
             },
             options: {
                 responsive: true,
+                animation: false,
                 plugins: {
                     legend: { display: false },
-                    tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y} avg plays` } }
+                    tooltip: {
+                        mode: 'nearest', intersect: false,
+                        callbacks: {
+                            title: (items) => {
+                                if (!items.length) return '';
+                                const idx = items[0].dataIndex;
+                                const t = new Date(rangeStart + idx * stepMs);
+                                return t.toLocaleString([], { weekday: 'short', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                            },
+                            label: (ctx) => `${ctx.parsed.y} plays (rolling 3h)`
+                        }
+                    }
                 },
                 scales: {
-                    x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false } },
+                    x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: numDays <= 7 ? 7 : 15, font: { size: 10 }, color: '#9ca3af' }, grid: { color: '#f3f4f6' } },
                     y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: '#f3f4f6' } }
                 }
             }
