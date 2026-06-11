@@ -946,7 +946,7 @@
         const user = r.userName ? esc(r.userName) : '<span style="color:#d1d5db;">anon</span>';
         const plateStr = `${r.solved}/${r.seen}`;
         const modeLabel = r.difficulty != null ? `${r.mode} ${r.difficulty}` : r.mode;
-        const clickAttr = r.liveRunId ? `onclick="showRunFromLivePlays('${r.liveRunId}')"` : '';
+        const clickAttr = r.liveRunId ? `onclick="showRunFromLivePlays('${r.liveRunId}',${r.time})"` : '';
         return `<div class="entry entry-${r.mode}" style="cursor:pointer;font-size:0.85rem;" ${clickAttr}>
             <span style="font-weight:600;flex:none;width:auto;min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user}</span>
             <span style="flex:1;"></span>
@@ -963,7 +963,7 @@
         feed.innerHTML = runs.slice(0, 100).map(r => renderRunHTML(r)).join('');
     }
 
-    window.showRunFromLivePlays = async function(liveRunId) {
+    window.showRunFromLivePlays = async function(liveRunId, authoritativeTime) {
         // Query live_plays from DB for this run's plates
         const { data } = await sb.from('live_plays')
             .select('plate, word, skipped, thinking_seconds, mode, user_id, difficulty')
@@ -973,11 +973,8 @@
 
         const name = await resolveUser(data[0].user_id) || 'Unknown';
         const solved = data.filter(p => !p.skipped).length;
-        let skipCount = 0, totalTime = 0;
-        for (const p of data) {
-            totalTime += p.thinking_seconds || 0;
-            if (p.skipped) { skipCount++; totalTime += skipCount * 5; }
-        }
+        // Use authoritative total from completed_runs if available
+        const totalTime = authoritativeTime || data.reduce((s, p) => s + (p.thinking_seconds || 0), 0);
         const mode = data[0].mode;
 
         let html = '<div style="padding:14px;">';
