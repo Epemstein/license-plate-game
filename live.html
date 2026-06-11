@@ -887,7 +887,7 @@
         // Runs tab: live from completed_runs inserts
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'completed_runs' }, (payload) => {
             const r = payload.new;
-            if (r.mode === 'endless') return;
+            if (r.mode === 'endless' || r.plates_solved < 10) return;
             addCompletedRun(r);
         });
         channel.subscribe((status) => {
@@ -909,6 +909,7 @@
         const { data } = await sb.from('completed_runs')
             .select('id, user_id, mode, total_seconds, difficulty, plates_solved, plates_seen, live_run_id, completed_at')
             .neq('mode', 'endless')
+            .gte('plates_solved', 10)
             .gte('completed_at', since)
             .order('completed_at', { ascending: false })
             .limit(500);
