@@ -1393,116 +1393,143 @@
         return result;
     }
 
-    // Store bucket data globally so we can update live
-    let activityBucketCounts = null;
-    let activityBucketLabels = null;
-    let activityStartEpoch = 0;
-    const ACTIVITY_INTERVAL = 60 * 60 * 1000; // 1 hour buckets
+    // Rolling 3-hour window activity chart — one data point per minute, midnight to midnight
+    const ROLLING_WINDOW = 3 * 60 * 60 * 1000; // 3 hours in ms
+    let activityTodayEpochs = []; // sorted array of timestamps (ms) for today
 
-    function getActivityBuckets() {
-        // Midnight to midnight (24 hourly buckets)
-        const now = new Date();
-        const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        const startEpoch = midnight.getTime();
-
-        const counts = new Array(24).fill(0);
-        const labels = [];
-        for (let i = 0; i < 24; i++) {
-            const t = startEpoch + i * ACTIVITY_INTERVAL;
-            labels.push(new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+    function computeRollingCounts(epochs, dayStart, numMinutes) {
+        // For each minute from dayStart, count how many epochs fall in [minute - ROLLING_WINDOW, minute)
+        const sorted = [...epochs].sort((a, b) => a - b);
+        const result = new Array(numMinutes);
+        let lo = 0;
+        for (let i = 0; i < numMinutes; i++) {
+            const t = dayStart + i * 60000;
+            const windowStart = t - ROLLING_WINDOW;
+            while (lo < sorted.length && sorted[lo] < windowStart) lo++;
+            let hi = lo;
+            while (hi < sorted.length && sorted[hi] < t) hi++;
+            result[i] = hi - lo;
         }
-        return { counts, labels, startEpoch };
+        return result;
     }
 
     function addToActivityBucket(epoch) {
-        if (!activityBucketCounts || isNaN(epoch)) return;
-        const idx = Math.floor((epoch - activityStartEpoch) / ACTIVITY_INTERVAL);
-        if (idx >= 0 && idx < 24) {
-            activityBucketCounts[idx]++;
-            if (activityChart) {
-                activityChart.data.datasets[0].data = [...activityBucketCounts];
-                activityChart.update('none');
-            }
-        }
+        if (isNaN(epoch)) return;
+        activityTodayEpochs.push(epoch);
+        // Live update handled by periodic re-render is fine; chart updates on tab switch
     }
 
     async function loadActivityChart() {
-        const { counts, labels, startEpoch } = getActivityBuckets();
-        activityBucketCounts = counts;
-        activityBucketLabels = labels;
-        activityStartEpoch = startEpoch;
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+        const currentMinute = Math.floor((now.getTime() - todayMidnight) / 60000);
 
-        const since = new Date(startEpoch).toISOString();
-        const allTimestamps = await fetchAllEntryTimestamps(since);
+        // Labels: every minute from midnight, but only show hourly ticks
+        const labels = [];
+        for (let i = 0; i < 1440; i++) {
+            if (i % 60 === 0) {
+                const h = i / 60;
+                const ampm = h < 12 ? 'AM' : 'PM';
+                const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                labels.push(`${h12} ${ampm}`);
+            } else {
+                labels.push('');
+            }
+        }
 
-        let matched = 0;
+        // Fetch all timestamps for today + last 6 days (need 3h before midnight too)
+        const fetchSince = new Date(todayMidnight - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const allTimestamps = await fetchAllEntryTimestamps(fetchSince);
+
+        // Group epochs by day
+        const todayKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const dayEpochs = {}; // 'YYYY-MM-DD' -> [epochs in ms, including 3h before that day's midnight]
+        activityTodayEpochs = [];
+
         for (const ts of allTimestamps) {
             const epoch = new Date(ts).getTime();
             if (isNaN(epoch)) continue;
-            const idx = Math.floor((epoch - startEpoch) / ACTIVITY_INTERVAL);
-            if (idx >= 0 && idx < 24) { activityBucketCounts[idx]++; matched++; }
-        }
-        console.log('[Activity] Bucketed', matched, '/', allTimestamps.length, 'timestamps');
-
-        const values = activityBucketCounts;
-
-        // Fetch last 6 days for background lines
-        const prevDaysSince = new Date(startEpoch - 6 * 24 * 60 * 60 * 1000).toISOString();
-        const prevTimestamps = await fetchAllEntryTimestamps(prevDaysSince);
-        const dayBuckets = {}; // 'YYYY-MM-DD' -> [24 counts]
-        for (const ts of prevTimestamps) {
-            const d = new Date(ts);
-            if (isNaN(d.getTime())) continue;
-            const dayKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            const todayKey = new Date(startEpoch).toISOString().slice(0, 10);
-            if (dayKey === todayKey) continue; // skip today (already shown)
-            if (!dayBuckets[dayKey]) dayBuckets[dayKey] = new Array(24).fill(0);
-            dayBuckets[dayKey][d.getHours()]++;
+            // For each day, include timestamps from 3h before midnight through end of day
+            for (let d = -6; d <= 0; d++) {
+                const dayStart = todayMidnight + d * 24 * 60 * 60 * 1000;
+                const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+                if (epoch >= dayStart - ROLLING_WINDOW && epoch < dayEnd) {
+                    const dk = new Date(dayStart).toISOString().slice(0, 10);
+                    if (!dayEpochs[dk]) dayEpochs[dk] = [];
+                    dayEpochs[dk].push(epoch);
+                }
+            }
+            if (epoch >= todayMidnight - ROLLING_WINDOW && epoch < todayMidnight + 24 * 60 * 60 * 1000) {
+                activityTodayEpochs.push(epoch);
+            }
         }
 
+        // Build datasets
         const datasets = [];
-        // Previous days as faded grey lines (behind today)
         const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        for (const [dayKey, counts] of Object.entries(dayBuckets).sort()) {
-            const dayDate = new Date(dayKey + 'T12:00:00');
+
+        // Previous 6 days as faded grey
+        for (let d = -6; d <= -1; d++) {
+            const dayStart = todayMidnight + d * 24 * 60 * 60 * 1000;
+            const dk = new Date(dayStart).toISOString().slice(0, 10);
+            const epochs = dayEpochs[dk] || [];
+            const counts = computeRollingCounts(epochs, dayStart, 1440);
+            const dayDate = new Date(dayStart);
             const label = `${dayNames[dayDate.getDay()]} ${dayDate.getMonth()+1}/${dayDate.getDate()}`;
             datasets.push({
                 data: counts,
-                borderColor: 'rgba(180, 180, 180, 0.35)',
+                borderColor: 'rgba(180, 180, 180, 0.3)',
                 backgroundColor: 'transparent',
                 fill: false,
                 tension: 0.3,
                 pointRadius: 0,
-                borderWidth: 1.5,
+                borderWidth: 1,
                 label,
             });
         }
-        // Today on top
+
+        // Today — only up to current minute, rest is null
+        const todayCounts = computeRollingCounts(activityTodayEpochs, todayMidnight, currentMinute + 1);
+        const todayData = new Array(1440).fill(null);
+        for (let i = 0; i <= currentMinute; i++) todayData[i] = todayCounts[i];
+
         datasets.push({
-            data: values,
+            data: todayData,
             borderColor: '#7c3aed',
-            backgroundColor: 'rgba(124, 58, 237, 0.1)',
+            backgroundColor: 'rgba(124, 58, 237, 0.08)',
             fill: true,
             tension: 0.3,
-            pointRadius: 3,
-            pointBackgroundColor: '#7c3aed',
+            pointRadius: 0,
             borderWidth: 2.5,
             label: 'Today',
+            spanGaps: false,
         });
 
         const ctx = document.getElementById('activityChart').getContext('2d');
         if (activityChart) activityChart.destroy();
         activityChart = new Chart(ctx, {
             type: 'line',
-            data: { labels: activityBucketLabels, datasets },
+            data: { labels, datasets },
             options: {
                 responsive: true,
+                animation: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
                         mode: 'nearest',
                         intersect: false,
                         filter: (item) => item.dataset.label === 'Today',
+                        callbacks: {
+                            title: (items) => {
+                                if (!items.length) return '';
+                                const min = items[0].dataIndex;
+                                const h = Math.floor(min / 60), m = min % 60;
+                                const ampm = h < 12 ? 'AM' : 'PM';
+                                const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                                return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+                            },
+                            label: (ctx) => `${ctx.parsed.y} plays (rolling 3h)`
+                        }
                     }
                 },
                 scales: {
