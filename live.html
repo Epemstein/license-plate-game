@@ -917,7 +917,8 @@
             if (solved >= 10 && !completedRunIds.has(rid)) {
                 completedRunIds.add(rid);
                 const sorted = info.plates.sort((a, b) => a.at - b.at);
-                const totalTime = sorted.reduce((s, p) => s + (p.time || 0), 0);
+                const skips = sorted.filter(p => p.skipped).length;
+                const totalTime = sorted.reduce((s, p) => s + (p.time || 0), 0) + skips * 5;
                 runs.push({
                     runId: rid,
                     userId: info.userId, userName: info.userName,
@@ -941,7 +942,8 @@
         const solved = rt.plates.filter(p => !p.skipped).length;
         if (solved >= 10) {
             completedRunIds.add(rid);
-            const totalTime = rt.plates.reduce((s, p) => s + (p.time || 0), 0);
+            const skips = rt.plates.filter(p => p.skipped).length;
+            const totalTime = rt.plates.reduce((s, p) => s + (p.time || 0), 0) + skips * 5;
             const r = {
                 runId: rid,
                 userId: rt.userId, userName: rt.userName,
@@ -967,8 +969,8 @@
         const plateStr = `${r.solved}/${r.seen}`;
         const modeLabel = r.difficulty != null ? `${r.mode} ${r.difficulty}` : r.mode;
         const clickAttr = r.runId ? `onclick="showRunFromFeed('${r.runId}')"` : (r.userId ? `onclick="showRunDetail('${r.userId}','${r.mode}','${r.at?.toISOString() || ''}')"` : '');
-        return `<div class="entry entry-${r.mode}" style="cursor:pointer;" ${clickAttr}>
-            <span class="user" style="flex:none;width:auto;min-width:0;max-width:180px;">${user}</span>
+        return `<div class="entry entry-${r.mode}" style="cursor:pointer;font-size:0.85rem;" ${clickAttr}>
+            <span style="font-weight:600;flex:none;width:auto;min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user}</span>
             <span style="flex:1;"></span>
             <span style="width:55px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:0.85rem;">${r.time.toFixed(2)}</span>
             <span style="width:45px;text-align:center;font-size:0.75rem;color:#6b7280;">${plateStr}</span>
