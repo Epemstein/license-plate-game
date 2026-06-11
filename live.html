@@ -1376,30 +1376,21 @@
         return result;
     }
 
-    // Rolling 3-hour window activity chart — one data point per minute, midnight to midnight
-    const ROLLING_WINDOW = 3 * 60 * 60 * 1000; // 3 hours in ms
-    let activityTodayEpochs = []; // sorted array of timestamps (ms) for today
-
-    function computeRollingCounts(epochs, dayStart, numMinutes) {
-        // For each minute from dayStart, count how many epochs fall in [minute - ROLLING_WINDOW, minute)
-        const sorted = [...epochs].sort((a, b) => a - b);
+    // Cumulative activity chart
+    function computeCumulative(epochs, start, numMinutes) {
+        const sorted = [...epochs].filter(e => e >= start).sort((a, b) => a - b);
         const result = new Array(numMinutes);
-        let lo = 0;
+        let count = 0, si = 0;
         for (let i = 0; i < numMinutes; i++) {
-            const t = dayStart + i * 60000;
-            const windowStart = t - ROLLING_WINDOW;
-            while (lo < sorted.length && sorted[lo] < windowStart) lo++;
-            let hi = lo;
-            while (hi < sorted.length && sorted[hi] < t) hi++;
-            result[i] = hi - lo;
+            const t = start + (i + 1) * 60000;
+            while (si < sorted.length && sorted[si] < t) { count++; si++; }
+            result[i] = count;
         }
         return result;
     }
 
     function addToActivityBucket(epoch) {
-        if (isNaN(epoch)) return;
-        activityTodayEpochs.push(epoch);
-        // Live update handled by periodic re-render is fine; chart updates on tab switch
+        // no-op; chart rebuilds on tab switch
     }
 
     async function loadActivityChart() {
@@ -1410,7 +1401,7 @@
         const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
         const currentMinute = Math.floor((now.getTime() - todayMidnight) / 60000);
 
-        // Labels: every minute from midnight, but only show hourly ticks
+        // Labels: hourly ticks
         const labels = [];
         for (let i = 0; i < 1440; i++) {
             if (i % 60 === 0) {
@@ -1423,72 +1414,58 @@
             }
         }
 
-        // Fetch all timestamps for today + last 6 days (need 3h before midnight too)
+        // Fetch timestamps for today + previous 7 days
         const fetchSince = new Date(todayMidnight - 7 * 24 * 60 * 60 * 1000).toISOString();
         const allTimestamps = await fetchAllEntryTimestamps(fetchSince);
 
-        // Group epochs by day
-        const todayKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-        const dayEpochs = {}; // 'YYYY-MM-DD' -> [epochs in ms, including 3h before that day's midnight]
-        activityTodayEpochs = [];
-
+        // Group by day
+        const dayEpochs = {};
         for (const ts of allTimestamps) {
             const epoch = new Date(ts).getTime();
             if (isNaN(epoch)) continue;
-            // For each day, include timestamps from 3h before midnight through end of day
-            for (let d = -6; d <= 0; d++) {
+            for (let d = -7; d <= 0; d++) {
                 const dayStart = todayMidnight + d * 24 * 60 * 60 * 1000;
                 const dayEnd = dayStart + 24 * 60 * 60 * 1000;
-                if (epoch >= dayStart - ROLLING_WINDOW && epoch < dayEnd) {
+                if (epoch >= dayStart && epoch < dayEnd) {
                     const dk = new Date(dayStart).toISOString().slice(0, 10);
                     if (!dayEpochs[dk]) dayEpochs[dk] = [];
                     dayEpochs[dk].push(epoch);
                 }
             }
-            if (epoch >= todayMidnight - ROLLING_WINDOW && epoch < todayMidnight + 24 * 60 * 60 * 1000) {
-                activityTodayEpochs.push(epoch);
-            }
         }
 
-        // Build datasets
         const datasets = [];
         const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-        // Previous 6 days as faded grey
-        for (let d = -6; d <= -1; d++) {
+        // Previous 7 days as faded grey cumulative lines
+        for (let d = -7; d <= -1; d++) {
             const dayStart = todayMidnight + d * 24 * 60 * 60 * 1000;
             const dk = new Date(dayStart).toISOString().slice(0, 10);
             const epochs = dayEpochs[dk] || [];
-            const counts = computeRollingCounts(epochs, dayStart, 1440);
+            const cum = computeCumulative(epochs, dayStart, 1440);
             const dayDate = new Date(dayStart);
-            const label = `${dayNames[dayDate.getDay()]} ${dayDate.getMonth()+1}/${dayDate.getDate()}`;
             datasets.push({
-                data: counts,
+                data: cum,
                 borderColor: 'rgba(180, 180, 180, 0.3)',
                 backgroundColor: 'transparent',
-                fill: false,
-                tension: 0.3,
-                pointRadius: 0,
-                borderWidth: 1,
-                label,
+                fill: false, tension: 0.3, pointRadius: 0, borderWidth: 1,
+                label: `${dayNames[dayDate.getDay()]} ${dayDate.getMonth()+1}/${dayDate.getDate()}`,
             });
         }
 
-        // Today — only up to current minute, rest is null
-        const todayCounts = computeRollingCounts(activityTodayEpochs, todayMidnight, currentMinute + 1);
+        // Today cumulative — stop at current minute
+        const todayKey = new Date(todayMidnight).toISOString().slice(0, 10);
+        const todayEpochs = dayEpochs[todayKey] || [];
+        const todayCum = computeCumulative(todayEpochs, todayMidnight, currentMinute + 1);
         const todayData = new Array(1440).fill(null);
-        for (let i = 0; i <= currentMinute; i++) todayData[i] = todayCounts[i];
+        for (let i = 0; i <= currentMinute; i++) todayData[i] = todayCum[i];
 
         datasets.push({
             data: todayData,
             borderColor: '#7c3aed',
             backgroundColor: 'rgba(124, 58, 237, 0.08)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 0,
-            borderWidth: 2.5,
-            label: 'Today',
-            spanGaps: false,
+            fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2.5,
+            label: 'Today', spanGaps: false,
         });
 
         const ctx = document.getElementById('activityChart').getContext('2d');
@@ -1497,13 +1474,11 @@
             type: 'line',
             data: { labels, datasets },
             options: {
-                responsive: true,
-                animation: false,
+                responsive: true, animation: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        mode: 'nearest',
-                        intersect: false,
+                        mode: 'nearest', intersect: false,
                         filter: (item) => item.dataset.label === 'Today',
                         callbacks: {
                             title: (items) => {
@@ -1514,20 +1489,13 @@
                                 const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
                                 return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
                             },
-                            label: (ctx) => `${ctx.parsed.y} plays (rolling 3h)`
+                            label: (ctx) => `${ctx.parsed.y} total plates`
                         }
                     }
                 },
                 scales: {
-                    x: {
-                        ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' },
-                        grid: { display: false }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        ticks: { font: { size: 10 }, color: '#9ca3af' },
-                        grid: { color: '#f3f4f6' }
-                    }
+                    x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false } },
+                    y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#9ca3af' }, grid: { color: '#f3f4f6' } }
                 }
             }
         });
@@ -1555,78 +1523,96 @@
     async function loadMultiDayChart(numDays) {
         const now = new Date();
         const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
-        const rangeStart = todayMidnight - (numDays - 1) * 24 * 60 * 60 * 1000;
-        const currentMinute = Math.floor((now.getTime() - todayMidnight) / 60000);
+        const periodMs = numDays * 24 * 60 * 60 * 1000;
+        // Current period: numDays ago midnight → now
+        const currentStart = todayMidnight - (numDays - 1) * 24 * 60 * 60 * 1000;
+        const currentMinute = Math.floor((now.getTime() - currentStart) / 60000);
+        // Previous periods for grey lines
+        const numPrev = numDays <= 7 ? 4 : 2;
 
-        // Use coarser resolution for longer periods: 15min for 7d, 60min for 30d
         const stepMin = numDays <= 7 ? 15 : 60;
-        const totalSteps = Math.ceil((numDays * 24 * 60) / stepMin);
+        const totalMinutes = numDays * 24 * 60;
+        const totalSteps = Math.ceil(totalMinutes / stepMin);
         const stepMs = stepMin * 60000;
 
-        // Fetch timestamps
-        const fetchSince = new Date(rangeStart - ROLLING_WINDOW).toISOString();
+        // Fetch all timestamps
+        const fetchSince = new Date(currentStart - numPrev * periodMs).toISOString();
         const allTimestamps = await fetchAllEntryTimestamps(fetchSince);
-        const epochs = allTimestamps.map(t => new Date(t).getTime()).filter(e => !isNaN(e)).sort((a, b) => a - b);
+        const allEpochs = allTimestamps.map(t => new Date(t).getTime()).filter(e => !isNaN(e));
 
-        // Compute rolling counts at each step
-        const data = new Array(totalSteps).fill(null);
-        const labels = [];
         const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        let lo = 0;
-        for (let i = 0; i < totalSteps; i++) {
-            const t = rangeStart + i * stepMs;
-            if (t > now.getTime()) break; // stop at current time
-            const windowStart = t - ROLLING_WINDOW;
-            while (lo < epochs.length && epochs[lo] < windowStart) lo++;
-            let hi = lo;
-            while (hi < epochs.length && epochs[hi] < t) hi++;
-            data[i] = hi - lo;
 
-            // Label: show day name at midnight boundaries
-            const d = new Date(t);
-            if (stepMin >= 60) {
-                if (d.getHours() === 0) labels.push(`${dayNames[d.getDay()]} ${d.getMonth()+1}/${d.getDate()}`);
-                else labels.push('');
-            } else {
-                if (d.getHours() === 0 && d.getMinutes() === 0) labels.push(`${dayNames[d.getDay()]} ${d.getMonth()+1}/${d.getDate()}`);
-                else labels.push('');
-            }
+        // Labels
+        const labels = [];
+        for (let i = 0; i < totalSteps; i++) {
+            const t = new Date(currentStart + i * stepMs);
+            if (t.getHours() === 0 && (stepMin >= 60 || t.getMinutes() === 0)) {
+                labels.push(`${dayNames[t.getDay()]} ${t.getMonth()+1}/${t.getDate()}`);
+            } else { labels.push(''); }
         }
-        // Fill remaining labels
-        while (labels.length < totalSteps) labels.push('');
+
+        // Cumulative for a period at stepMin resolution
+        function periodCumulative(epochs, start, steps) {
+            const sorted = epochs.filter(e => e >= start).sort((a, b) => a - b);
+            const result = new Array(steps);
+            let count = 0, si = 0;
+            for (let i = 0; i < steps; i++) {
+                const t = start + (i + 1) * stepMs;
+                while (si < sorted.length && sorted[si] < t) { count++; si++; }
+                result[i] = count;
+            }
+            return result;
+        }
+
+        const datasets = [];
+
+        // Previous periods as grey
+        for (let p = numPrev; p >= 1; p--) {
+            const pStart = currentStart - p * periodMs;
+            const pEnd = pStart + periodMs;
+            const pEpochs = allEpochs.filter(e => e >= pStart && e < pEnd);
+            const cum = periodCumulative(pEpochs, pStart, totalSteps);
+            const pStartDate = new Date(pStart);
+            const pEndDate = new Date(pEnd - 24*60*60*1000);
+            const label = `${pStartDate.getMonth()+1}/${pStartDate.getDate()} – ${pEndDate.getMonth()+1}/${pEndDate.getDate()}`;
+            datasets.push({
+                data: cum, borderColor: 'rgba(180,180,180,0.3)', backgroundColor: 'transparent',
+                fill: false, tension: 0.3, pointRadius: 0, borderWidth: 1, label,
+            });
+        }
+
+        // Current period — stop at current step
+        const currentStepIdx = Math.min(Math.floor(currentMinute / stepMin), totalSteps - 1);
+        const curEpochs = allEpochs.filter(e => e >= currentStart);
+        const curCum = periodCumulative(curEpochs, currentStart, currentStepIdx + 1);
+        const curData = new Array(totalSteps).fill(null);
+        for (let i = 0; i <= currentStepIdx; i++) curData[i] = curCum[i];
+
+        datasets.push({
+            data: curData, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.08)',
+            fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2.5,
+            label: 'Current', spanGaps: false,
+        });
 
         const ctx = document.getElementById('activityChart').getContext('2d');
         if (activityChart) activityChart.destroy();
         activityChart = new Chart(ctx, {
             type: 'line',
-            data: {
-                labels,
-                datasets: [{
-                    data,
-                    borderColor: '#7c3aed',
-                    backgroundColor: 'rgba(124, 58, 237, 0.08)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 0,
-                    borderWidth: 2,
-                    spanGaps: false,
-                }]
-            },
+            data: { labels, datasets },
             options: {
-                responsive: true,
-                animation: false,
+                responsive: true, animation: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
                         mode: 'nearest', intersect: false,
+                        filter: (item) => item.dataset.label === 'Current',
                         callbacks: {
                             title: (items) => {
                                 if (!items.length) return '';
-                                const idx = items[0].dataIndex;
-                                const t = new Date(rangeStart + idx * stepMs);
+                                const t = new Date(currentStart + items[0].dataIndex * stepMs);
                                 return t.toLocaleString([], { weekday: 'short', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
                             },
-                            label: (ctx) => `${ctx.parsed.y} plays (rolling 3h)`
+                            label: (ctx) => `${ctx.parsed.y} total plates`
                         }
                     }
                 },
