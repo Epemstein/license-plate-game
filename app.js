@@ -779,6 +779,8 @@
 
         if (success) {
             localStorage.removeItem('pendingDailySubmission');
+            const solved = entries.filter(e => !e.skipped).length;
+            pushCompletedRun('daily', totalSeconds, null, solved, entries.length);
         }
 
         // Update daily button and refresh profile stats
@@ -830,6 +832,23 @@
         } catch (e) {
             console.warn('[Submit] Pending retry failed:', e);
         }
+    }
+
+    // Push completed run to the unified completed_runs table for live tracker
+    function pushCompletedRun(mode, totalSeconds, difficulty, platesSolved, platesSeen) {
+        if (!currentUser) return;
+        sb.from('completed_runs').insert({
+            user_id: currentUser.id,
+            mode,
+            total_seconds: Math.round(totalSeconds * 100) / 100,
+            difficulty: difficulty != null ? difficulty : null,
+            plates_solved: platesSolved,
+            plates_seen: platesSeen,
+            live_run_id: currentLiveRunId
+        }).then(({ error }) => {
+            if (error) console.warn('[CompletedRun]', error.message);
+            else console.log('[CompletedRun] Pushed', mode, totalSeconds.toFixed(2) + 's');
+        });
     }
 
     // Fire-and-forget live play for the realtime tracker
@@ -2389,7 +2408,10 @@
                 plates_seen: gameHistory.length
             });
             if (runErr) console.error('[Practice] practice_runs insert FAILED:', runErr.message);
-            else console.log('[Practice] Created practice_runs entry, solved:', solved, 'seen:', gameHistory.length);
+            else {
+                console.log('[Practice] Created practice_runs entry, solved:', solved, 'seen:', gameHistory.length);
+                pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length);
+            }
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
         }
@@ -4828,6 +4850,8 @@
                 alert('Warning: your results may not have saved. Error: ' + error.message);
             } else {
                 console.log('H2H run submitted successfully');
+                const solved = entries.filter(e => !e.skipped).length;
+                pushCompletedRun('h2h', totalSeconds, currentH2HDifficulty, solved, entries.length);
             }
         } catch (e) {
             console.error('Error submitting H2H run:', e);

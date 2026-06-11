@@ -873,7 +873,12 @@
                 markDailyCompleted(payload.new.user_id, payload.new.total_seconds);
             }
         });
-        // Runs tab is driven by detecting the 10th plate per run_id in the feed
+        // Runs tab: live from completed_runs inserts
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'completed_runs' }, (payload) => {
+            const r = payload.new;
+            if (r.mode === 'endless') return;
+            addCompletedRun(r);
+        });
         channel.subscribe((status) => {
             const dot = document.getElementById('statusDot');
             if (status === 'SUBSCRIBED') { dot.className = 'dot'; }
@@ -882,92 +887,58 @@
     }
 
     // ==================== RUNS TAB ====================
-    // Runs are built from the feed: when we see 10 plates for a run_id, it's complete.
+    // Driven by completed_runs table — one unified source of truth.
 
     let runs = [];
-    let runTracker = {}; // run_id -> { plates: [{...}], userId, mode, difficulty }
-    let completedRunIds = new Set();
+    let knownRunIds = new Set();
 
     async function loadRecentRuns() {
+        const since = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+        const { data } = await sb.from('completed_runs')
+            .select('id, user_id, mode, total_seconds, difficulty, plates_solved, plates_seen, live_run_id, completed_at')
+            .neq('mode', 'endless')
+            .gte('completed_at', since)
+            .order('completed_at', { ascending: false })
+            .limit(100);
+
         runs = [];
-        completedRunIds = new Set();
-        buildRunsFromEntries();
-        // Also seed runTracker for live detection
-        for (const e of entries) {
-            const rid = e.runId;
-            if (!rid || e.mode === 'endless') continue;
-            if (!runTracker[rid]) runTracker[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
-            if (e.difficulty != null) runTracker[rid].difficulty = e.difficulty;
-            runTracker[rid].plates.push(e);
+        knownRunIds = new Set();
+        for (const r of (data || [])) {
+            knownRunIds.add(r.id);
+            runs.push({
+                id: r.id, userId: r.user_id, userName: null,
+                time: r.total_seconds, mode: r.mode, difficulty: r.difficulty,
+                solved: r.plates_solved, seen: r.plates_seen,
+                liveRunId: r.live_run_id,
+                at: new Date(r.completed_at)
+            });
+        }
+        // Resolve names
+        for (const r of runs) {
+            if (r.userId) r.userName = await resolveUser(r.userId);
         }
         renderRuns();
     }
 
-    function buildRunsFromEntries() {
-        const byRun = {};
-        for (const e of entries) {
-            const rid = e.runId;
-            if (!rid || e.mode === 'endless') continue;
-            if (!byRun[rid]) byRun[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
-            if (e.difficulty != null) byRun[rid].difficulty = e.difficulty;
-            byRun[rid].plates.push(e);
-        }
-        for (const [rid, info] of Object.entries(byRun)) {
-            const solved = info.plates.filter(p => !p.skipped).length;
-            if (solved >= 10 && !completedRunIds.has(rid)) {
-                completedRunIds.add(rid);
-                const sorted = info.plates.sort((a, b) => a.at - b.at);
-                let skipCount = 0;
-                let totalTime = 0;
-                for (const p of sorted) {
-                    totalTime += p.time || 0;
-                    if (p.skipped) { skipCount++; totalTime += skipCount * 5; }
-                }
-                runs.push({
-                    runId: rid,
-                    userId: info.userId, userName: info.userName,
-                    time: Math.round(totalTime * 100) / 100,
-                    mode: info.mode, difficulty: info.difficulty,
-                    solved, seen: sorted.length,
-                    at: sorted[sorted.length - 1].at
-                });
-            }
-        }
-        runs.sort((a, b) => b.at - a.at);
-    }
-
-    function checkRunComplete(e) {
-        const rid = e.runId;
-        if (!rid || completedRunIds.has(rid) || e.mode === 'endless') return;
-        if (!runTracker[rid]) runTracker[rid] = { plates: [], userId: e.userId, userName: e.userName, mode: e.mode, difficulty: e.difficulty };
-        const rt = runTracker[rid];
-        if (e.difficulty != null) rt.difficulty = e.difficulty;
-        rt.plates.push(e);
-        const solved = rt.plates.filter(p => !p.skipped).length;
-        if (solved >= 10) {
-            completedRunIds.add(rid);
-            let skipCount = 0, totalTime = 0;
-            for (const p of rt.plates) {
-                totalTime += p.time || 0;
-                if (p.skipped) { skipCount++; totalTime += skipCount * 5; }
-            }
-            const r = {
-                runId: rid,
-                userId: rt.userId, userName: rt.userName,
-                time: Math.round(totalTime * 100) / 100,
-                mode: rt.mode, difficulty: rt.difficulty,
-                solved, seen: rt.plates.length,
-                at: new Date()
-            };
-            runs.unshift(r);
-            if (runs.length > 100) runs.pop();
-            if (activeTab === 'runs') {
-                const feed = document.getElementById('runsFeed');
-                const empty = feed.querySelector('.empty');
-                if (empty) empty.remove();
-                feed.insertAdjacentHTML('afterbegin', renderRunHTML(r));
-                while (feed.children.length > 100) feed.removeChild(feed.lastChild);
-            }
+    async function addCompletedRun(row) {
+        if (knownRunIds.has(row.id)) return;
+        knownRunIds.add(row.id);
+        const r = {
+            id: row.id, userId: row.user_id, userName: null,
+            time: row.total_seconds, mode: row.mode, difficulty: row.difficulty,
+            solved: row.plates_solved, seen: row.plates_seen,
+            liveRunId: row.live_run_id,
+            at: new Date(row.completed_at || Date.now())
+        };
+        if (r.userId) r.userName = await resolveUser(r.userId);
+        runs.unshift(r);
+        if (runs.length > 100) runs.pop();
+        if (activeTab === 'runs') {
+            const feed = document.getElementById('runsFeed');
+            const empty = feed.querySelector('.empty');
+            if (empty) empty.remove();
+            feed.insertAdjacentHTML('afterbegin', renderRunHTML(r));
+            while (feed.children.length > 100) feed.removeChild(feed.lastChild);
         }
     }
 
@@ -975,7 +946,7 @@
         const user = r.userName ? esc(r.userName) : '<span style="color:#d1d5db;">anon</span>';
         const plateStr = `${r.solved}/${r.seen}`;
         const modeLabel = r.difficulty != null ? `${r.mode} ${r.difficulty}` : r.mode;
-        const clickAttr = r.runId ? `onclick="showRunFromFeed('${r.runId}')"` : (r.userId ? `onclick="showRunDetail('${r.userId}','${r.mode}','${r.at?.toISOString() || ''}')"` : '');
+        const clickAttr = r.liveRunId ? `onclick="showRunFromLivePlays('${r.liveRunId}')"` : '';
         return `<div class="entry entry-${r.mode}" style="cursor:pointer;font-size:0.85rem;" ${clickAttr}>
             <span style="font-weight:600;flex:none;width:auto;min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user}</span>
             <span style="flex:1;"></span>
@@ -992,20 +963,28 @@
         feed.innerHTML = runs.slice(0, 100).map(r => renderRunHTML(r)).join('');
     }
 
-    window.showRunFromFeed = function(runId) {
-        // Build detail popover from feed entries
-        const plates = entries.filter(e => e.runId === runId).sort((a, b) => a.at - b.at);
-        if (plates.length === 0) return;
-        const name = plates[0].userName || 'Unknown';
-        const solved = plates.filter(p => !p.skipped).length;
-        const totalTime = plates.reduce((s, p) => s + (p.time || 0), 0);
-        const mode = plates[0].mode;
+    window.showRunFromLivePlays = async function(liveRunId) {
+        // Query live_plays from DB for this run's plates
+        const { data } = await sb.from('live_plays')
+            .select('plate, word, skipped, thinking_seconds, mode, user_id, difficulty')
+            .eq('run_id', liveRunId)
+            .order('created_at', { ascending: true });
+        if (!data || data.length === 0) return;
+
+        const name = await resolveUser(data[0].user_id) || 'Unknown';
+        const solved = data.filter(p => !p.skipped).length;
+        let skipCount = 0, totalTime = 0;
+        for (const p of data) {
+            totalTime += p.thinking_seconds || 0;
+            if (p.skipped) { skipCount++; totalTime += skipCount * 5; }
+        }
+        const mode = data[0].mode;
 
         let html = '<div style="padding:14px;">';
         html += `<div style="font-weight:700;font-size:1rem;margin-bottom:2px;">${esc(name)}</div>`;
-        html += `<div style="font-size:0.8rem;color:#6b7280;margin-bottom:10px;">${totalTime.toFixed(2)}s · ${solved}/${plates.length} solved · ${mode}</div>`;
-        for (const e of plates) {
-            const bg = e.skipped ? '#1f2937' : sidebarTimeColor(e.time);
+        html += `<div style="font-size:0.8rem;color:#6b7280;margin-bottom:10px;">${totalTime.toFixed(2)}s · ${solved}/${data.length} solved · ${mode}</div>`;
+        for (const e of data) {
+            const bg = e.skipped ? '#1f2937' : sidebarTimeColor(e.thinking_seconds);
             const textColor = e.skipped ? '#ef4444' : '#000';
             html += `<div style="display:flex;align-items:center;padding:5px 8px;margin-bottom:2px;border-radius:6px;background:${bg};color:${textColor};">`;
             html += `<span style="font-family:monospace;font-weight:700;width:36px;font-size:0.85rem;">${e.plate}</span>`;
@@ -1016,7 +995,7 @@
                 html += `<span style="font-weight:600;color:#000;">${(e.word || '?').toLowerCase()}</span>`;
             }
             html += '<span style="flex:1;"></span>';
-            html += `<span style="font-size:0.8rem;font-weight:600;font-variant-numeric:tabular-nums;color:${textColor};">${e.time.toFixed(2)}</span>`;
+            html += `<span style="font-size:0.8rem;font-weight:600;font-variant-numeric:tabular-nums;color:${textColor};">${e.thinking_seconds.toFixed(2)}</span>`;
             html += '</div>';
         }
         html += '</div>';
@@ -1076,8 +1055,6 @@
             updateDailyPosition(e.userId, e.plate, e.word, e.skipped);
         }
 
-        // Check if this plate completes a run (10 plates)
-        checkRunComplete(e);
     }
 
     const splitElMap = { daily: 'splitDaily', practice: 'splitPractice', endless: 'splitEndless', h2h: 'splitH2h', group: 'splitGroup' };
