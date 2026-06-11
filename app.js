@@ -2408,12 +2408,16 @@
                 plates_seen: gameHistory.length
             });
             if (runErr) console.error('[Practice] practice_runs insert FAILED:', runErr.message);
-            else {
-                console.log('[Practice] Created practice_runs entry, solved:', solved, 'seen:', gameHistory.length);
-                pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length);
-            }
+            else console.log('[Practice] Created practice_runs entry, solved:', solved, 'seen:', gameHistory.length);
+            // Always push completed run regardless of practice_runs success
+            pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length);
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
+            // Still push completed run even if plate stats failed
+            const solved = gameHistory.filter(en => !en.skipped).length;
+            const totalTime = gameHistory.reduce((s, en) => s + (en.thinkingSeconds || 0) + (en.penaltySeconds || 0), 0);
+            const diff = typeof practiceDifficulty === 'number' ? practiceDifficulty : 50;
+            pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length);
         }
     }
 
