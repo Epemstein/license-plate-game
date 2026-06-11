@@ -250,7 +250,7 @@
         auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const MAX_ENTRIES = 500;
+    const MAX_ENTRIES = 5000;
     let entries = [];
     let profileCache = {};
     let activeFilter = 'all';
@@ -332,9 +332,10 @@
     }
 
     async function loadRecent() {
-        const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const now = new Date();
+        const since = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
 
-        // Fetch last hour for feed
+        // Fetch all plates from today
         const feedRes = await sb.from('live_plays')
             .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id, run_id, difficulty')
             .gte('created_at', since)
