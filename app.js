@@ -4243,6 +4243,11 @@
         document.getElementById('chTabIncoming').classList.toggle('active', tab === 'incoming');
         document.getElementById('chTabPending').classList.toggle('active', tab === 'pending');
         document.getElementById('chTabResults').classList.toggle('active', tab === 'results');
+        document.getElementById('chTabLeaderboard').classList.toggle('active', tab === 'leaderboard');
+        if (tab === 'leaderboard') {
+            renderH2HLeaderboard();
+            return;
+        }
         renderChallengesList();
     }
     window.switchChallengeTab = switchChallengeTab;
@@ -4462,6 +4467,59 @@
         });
 
         contentEl.innerHTML = html;
+    }
+
+    // === H2H Leaderboard ===
+    async function renderH2HLeaderboard() {
+        const contentEl = document.getElementById('challengesContent');
+        contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:40px 0;">Loading rankings...</p>';
+
+        try {
+            const { data, error } = await sb.rpc('h2h_rankings');
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:40px 0;">No ranked players yet</p>';
+                return;
+            }
+
+            let html = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">';
+            html += '<thead><tr style="font-size:0.7rem;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">';
+            html += '<th style="padding:6px 8px;text-align:center;width:28px;">#</th>';
+            html += '<th style="padding:6px 8px;text-align:left;">Player</th>';
+            html += '<th style="padding:6px 8px;text-align:left;">Elo</th>';
+            html += '<th style="padding:6px 8px;text-align:right;">W</th>';
+            html += '<th style="padding:6px 8px;text-align:right;">L</th>';
+            html += '<th style="padding:6px 8px;text-align:right;">PCT</th>';
+            html += '</tr></thead><tbody>';
+
+            const myId = currentUser?.id;
+
+            data.forEach((r, i) => {
+                const isMe = r.id === myId;
+                const total = r.wins + r.losses;
+                const pct = total > 0 ? Math.round(r.wins / total * 100) : 0;
+                const todayStr = r.today > 0 ? `<span style="color:#16a34a;font-size:0.75rem;margin-left:3px;">(+${r.today})</span>`
+                    : r.today < 0 ? `<span style="color:#dc2626;font-size:0.75rem;margin-left:3px;">(${r.today})</span>` : '';
+                const bg = isMe ? 'background:rgba(124,58,237,0.05);' : '';
+                const bold = isMe ? 'font-weight:700;' : '';
+
+                html += `<tr style="${bg}border-bottom:1px solid #f3f4f6;">`;
+                html += `<td style="padding:8px;text-align:center;color:#9ca3af;font-size:0.8rem;">${i + 1}</td>`;
+                html += `<td style="padding:8px;${bold}max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.anonymous ? '<span style="color:#9ca3af;">Anonymous</span>' : r.name}</td>`;
+                html += `<td style="padding:8px;font-weight:700;font-variant-numeric:tabular-nums;">${r.elo.toLocaleString()}${todayStr}</td>`;
+                html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.wins}</td>`;
+                html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.losses}</td>`;
+                html += `<td style="padding:8px;text-align:right;color:#6b7280;font-variant-numeric:tabular-nums;">${pct}%</td>`;
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            contentEl.innerHTML = html;
+        } catch (e) {
+            console.error('[H2H Leaderboard]', e);
+            contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;padding:40px 0;">Failed to load rankings</p>';
+        }
     }
 
     // === New Challenge Modal ===
