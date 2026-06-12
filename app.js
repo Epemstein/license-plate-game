@@ -4508,7 +4508,7 @@
                 html += `<td style="padding:8px;text-align:center;color:#9ca3af;font-size:0.8rem;">${i + 1}</td>`;
                 const nameContent = r.anonymous || isMe
                     ? `<span style="color:${r.anonymous ? '#9ca3af' : 'inherit'};">${r.anonymous ? 'Anonymous' : r.name}</span>`
-                    : `<span style="color:#7c3aed;cursor:pointer;" onclick="event.stopPropagation();if(confirm('Challenge ${r.name.replace(/'/g,"\\'")}?')){preselectedChallengeUserId='${r.id}';preselectedChallengeUserName='${r.name.replace(/'/g,"\\'")}';openNewChallengeModal()}">${r.name}</span>`;
+                    : `<span style="color:#7c3aed;cursor:pointer;" onclick="event.stopPropagation();preselectedChallengeUserId='${r.id}';preselectedChallengeUserName='${r.name.replace(/'/g,"\\'")}';openNewChallengeModal()">${r.name}</span>`;
                 html += `<td style="padding:8px;${bold}max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nameContent}</td>`;
                 html += `<td style="padding:8px;font-weight:700;font-variant-numeric:tabular-nums;">${r.elo.toLocaleString()}${todayStr}</td>`;
                 html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.wins}</td>`;
