@@ -4501,7 +4501,31 @@
                 return;
             }
 
-            let html = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">';
+            const myId = currentUser?.id;
+            const myRow = myId ? data.find(r => r.id === myId) : null;
+            const myRank = myRow ? data.indexOf(myRow) + 1 : null;
+
+            let html = '';
+
+            // Pinned stats card
+            if (myRow) {
+                const total = myRow.wins + myRow.losses;
+                const pct = total > 0 ? Math.round(myRow.wins / total * 100) : 0;
+                const todayBadge = myRow.today > 0 ? `<span style="color:#16a34a;font-weight:700;margin-left:4px;">+${myRow.today}</span>`
+                    : myRow.today < 0 ? `<span style="color:#dc2626;font-weight:700;margin-left:4px;">${myRow.today}</span>` : '';
+                html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;margin-bottom:12px;border-radius:12px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);">`;
+                html += `<div><div style="font-size:0.7rem;color:#6b7280;">Your Rating</div><div style="font-size:1.4rem;font-weight:800;font-variant-numeric:tabular-nums;">${myRow.elo.toLocaleString()}${todayBadge}</div></div>`;
+                html += `<div style="text-align:right;"><div style="font-size:0.7rem;color:#6b7280;">Rank</div><div style="font-size:1.4rem;font-weight:800;">#${myRank}</div></div>`;
+                html += `</div>`;
+                html += `<div style="display:flex;gap:12px;margin-bottom:14px;text-align:center;">`;
+                html += `<div style="flex:1;padding:8px;border-radius:8px;background:#f9fafb;"><div style="font-size:1rem;font-weight:700;">${myRow.games}</div><div style="font-size:0.65rem;color:#6b7280;">Games</div></div>`;
+                html += `<div style="flex:1;padding:8px;border-radius:8px;background:#f9fafb;"><div style="font-size:1rem;font-weight:700;">${myRow.wins}</div><div style="font-size:0.65rem;color:#6b7280;">Wins</div></div>`;
+                html += `<div style="flex:1;padding:8px;border-radius:8px;background:#f9fafb;"><div style="font-size:1rem;font-weight:700;">${myRow.losses}</div><div style="font-size:0.65rem;color:#6b7280;">Losses</div></div>`;
+                html += `<div style="flex:1;padding:8px;border-radius:8px;background:#f9fafb;"><div style="font-size:1rem;font-weight:700;">${pct}%</div><div style="font-size:0.65rem;color:#6b7280;">Win%</div></div>`;
+                html += `</div>`;
+            }
+
+            html += '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">';
             html += '<thead><tr style="font-size:0.7rem;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">';
             html += '<th style="padding:6px 8px;text-align:center;width:28px;">#</th>';
             html += '<th style="padding:6px 8px;text-align:left;">Player</th>';
@@ -4510,8 +4534,6 @@
             html += '<th style="padding:6px 8px;text-align:right;">L</th>';
             html += '<th style="padding:6px 8px;text-align:right;">PCT</th>';
             html += '</tr></thead><tbody>';
-
-            const myId = currentUser?.id;
 
             data.forEach((r, i) => {
                 const isMe = r.id === myId;
