@@ -1369,11 +1369,20 @@
         if (activitySource === 'daily') {
             // For daily only: query daily_runs completed_at as proxy timestamps
             // Each run completion = ~10 plates played at that time
-            const { data: runs } = await sb.from('daily_runs')
-                .select('completed_at, total_seconds')
-                .gte('completed_at', sinceDate)
-                .not('total_seconds', 'is', null);
-            if (!runs) return [];
+            let runs = [];
+            let page = 0;
+            while (true) {
+                const { data } = await sb.from('daily_runs')
+                    .select('completed_at, total_seconds')
+                    .gte('completed_at', sinceDate)
+                    .not('total_seconds', 'is', null)
+                    .range(page * 1000, (page + 1) * 1000 - 1);
+                if (!data || data.length === 0) break;
+                runs = runs.concat(data);
+                if (data.length < 1000) break;
+                page++;
+            }
+            if (runs.length === 0) return [];
             // Spread each run into ~10-12 plate timestamps by subtracting thinking time
             const timestamps = [];
             for (const r of runs) {
