@@ -4310,6 +4310,25 @@
                 }
             }
 
+            // Fetch Elo history for completed challenges
+            const completedIds = h2hChallengesCache.filter(c => c.status === 'completed').map(c => c.id);
+            if (completedIds.length > 0 && currentUser) {
+                const { data: eloRows } = await sb.from('elo_history')
+                    .select('user_id, challenge_id, old_elo, new_elo')
+                    .in('challenge_id', completedIds);
+                if (eloRows) {
+                    for (const e of eloRows) {
+                        const ch = h2hChallengesCache.find(c => c.id === e.challenge_id);
+                        if (!ch) continue;
+                        if (e.user_id === currentUser.id) {
+                            ch._eloChange = e.new_elo - e.old_elo;
+                        } else {
+                            ch._oppElo = e.old_elo;
+                        }
+                    }
+                }
+            }
+
             renderChallengesList();
         } catch (e) {
             console.error('Error loading challenges:', e);
@@ -4444,24 +4463,19 @@
                 const myColor = resultLabel === 'Win' ? '#16a34a' : resultLabel === 'Loss' ? '#dc2626' : '#374151';
                 const oppColor = resultLabel === 'Loss' ? '#16a34a' : resultLabel === 'Win' ? '#dc2626' : '#374151';
 
-                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${resultBg};border:1px solid ${resultBorder};cursor:pointer;" onclick="viewH2HScorecard('${ch.id}')">`;
+                const wonIcon = resultLabel === 'Win' ? '✓' : resultLabel === 'Loss' ? '✗' : '—';
+                const wonIconColor = resultLabel === 'Win' ? '#16a34a' : resultLabel === 'Loss' ? '#dc2626' : '#6b7280';
+                const eloChange = ch._eloChange || 0;
+                const eloStr = eloChange > 0 ? `<span style="color:#16a34a;font-size:0.75rem;margin-left:4px;">+${eloChange}</span>` : eloChange < 0 ? `<span style="color:#dc2626;font-size:0.75rem;margin-left:4px;">${eloChange}</span>` : '';
+                const oppElo = ch._oppElo ? ` (${ch._oppElo})` : '';
+
+                html += `<div style="display:flex;align-items:center;padding:10px 14px;margin-bottom:4px;border-radius:10px;background:${resultBg};border:1px solid ${resultBorder};cursor:pointer;gap:10px;" onclick="viewH2HScorecard('${ch.id}')">`;
+                html += `<span style="font-size:1.2rem;font-weight:700;color:${wonIconColor};width:20px;">${wonIcon}</span>`;
                 html += `<div style="flex:1;min-width:0;">`;
-                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">vs ${oppName}</div>`;
-                html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${diffLabel} · ${dateStr}</div>`;
+                html += `<div style="font-weight:600;font-size:0.9rem;color:#1f2937;">${oppName}<span style="color:#374151;font-size:0.8rem;">${oppElo}</span></div>`;
+                html += `<div style="font-size:0.7rem;color:#9ca3af;margin-top:1px;">${myDisplay} vs ${oppDisplay} · ${diffLabel} · ${dateStr}${eloStr}</div>`;
                 html += `</div>`;
-                html += `<div style="display:flex;align-items:center;gap:12px;">`;
-                html += `<div style="text-align:center;min-width:55px;">`;
-                html += `<div style="font-size:0.7rem;color:#9ca3af;font-weight:600;">YOU</div>`;
-                html += `<div style="font-size:0.95rem;font-weight:700;color:${myColor};">${myDisplay}</div>`;
-                html += `</div>`;
-                html += `<div style="color:#d1d5db;font-size:0.8rem;">vs</div>`;
-                html += `<div style="text-align:center;min-width:55px;">`;
-                html += `<div style="font-size:0.7rem;color:#9ca3af;font-weight:600;">THEM</div>`;
-                html += `<div style="font-size:0.95rem;font-weight:700;color:${oppColor};">${oppDisplay}</div>`;
-                html += `</div>`;
-                html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty ?? 50})" style="padding:5px 10px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.75rem;cursor:pointer;">↻</button>`;
-                html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
-                html += `</div>`;
+                html += `<span style="color:#d1d5db;font-size:0.9rem;">›</span>`;
                 html += `</div>`;
             }
         });
@@ -5022,11 +5036,25 @@
                 }
             }
 
+            // Fetch Elo for this challenge
+            let p1Elo = '', p2Elo = '', p1EloChange = '', p2EloChange = '';
+            const { data: eloData } = await sb.from('elo_history')
+                .select('user_id, old_elo, new_elo')
+                .eq('challenge_id', challengeId);
+            if (eloData) {
+                for (const e of eloData) {
+                    const change = e.new_elo - e.old_elo;
+                    const changeStr = change >= 0 ? `<span style="color:#16a34a;font-size:0.8rem;margin-left:4px;">(+${change})</span>` : `<span style="color:#dc2626;font-size:0.8rem;margin-left:4px;">(${change})</span>`;
+                    if (e.user_id === p1Id) { p1Elo = `<div style="font-size:0.85rem;font-weight:700;color:#374151;">${e.new_elo}${changeStr}</div>`; }
+                    else { p2Elo = `<div style="font-size:0.85rem;font-weight:700;color:#374151;">${e.new_elo}${changeStr}</div>`; }
+                }
+            }
+
             let html = '<div class="scorecard-header">';
-            html += `<div class="scorecard-player"><div class="scorecard-player-name">${p1Name}${p1Icon}</div>`;
+            html += `<div class="scorecard-player"><div class="scorecard-player-name">${p1Name}${p1Icon}</div>${p1Elo}`;
             html += `<div class="scorecard-player-time ${p1TimeClass}">${p1Time !== null ? p1Time.toFixed(2) : '--'}</div></div>`;
             html += '<div class="scorecard-vs">VS</div>';
-            html += `<div class="scorecard-player"><div class="scorecard-player-name">${p2Name}${p2Icon}</div>`;
+            html += `<div class="scorecard-player"><div class="scorecard-player-name">${p2Name}${p2Icon}</div>${p2Elo}`;
             html += `<div class="scorecard-player-time ${p2TimeClass}">${p2Time !== null ? p2Time.toFixed(2) : '--'}</div></div>`;
             html += '</div>';
 
