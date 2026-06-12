@@ -341,23 +341,14 @@
         const now = new Date();
         const since = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
 
-        // Fetch all plates from today (paginate past Supabase 1000-row default)
-        let allData = [];
-        let page = 0;
-        const PAGE_SIZE = 1000;
-        while (true) {
-            const { data } = await sb.from('live_plays')
-                .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id, run_id, difficulty')
-                .gte('created_at', since)
-                .order('created_at', { ascending: false })
-                .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-            if (!data || data.length === 0) break;
-            allData = allData.concat(data);
-            if (data.length < PAGE_SIZE) break;
-            page++;
-        }
-        const feedRes = { data: allData };
-        console.log('[Feed] Loaded', allData.length, 'plates from today');
+        // Fetch most recent 250 plates
+        const { data: feedData } = await sb.from('live_plays')
+            .select('plate, word, skipped, thinking_seconds, mode, created_at, user_id, run_id, difficulty')
+            .gte('created_at', since)
+            .order('created_at', { ascending: false })
+            .limit(250);
+        const feedRes = { data: feedData || [] };
+        console.log('[Feed] Loaded', feedRes.data.length, 'plates');
 
         // Today counts from real entry tables (accurate, includes non-live users)
         await loadTodayCounts();
