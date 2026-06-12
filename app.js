@@ -4473,7 +4473,11 @@
                 html += `<span style="font-size:1.2rem;font-weight:700;color:${wonIconColor};width:20px;">${wonIcon}</span>`;
                 html += `<div style="flex:1;min-width:0;">`;
                 html += `<div style="font-weight:600;font-size:0.9rem;color:#1f2937;">${oppName}<span style="color:#374151;font-size:0.8rem;">${oppElo}</span></div>`;
-                html += `<div style="font-size:0.7rem;color:#9ca3af;margin-top:1px;">${myDisplay} vs ${oppDisplay} · ${diffLabel} · ${dateStr}${eloStr}</div>`;
+                html += `<div style="font-size:0.7rem;color:#9ca3af;margin-top:1px;">${diffLabel} · ${dateStr}</div>`;
+                html += `</div>`;
+                html += `<div style="text-align:right;">`;
+                html += `<div style="font-size:0.85rem;font-weight:700;color:#374151;">${myDisplay} vs ${oppDisplay}</div>`;
+                html += eloStr ? `<div style="font-size:0.75rem;margin-top:1px;">${eloStr}</div>` : '';
                 html += `</div>`;
                 html += `<span style="color:#d1d5db;font-size:0.9rem;">›</span>`;
                 html += `</div>`;
