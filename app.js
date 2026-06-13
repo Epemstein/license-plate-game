@@ -4479,6 +4479,7 @@
                 html += `<div style="font-size:0.85rem;font-weight:700;color:#374151;">${myDisplay} vs ${oppDisplay}</div>`;
                 html += eloStr ? `<div style="font-size:0.75rem;margin-top:1px;">${eloStr}</div>` : '';
                 html += `</div>`;
+                html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty ?? 50})" style="padding:4px 8px;background:none;border:1px solid #d1d5db;border-radius:6px;font-size:0.7rem;color:#6b7280;cursor:pointer;white-space:nowrap;" title="Rematch">↻</button>`;
                 html += `<span style="color:#d1d5db;font-size:0.9rem;">›</span>`;
                 html += `</div>`;
             }
