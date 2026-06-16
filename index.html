@@ -20,6 +20,7 @@
     <button class="tab-bar-item" onclick="switchTab('leaderboard')">Leaderboard</button>
     <button class="tab-bar-item" onclick="switchTab('challenges')">Challenges</button>
     <button class="tab-bar-item" onclick="switchTab('profile')">Profile</button>
+    <button class="tab-bar-item" onclick="switchTab('feedback')">Feedback</button>
 </div>
 
 <!-- Hidden elements needed by JS -->
@@ -193,6 +194,24 @@
 <div id="profileTab" class="tab-content">
     <div class="profile-card" id="profileContent">
         <p style="text-align:center;color:#9ca3af;padding:40px 0;">Loading...</p>
+    </div>
+</div>
+
+<!-- ===== FEEDBACK TAB ===== -->
+<div id="feedbackTab" class="tab-content">
+    <div style="max-width:600px;margin:0 auto;padding:16px;">
+        <h2 style="font-size:1.2rem;font-weight:700;margin-bottom:4px;">Feedback</h2>
+        <p style="font-size:0.85rem;color:#9ca3af;margin-bottom:16px;">Send me feedback, bug reports, feature requests, or dictionary changes. I'll respond as soon as I can.</p>
+        <div id="feedbackSignInPrompt" style="display:none;text-align:center;padding:40px 0;color:#9ca3af;">
+            <p style="margin-bottom:12px;">Sign in to send feedback</p>
+        </div>
+        <div id="feedbackChatArea" style="display:none;">
+            <div id="feedbackMessages" style="min-height:200px;max-height:60vh;overflow-y:auto;margin-bottom:12px;display:flex;flex-direction:column;gap:6px;"></div>
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="feedbackInput" placeholder="Type a message..." style="flex:1;padding:10px 14px;border:1px solid #e0e0e0;border-radius:12px;font-size:0.9rem;outline:none;" onkeydown="if(event.key==='Enter')sendFeedback()">
+                <button onclick="sendFeedback()" style="padding:10px 20px;background:#9370db;color:white;border:none;border-radius:12px;font-weight:600;font-size:0.9rem;cursor:pointer;">Send</button>
+            </div>
+        </div>
     </div>
 </div>
 

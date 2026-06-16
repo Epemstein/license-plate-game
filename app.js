@@ -6,6 +6,7 @@
         document.getElementById('leaderboardTab').classList.remove('active');
         document.getElementById('challengesTab').classList.remove('active');
         document.getElementById('profileTab').classList.remove('active');
+        document.getElementById('feedbackTab').classList.remove('active');
 
         // Deactivate all tab buttons
         document.querySelectorAll('.tab-bar-item').forEach(btn => btn.classList.remove('active'));
@@ -15,7 +16,7 @@
 
         // Activate button
         const buttons = document.querySelectorAll('.tab-bar-item');
-        const tabMap = { game: 0, leaderboard: 1, challenges: 2, profile: 3 };
+        const tabMap = { game: 0, leaderboard: 1, challenges: 2, profile: 3, feedback: 4 };
         buttons[tabMap[tabName]].classList.add('active');
 
         // On leaderboard tab, auto-load today
@@ -37,6 +38,11 @@
         // On profile tab, update profile display
         if (tabName === 'profile') {
             updateProfileTab();
+        }
+
+        // On feedback tab, load messages
+        if (tabName === 'feedback') {
+            loadFeedback();
         }
     }
     window.switchTab = switchTab;
@@ -5720,4 +5726,99 @@ window.addEventListener('load', function() {
     if (challengeId && currentUser) {
         setTimeout(() => { playH2HChallenge(challengeId); }, 500);
     }
+
+    // === FEEDBACK TAB ===
+    let feedbackLoaded = false;
+
+    async function loadFeedback() {
+        const prompt = document.getElementById('feedbackSignInPrompt');
+        const chatArea = document.getElementById('feedbackChatArea');
+        if (!currentUser) {
+            prompt.style.display = 'block';
+            chatArea.style.display = 'none';
+            return;
+        }
+        prompt.style.display = 'none';
+        chatArea.style.display = 'block';
+
+        const container = document.getElementById('feedbackMessages');
+        if (!feedbackLoaded) container.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:20px;">Loading...</p>';
+
+        try {
+            const { data, error } = await sb.from('feedback_messages')
+                .select('id, text, from_admin, created_at, image_url')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+
+            container.innerHTML = '';
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:20px;">No messages yet. Send your first message!</p>';
+            } else {
+                for (const msg of data) {
+                    container.appendChild(createFeedbackBubble(msg));
+                }
+            }
+            feedbackLoaded = true;
+            container.scrollTop = container.scrollHeight;
+        } catch (e) {
+            console.error('Failed to load feedback:', e);
+            container.innerHTML = '<p style="color:#ef4444;text-align:center;padding:20px;">Error loading messages</p>';
+        }
+    }
+    window.loadFeedback = loadFeedback;
+
+    function createFeedbackBubble(msg) {
+        const div = document.createElement('div');
+        const isAdmin = msg.from_admin;
+        div.style.cssText = `display:flex;flex-direction:column;align-items:${isAdmin ? 'flex-start' : 'flex-end'};`;
+
+        let html = '';
+        if (msg.image_url) {
+            html += `<img src="${msg.image_url}" style="max-width:200px;border-radius:12px;margin-bottom:4px;cursor:pointer;" onclick="window.open('${msg.image_url}','_blank')">`;
+        }
+        if (msg.text) {
+            html += `<div style="padding:8px 14px;border-radius:16px;font-size:0.9rem;line-height:1.4;max-width:80%;${isAdmin ? 'background:#e5e7eb;color:#111;' : 'background:#9370db;color:white;'}">${escapeHtml(msg.text)}</div>`;
+        }
+
+        const time = new Date(msg.created_at);
+        const timeStr = time.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + time.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        html += `<div style="font-size:0.7rem;color:#aaa;margin-top:2px;padding:0 4px;">${isAdmin ? 'Dev · ' : ''}${timeStr}</div>`;
+
+        div.innerHTML = html;
+        return div;
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    async function sendFeedback() {
+        if (!currentUser) return;
+        const input = document.getElementById('feedbackInput');
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+
+        const container = document.getElementById('feedbackMessages');
+        // Remove "no messages" placeholder
+        if (container.querySelector('p')) container.innerHTML = '';
+
+        // Optimistic append
+        const tempMsg = { text, from_admin: false, created_at: new Date().toISOString(), image_url: null };
+        container.appendChild(createFeedbackBubble(tempMsg));
+        container.scrollTop = container.scrollHeight;
+
+        try {
+            const { error } = await sb.from('feedback_messages')
+                .insert({ user_id: currentUser.id, text, from_admin: false });
+            if (error) throw error;
+        } catch (e) {
+            console.error('Failed to send feedback:', e);
+            alert('Failed to send message. Please try again.');
+        }
+    }
+    window.sendFeedback = sendFeedback;
 });
