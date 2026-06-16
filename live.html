@@ -424,10 +424,10 @@
         }
 
         // Batch fetch all profiles at once
-        const userIds = [...new Set(runs.map(r => r.user_id))];
-        const { data: profiles } = await sb.from('profiles')
-            .select('id, display_name, handle')
-            .in('id', userIds);
+        const userIds = [...new Set(runs.map(r => r.user_id).filter(Boolean))];
+        const { data: profiles } = userIds.length > 0
+            ? await sb.from('profiles').select('id, display_name, handle').in('id', userIds)
+            : { data: [] };
         const profileMap = {};
         for (const p of (profiles || [])) {
             profileMap[p.id] = p.display_name || (p.handle ? '@' + p.handle : 'Anon');
@@ -444,6 +444,7 @@
         // Build player data
         for (const run of runs) {
             const uid = run.user_id;
+            if (!uid) continue; // deleted account — skip from sidebar positions
             const userName = profileMap[uid] || 'Anon';
             const initials = getInitials(userName);
             const colorIdx = Math.abs(hashStr(uid)) % avatarColors.length;
@@ -482,9 +483,9 @@
             .select('user_id, total_seconds')
             .eq('date', today)
             .not('total_seconds', 'is', null);
-        const completedSet = new Set((completedRuns || []).map(r => r.user_id));
+        const completedSet = new Set((completedRuns || []).filter(r => r.user_id).map(r => r.user_id));
         const completedTimes = {};
-        for (const r of (completedRuns || [])) completedTimes[r.user_id] = r.total_seconds;
+        for (const r of (completedRuns || [])) { if (r.user_id) completedTimes[r.user_id] = r.total_seconds; }
         if (!data || data.length === 0) return;
 
         // Batch resolve profiles
