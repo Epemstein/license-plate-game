@@ -905,19 +905,12 @@
     let knownRunIds = new Set();
 
     async function loadRecentRuns() {
-        const now = new Date();
-        const since = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
-        const { data } = await sb.from('completed_runs')
-            .select('id, user_id, mode, total_seconds, difficulty, plates_solved, plates_seen, live_run_id, completed_at, expected_seconds')
-            .neq('mode', 'endless')
-            .gte('plates_solved', 10)
-            .gte('completed_at', since)
-            .order('completed_at', { ascending: false })
-            .limit(500);
+        const { data } = await sb.rpc('recent_completed_runs');
+        const rows = data || [];
 
         runs = [];
         knownRunIds = new Set();
-        for (const r of (data || [])) {
+        for (const r of rows) {
             knownRunIds.add(r.id);
             runs.push({
                 id: r.id, userId: r.user_id, userName: null,
