@@ -786,7 +786,7 @@
         if (success) {
             localStorage.removeItem('pendingDailySubmission');
             const solved = entries.filter(e => !e.skipped).length;
-            pushCompletedRun('daily', totalSeconds, null, solved, entries.length);
+            pushCompletedRun('daily', totalSeconds, null, solved, entries.length, runId);
         }
 
         // Update daily button and refresh profile stats
@@ -841,8 +841,9 @@
     }
 
     // Push completed run to the unified completed_runs table for live tracker
-    function pushCompletedRun(mode, totalSeconds, difficulty, platesSolved, platesSeen) {
+    function pushCompletedRun(mode, totalSeconds, difficulty, platesSolved, platesSeen, sourceRunId) {
         if (!currentUser) return;
+        const sourceTable = sourceRunId ? (mode === 'daily' ? 'daily_runs' : mode === 'practice' ? 'practice_runs' : mode === 'h2h' ? 'h2h_runs' : null) : null;
         sb.from('completed_runs').insert({
             user_id: currentUser.id,
             mode,
@@ -850,10 +851,11 @@
             difficulty: difficulty != null ? difficulty : null,
             plates_solved: platesSolved,
             plates_seen: platesSeen,
-            live_run_id: currentLiveRunId
+            live_run_id: currentLiveRunId,
+            source_run_id: sourceRunId || null,
+            source_table: sourceTable
         }).then(({ error }) => {
             if (error) console.warn('[CompletedRun]', error.message);
-            else console.log('[CompletedRun] Pushed', mode, totalSeconds.toFixed(2) + 's');
         });
     }
 
@@ -2399,24 +2401,26 @@
                 difficulty: diff,
                 source: 'practice'
             }));
-            await sb.from('practice_plate_stats').insert(rows);
-            console.log('[Practice] Submitted', rows.length, 'plate stats at difficulty', diff);
-
-            // Also create a practice_runs entry
+            // Create practice_runs entry first to get run_id
             const solved = gameHistory.filter(e => !e.skipped).length;
             const totalTime = gameHistory.reduce((s, e) => s + (e.thinkingSeconds || 0) + (e.penaltySeconds || 0), 0);
-            const { error: runErr } = await sb.from('practice_runs').insert({
+            const { data: runData, error: runErr } = await sb.from('practice_runs').insert({
                 user_id: currentUser.id,
                 total_seconds: Math.floor(totalTime * 100) / 100,
                 difficulty: diff,
                 source: 'practice',
                 plates_solved: solved,
                 plates_seen: gameHistory.length
-            });
+            }).select('id').single();
+            const practiceRunId = runData?.id || null;
             if (runErr) console.error('[Practice] practice_runs insert FAILED:', runErr.message);
-            else console.log('[Practice] Created practice_runs entry, solved:', solved, 'seen:', gameHistory.length);
-            // Always push completed run regardless of practice_runs success
-            pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length);
+
+            // Insert plate stats with run_id
+            const rowsWithRunId = rows.map(r => ({ ...r, run_id: practiceRunId }));
+            await sb.from('practice_plate_stats').insert(rowsWithRunId);
+
+            pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length, practiceRunId);
+            window._lastPracticeRunId = practiceRunId;
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
             // Still push completed run even if plate stats failed
@@ -2865,6 +2869,15 @@
                 el.innerHTML = `The expected time for this practice round was <a href="#" onclick="event.preventDefault();document.getElementById('expectedBreakdown').style.display=document.getElementById('expectedBreakdown').style.display==='none'?'block':'none';" style="font-weight:700;color:#2563eb;text-decoration:underline;">${expectedTime.toFixed(1)} seconds</a>.
                     <br><span style="color:${color};font-weight:600;">You were ${absDiff} seconds ${word} than expected.</span>
                     <div id="expectedBreakdown" style="display:none;">${bkHtml}</div>`;
+            }
+            // Save expected_seconds to the source run table and completed_runs
+            if (currentUser && expectedTime > 0) {
+                const runId = window._lastPracticeRunId;
+                if (runId) {
+                    sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', runId).then(() => {});
+                    sb.from('completed_runs').update({ expected_seconds: expectedTime })
+                        .eq('source_run_id', runId).then(() => {});
+                }
             }
         } catch (e) {
             console.error('Expected time error:', e);
