@@ -948,6 +948,19 @@
             if (empty) empty.remove();
             feed.insertAdjacentHTML('afterbegin', renderRunHTML(r));
         }
+        // Expected seconds is saved async after the run — check after a delay
+        if (r.expected == null && row.source_run_id && row.source_table) {
+            setTimeout(async () => {
+                const { data } = await sb.from(row.source_table)
+                    .select('expected_seconds')
+                    .eq('id', row.source_run_id)
+                    .single();
+                if (data?.expected_seconds != null) {
+                    r.expected = data.expected_seconds;
+                    if (activeTab === 'runs') renderRuns();
+                }
+            }, 5000);
+        }
     }
 
     function renderRunHTML(r) {
