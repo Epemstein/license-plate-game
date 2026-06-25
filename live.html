@@ -908,7 +908,7 @@
         const now = new Date();
         const since = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
         const { data } = await sb.from('completed_runs')
-            .select('id, user_id, mode, total_seconds, difficulty, plates_solved, plates_seen, live_run_id, completed_at')
+            .select('id, user_id, mode, total_seconds, difficulty, plates_solved, plates_seen, live_run_id, completed_at, expected_seconds')
             .neq('mode', 'endless')
             .gte('plates_solved', 10)
             .gte('completed_at', since)
@@ -924,7 +924,8 @@
                 time: r.total_seconds, mode: r.mode, difficulty: r.difficulty,
                 solved: r.plates_solved, seen: r.plates_seen,
                 liveRunId: r.live_run_id,
-                at: new Date(r.completed_at)
+                at: new Date(r.completed_at),
+                expected: r.expected_seconds
             });
         }
         // Resolve names
@@ -942,7 +943,8 @@
             time: row.total_seconds, mode: row.mode, difficulty: row.difficulty,
             solved: row.plates_solved, seen: row.plates_seen,
             liveRunId: row.live_run_id,
-            at: new Date(row.completed_at || Date.now())
+            at: new Date(row.completed_at || Date.now()),
+            expected: row.expected_seconds
         };
         if (r.userId) r.userName = await resolveUser(r.userId);
         runs.unshift(r);
@@ -960,9 +962,15 @@
         const plateStr = `${r.solved}/${r.seen}`;
         const modeLabel = r.difficulty != null ? `${r.mode} ${r.difficulty}` : r.mode;
         const clickAttr = r.liveRunId ? `onclick="showRunFromLivePlays('${r.liveRunId}',${r.time})"` : '';
+        let diffStr = '';
+        if (r.expected != null) {
+            const diff = r.expected - r.time;
+            const color = diff > 0 ? '#16a34a' : '#ef4444';
+            diffStr = ` <span style="font-size:0.7rem;font-weight:600;color:${color};">(${diff > 0 ? '+' : ''}${diff.toFixed(1)})</span>`;
+        }
         return `<div class="entry entry-${r.mode}" style="cursor:pointer;display:flex;align-items:center;gap:12px;" ${clickAttr}>
             <span style="flex:1;min-width:100px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user}</span>
-            <span style="width:70px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${r.time.toFixed(2)}</span>
+            <span style="width:100px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${r.time.toFixed(2)}${diffStr}</span>
             <span style="width:55px;text-align:center;font-size:0.75rem;color:#6b7280;">${plateStr}</span>
             <span style="width:80px;text-align:center;"><span class="mode mode-${r.mode}" style="white-space:nowrap;font-size:8px;">${modeLabel}</span></span>
             <span style="width:40px;text-align:right;font-size:0.75rem;color:#9ca3af;" class="run-ago">${ago(r.at)}</span>
