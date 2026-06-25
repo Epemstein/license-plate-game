@@ -2875,8 +2875,11 @@
                 const runId = window._lastPracticeRunId;
                 if (runId) {
                     sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', runId).then(() => {});
-                    sb.from('completed_runs').update({ expected_seconds: expectedTime })
-                        .eq('source_run_id', runId).then(() => {});
+                    // Small delay to ensure completed_runs row exists before updating
+                    setTimeout(() => {
+                        sb.from('completed_runs').update({ expected_seconds: expectedTime })
+                            .eq('source_run_id', runId).then(() => {});
+                    }, 2000);
                 }
             }
         } catch (e) {
