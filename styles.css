@@ -32,37 +32,84 @@
             color: #1a1714;
         }
 
-        /* ===== TAB BAR ===== */
-        .tab-bar {
+        /* ===== SITE HEADER ===== */
+        .site-header {
             position: sticky;
             top: 0;
             z-index: 100;
-            display: flex;
             background: #f7f4eb;
             border-bottom: 2px solid #1a1714;
+            display: flex;
+            align-items: baseline;
+            padding: 0 16px;
+            gap: 32px;
+        }
+        .site-title {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #1a1714;
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+            padding: 12px 0 10px;
+        }
+
+        /* ===== TAB BAR ===== */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
             padding: 0;
         }
         .tab-bar-item {
-            flex: 1;
             text-align: center;
-            padding: 12px 0 10px;
+            padding: 12px 12px 10px;
             font-size: 0.85rem;
             font-weight: 500;
             color: #756e5c;
             cursor: pointer;
             border-bottom: 3px solid transparent;
-            transition: color 0.2s, border-color 0.2s;
+            transition: color 0.15s, border-color 0.15s;
             background: none;
             border-top: none;
             border-left: none;
             border-right: none;
+            box-shadow: none;
             font-family: "Public Sans", system-ui, -apple-system, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
+        .tab-bar-item:hover {
+            color: #1a1714;
+            transform: none;
+            box-shadow: none;
+        }
+        .tab-bar-item:active {
+            transform: none;
+            box-shadow: none;
+        }
         .tab-bar-item.active {
-            color: #9370db;
-            border-bottom-color: #9370db;
-            font-weight: 600;
+            color: #1a1714;
+            border-bottom-color: #1a1714;
+            font-weight: 700;
+        }
+
+        /* Mobile: stack title above tabs */
+        @media (max-width: 700px) {
+            .site-header {
+                flex-direction: column;
+                align-items: center;
+                gap: 0;
+                padding: 0;
+            }
+            .site-title {
+                padding: 10px 0 0;
+                font-size: 1.3rem;
+            }
+            .tab-bar {
+                width: 100%;
+            }
+            .tab-bar-item {
+                flex: 1;
+            }
         }
 
         /* ===== TAB CONTENT ===== */
