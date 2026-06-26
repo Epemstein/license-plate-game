@@ -91,8 +91,7 @@
 
     let cachedScores = [];
     let previousLeaderboardIds = new Set();
-    let newlyArrivedIds = new Set();
-    let arrivalClearTimer = null;
+    let previousLeaderboardIds_unused = new Set();
 
     function renderLeaderboardRows(scores, oldIds) {
         let displayScores = scores;
@@ -107,20 +106,6 @@
         const userHasPlayed = currentUser && scores.some(s => s.userId === currentUser.id || s.isMe);
         const isPastDate = currentViewingDate !== getTodayString();
 
-        // Detect new arrivals (skip on first load when oldIds is empty/undefined)
-        if (oldIds && oldIds.size > 0) {
-            const currentIds = new Set(scores.map(s => s.userId));
-            const arrived = new Set([...currentIds].filter(id => !oldIds.has(id)));
-            if (arrived.size > 0) {
-                newlyArrivedIds = arrived;
-                if (arrivalClearTimer) clearTimeout(arrivalClearTimer);
-                arrivalClearTimer = setTimeout(() => {
-                    newlyArrivedIds = new Set();
-                    renderLeaderboardRows(cachedScores);
-                }, 5000);
-            }
-        }
-
         let h = '';
         displayScores.forEach((s, i) => {
             const rank = i + 1;
@@ -132,7 +117,7 @@
 
             const isMe = s.isMe || (currentUser && s.userId === currentUser.id);
             const meClass = isMe ? ' is-me' : '';
-            const newClass = newlyArrivedIds.has(s.userId) ? ' lb-new-arrival' : '';
+            const newClass = '';
 
             const streakHtml = s.streak && s.streak > 1 ? `<span class="lb-streak">\uD83D\uDD25${s.streak}</span>` : '';
 
