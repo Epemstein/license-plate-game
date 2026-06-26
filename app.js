@@ -1242,10 +1242,9 @@
 
     // Push completed run to the unified completed_runs table for live tracker
     function pushCompletedRun(mode, totalSeconds, difficulty, platesSolved, platesSeen, sourceRunId) {
-        if (!currentUser) return;
         const sourceTable = sourceRunId ? (mode === 'daily' ? 'daily_runs' : mode === 'practice' ? 'practice_runs' : mode === 'h2h' ? 'h2h_runs' : null) : null;
         sb.from('completed_runs').insert({
-            user_id: currentUser.id,
+            user_id: currentUser ? currentUser.id : null,
             mode,
             total_seconds: Math.round(totalSeconds * 100) / 100,
             difficulty: difficulty != null ? difficulty : null,
@@ -2754,28 +2753,23 @@
             const solved = gameHistory.filter(e => !e.skipped).length;
             const totalTime = gameHistory.reduce((s, e) => s + (e.thinkingSeconds || 0) + (e.penaltySeconds || 0), 0);
 
-            let practiceRunId = null;
-            if (userId) {
-                // Create practice_runs entry first to get run_id (signed-in users only)
-                const { data: runData, error: runErr } = await sb.from('practice_runs').insert({
-                    user_id: userId,
-                    total_seconds: Math.floor(totalTime * 100) / 100,
-                    difficulty: diff,
-                    source: 'practice',
-                    plates_solved: solved,
-                    plates_seen: gameHistory.length
-                }).select('id').single();
-                practiceRunId = runData?.id || null;
-                if (runErr) console.error('[Practice] practice_runs insert FAILED:', runErr.message);
-            }
+            // Create practice_runs entry first to get run_id
+            const { data: runData, error: runErr } = await sb.from('practice_runs').insert({
+                user_id: userId,
+                total_seconds: Math.floor(totalTime * 100) / 100,
+                difficulty: diff,
+                source: 'practice',
+                plates_solved: solved,
+                plates_seen: gameHistory.length
+            }).select('id').single();
+            const practiceRunId = runData?.id || null;
+            if (runErr) console.error('[Practice] practice_runs insert FAILED:', runErr.message);
 
-            // Insert plate stats (works for both guests and signed-in users)
+            // Insert plate stats with run_id
             const rowsWithRunId = rows.map(r => ({ ...r, run_id: practiceRunId }));
             await sb.from('practice_plate_stats').insert(rowsWithRunId);
 
-            if (userId) {
-                pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length, practiceRunId);
-            }
+            pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length, practiceRunId);
             window._lastPracticeRunId = practiceRunId;
         } catch (e) {
             console.warn('[Practice] Stats submit error:', e);
