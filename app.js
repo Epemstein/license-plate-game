@@ -81,6 +81,9 @@
             const scores = await loadLeaderboard(dateStr);
             if (scores.length) {
                 cachedScores = scores;
+                const friendCount = scores.filter(s => s.isFriend || s.isMe).length;
+                document.getElementById('lbGlobalBtn').textContent = `Global (${scores.length})`;
+                document.getElementById('lbFriendsBtn').textContent = `Friends (${friendCount})`;
                 renderLeaderboardRows(scores, oldIds);
             }
         })();
