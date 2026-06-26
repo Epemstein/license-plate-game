@@ -2752,31 +2752,38 @@
             const solved = gameHistory.filter(e => !e.skipped).length;
             const totalTime = gameHistory.reduce((s, e) => s + (e.thinkingSeconds || 0) + (e.penaltySeconds || 0), 0);
 
-            // Create practice_runs entry first to get run_id
-            const { data: runData, error: runErr } = await sb.from('practice_runs').insert({
-                user_id: userId,
-                total_seconds: Math.floor(totalTime * 100) / 100,
-                difficulty: diff,
-                source: 'practice',
-                plates_solved: solved,
-                plates_seen: gameHistory.length
-            }).select('id').single();
-            const practiceRunId = runData?.id || null;
-            if (runErr) console.error('[Practice] practice_runs insert FAILED:', runErr.message);
+            // Try to create practice_runs entry to get run_id
+            let practiceRunId = null;
+            try {
+                const { data: runData, error: runErr } = await sb.from('practice_runs').insert({
+                    user_id: userId,
+                    total_seconds: Math.floor(totalTime * 100) / 100,
+                    difficulty: diff,
+                    source: 'practice',
+                    plates_solved: solved,
+                    plates_seen: gameHistory.length
+                }).select('id').single();
+                if (runErr) console.error('[Practice] practice_runs FAILED:', runErr.message);
+                else practiceRunId = runData?.id || null;
+            } catch (e) {
+                console.warn('[Practice] practice_runs error:', e.message);
+            }
 
-            // Insert plate stats with run_id
-            const rowsWithRunId = rows.map(r => ({ ...r, run_id: practiceRunId }));
-            await sb.from('practice_plate_stats').insert(rowsWithRunId);
+            // Always insert plate stats (even if practice_runs failed)
+            try {
+                const rowsWithRunId = rows.map(r => ({ ...r, run_id: practiceRunId }));
+                const { error: statsErr } = await sb.from('practice_plate_stats').insert(rowsWithRunId);
+                if (statsErr) console.error('[Practice] plate stats FAILED:', statsErr.message);
+                else console.log('[Practice] Saved', rowsWithRunId.length, 'plate stats');
+            } catch (e) {
+                console.error('[Practice] plate stats error:', e.message);
+            }
 
+            // Always push completed run
             pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length, practiceRunId);
             window._lastPracticeRunId = practiceRunId;
         } catch (e) {
-            console.warn('[Practice] Stats submit error:', e);
-            // Still push completed run even if plate stats failed
-            const solved = gameHistory.filter(en => !en.skipped).length;
-            const totalTime = gameHistory.reduce((s, en) => s + (en.thinkingSeconds || 0) + (en.penaltySeconds || 0), 0);
-            const diff = typeof practiceDifficulty === 'number' ? practiceDifficulty : 50;
-            pushCompletedRun('practice', totalTime, diff, solved, gameHistory.length);
+            console.error('[Practice] Submit error:', e);
         }
     }
 
