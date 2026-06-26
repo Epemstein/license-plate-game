@@ -67,12 +67,11 @@
             font-weight: 500;
             color: #756e5c;
             cursor: pointer;
+            border: none;
             border-bottom: 3px solid transparent;
+            border-radius: 0;
             transition: color 0.15s, border-color 0.15s;
             background: none;
-            border-top: none;
-            border-left: none;
-            border-right: none;
             box-shadow: none;
             font-family: "Public Sans", system-ui, -apple-system, sans-serif;
             -webkit-tap-highlight-color: transparent;
