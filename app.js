@@ -221,11 +221,124 @@
                     <span>Global Stats</span><span>&#8250;</span>
                 </button>
             </div>
-            <button class="profile-signout-btn" onclick="signOut()" style="margin-top:24px;">Sign Out</button>
+            <div style="display:flex;gap:10px;margin-top:24px;justify-content:center;">
+                <button onclick="showEditProfile()" style="padding:10px 20px;background:#eee9db;color:#4a4338;border:2px solid #d9cfb6;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:none;">Edit Profile</button>
+                <button class="profile-signout-btn" onclick="signOut()">Sign Out</button>
+            </div>
         `;
         // Load stats asynchronously
         if (currentUser) loadProfileStats();
     }
+
+    function renderProfileSetup(container, currentName) {
+        const suggested = (currentName || '').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 20);
+        container.innerHTML = `
+            <div style="max-width:360px;margin:40px auto;text-align:left;">
+                <h2 style="text-align:center;margin-bottom:4px;">Set up your profile</h2>
+                <p style="text-align:center;color:#756e5c;font-size:0.9rem;margin-bottom:24px;">Choose a display name and username to appear on leaderboards.</p>
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:0.8rem;font-weight:600;color:#756e5c;">Display Name</label>
+                    <input id="setupDisplayName" type="text" value="${currentName || ''}" maxlength="40" style="width:100%;padding:10px 12px;border:2px solid #d9cfb6;border-radius:5px;font-size:1rem;margin-top:4px;background:#fefcf7;">
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:0.8rem;font-weight:600;color:#756e5c;">Username</label>
+                    <div style="display:flex;align-items:center;gap:4px;padding:10px 12px;border:2px solid #d9cfb6;border-radius:5px;margin-top:4px;background:#fefcf7;">
+                        <span style="color:#756e5c;font-weight:600;">@</span>
+                        <input id="setupHandle" type="text" value="${suggested}" maxlength="20" style="border:none;outline:none;font-size:1rem;flex:1;background:transparent;" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')">
+                    </div>
+                    <div style="font-size:0.75rem;color:#756e5c;margin-top:4px;">3–20 chars, letters/numbers/underscores. Can't be changed.</div>
+                </div>
+                <div id="setupError" style="color:#ff3b30;font-size:0.85rem;margin-bottom:8px;display:none;"></div>
+                <button onclick="submitProfileSetup()" style="width:100%;padding:14px;background:#9370db;color:white;border:2px solid #1a1714;border-radius:5px;font-size:1rem;font-weight:700;cursor:pointer;box-shadow:3px 3px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #1a1714'">Save Profile</button>
+            </div>
+        `;
+    }
+    window.renderProfileSetup = renderProfileSetup;
+
+    async function submitProfileSetup() {
+        const handle = document.getElementById('setupHandle').value.trim();
+        const displayName = document.getElementById('setupDisplayName').value.trim();
+        const errorEl = document.getElementById('setupError');
+        errorEl.style.display = 'none';
+
+        if (!/^[a-zA-Z0-9_]{3,20}$/.test(handle)) {
+            errorEl.textContent = 'Username must be 3–20 characters (letters, numbers, underscores).';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            // Check handle uniqueness
+            const { data: existing } = await sb.from('profiles').select('id').eq('handle', handle.toLowerCase());
+            if (existing && existing.length > 0 && existing[0].id !== currentUser.id) {
+                errorEl.textContent = 'That username is taken.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const { error } = await sb.from('profiles')
+                .update({ handle: handle.toLowerCase(), display_name: displayName || handle })
+                .eq('id', currentUser.id);
+            if (error) throw error;
+
+            document.getElementById('userName').textContent = displayName || handle;
+            updateProfileTab();
+        } catch (e) {
+            errorEl.textContent = e.message || 'Error saving profile.';
+            errorEl.style.display = 'block';
+        }
+    }
+    window.submitProfileSetup = submitProfileSetup;
+
+    function showEditProfile() {
+        const container = document.getElementById('profileContent');
+        sb.from('profiles').select('display_name, handle').eq('id', currentUser.id).single()
+            .then(({ data }) => {
+                const name = data?.display_name || '';
+                const handle = data?.handle || '';
+                container.innerHTML = `
+                    <div style="max-width:360px;margin:20px auto;text-align:left;">
+                        <button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;margin-bottom:12px;">&larr; Back</button>
+                        <h3 style="margin:0 0 16px;">Edit Profile</h3>
+                        <div style="margin-bottom:16px;">
+                            <label style="font-size:0.8rem;font-weight:600;color:#756e5c;">Display Name</label>
+                            <input id="editDisplayName" type="text" value="${name}" maxlength="40" style="width:100%;padding:10px 12px;border:2px solid #d9cfb6;border-radius:5px;font-size:1rem;margin-top:4px;background:#fefcf7;">
+                        </div>
+                        <div style="margin-bottom:16px;">
+                            <label style="font-size:0.8rem;font-weight:600;color:#756e5c;">Username</label>
+                            <div style="padding:10px 12px;border:2px solid #d9cfb6;border-radius:5px;margin-top:4px;background:#eee9db;color:#756e5c;">@${handle}</div>
+                            <div style="font-size:0.75rem;color:#756e5c;margin-top:4px;">Username cannot be changed.</div>
+                        </div>
+                        <div id="editError" style="color:#ff3b30;font-size:0.85rem;margin-bottom:8px;display:none;"></div>
+                        <button onclick="submitEditProfile()" style="width:100%;padding:14px;background:#9370db;color:white;border:2px solid #1a1714;border-radius:5px;font-size:1rem;font-weight:700;cursor:pointer;box-shadow:3px 3px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #1a1714'">Save</button>
+                    </div>
+                `;
+            });
+    }
+    window.showEditProfile = showEditProfile;
+
+    async function submitEditProfile() {
+        const displayName = document.getElementById('editDisplayName').value.trim();
+        const errorEl = document.getElementById('editError');
+        errorEl.style.display = 'none';
+        if (!displayName) {
+            errorEl.textContent = 'Display name cannot be empty.';
+            errorEl.style.display = 'block';
+            return;
+        }
+        try {
+            const { error } = await sb.from('profiles')
+                .update({ display_name: displayName })
+                .eq('id', currentUser.id);
+            if (error) throw error;
+            document.getElementById('userName').textContent = displayName;
+            updateProfileTab();
+        } catch (e) {
+            errorEl.textContent = e.message || 'Error saving.';
+            errorEl.style.display = 'block';
+        }
+    }
+    window.submitEditProfile = submitEditProfile;
 
     async function loadProfileStats(forceRefresh) {
         if (!currentUser) return;
@@ -652,12 +765,15 @@
                 .eq('id', currentUser.id)
                 .single()
                 .then(({ data: profile, error }) => {
-                    console.log('Profile loaded:', profile, error);
                     if (profile) {
                         const name = profile.display_name || currentUser.email || 'Player';
                         const handle = profile.handle || '';
                         document.getElementById('userName').textContent = name;
-                        renderProfile(container, name, handle);
+                        if (!handle) {
+                            renderProfileSetup(container, name);
+                        } else {
+                            renderProfile(container, name, handle);
+                        }
                     }
                 })
                 .catch(e => console.error('Profile load error:', e));
@@ -985,13 +1101,13 @@
             btn.style.color = '#9ca3af';
             btn.style.cursor = 'pointer';
             btn.disabled = false;
-            btn.onclick = () => signInWithApple();
+            btn.onclick = () => switchTab('profile');
             practiceBtn.textContent = 'Sign in to Practice';
             practiceBtn.style.background = '#e5e7eb';
             practiceBtn.style.color = '#9ca3af';
             practiceBtn.style.cursor = 'pointer';
             practiceBtn.disabled = false;
-            practiceBtn.onclick = () => signInWithApple();
+            practiceBtn.onclick = () => switchTab('profile');
             practiceSettingsBtn.style.display = 'none';
             return;
         }
