@@ -2697,14 +2697,12 @@
         document.getElementById('practiceSettingsBtn').style.display = '';
         window.onbeforeunload = null;
 
-        if (currentUser) {
-            if (gameMode === 'daily') {
-                saveScore(computedSec, solvedCount, skipCount);
-            } else if (gameMode === 'h2h_challenge' && currentH2HRunId) {
-                saveChallengeResult(computedSec, solvedCount, skipCount);
-            } else if (gameMode === 'practice') {
-                submitPracticePlateStats();
-            }
+        if (gameMode === 'daily' && currentUser) {
+            saveScore(computedSec, solvedCount, skipCount);
+        } else if (gameMode === 'h2h_challenge' && currentUser && currentH2HRunId) {
+            saveChallengeResult(computedSec, solvedCount, skipCount);
+        } else if (gameMode === 'practice') {
+            submitPracticePlateStats();
         }
     }
 
