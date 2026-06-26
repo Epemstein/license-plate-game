@@ -129,9 +129,9 @@
 
             let timeHtml;
             if (userHasPlayed || isPastDate) {
-                timeHtml = `<span class="lb-time">${s.totalTime.toFixed(2)}s</span>`;
+                timeHtml = `<span class="lb-time">${s.totalTime.toFixed(2)}</span>`;
             } else {
-                timeHtml = `<span class="lb-time blurred-score">${s.totalTime.toFixed(2)}s</span>`;
+                timeHtml = `<span class="lb-time blurred-score">${s.totalTime.toFixed(2)}</span>`;
             }
 
             let clickAttr = '';
@@ -365,7 +365,7 @@
             if (data) {
                 stats.dailies = data.length;
                 if (data.length > 0) {
-                    stats.avgTime = (data.reduce((s, r) => s + r.total_seconds, 0) / data.length).toFixed(2) + 's';
+                    stats.avgTime = (data.reduce((s, r) => s + r.total_seconds, 0) / data.length).toFixed(2);
                 }
             }
         } catch(e) {}
@@ -474,7 +474,7 @@
                         ? `<span style="font-size:0.8rem;font-weight:600;color:${xtDelta >= 0 ? '#14a06b' : '#ff3b30'};">(${xtDelta >= 0 ? '+' : ''}${xtDelta.toFixed(1)})</span>`
                         : '';
                     html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #d9cfb6;">
-                        <div><span style="font-weight:600;">${r.total_seconds.toFixed(1)}s</span> ${xtHtml} <span style="font-size:0.8rem;color:#756e5c;margin-left:6px;">${r.plates_solved}/${r.plates_seen} · D${r.difficulty || 0}</span></div>
+                        <div><span style="font-weight:600;">${r.total_seconds.toFixed(1)}</span> ${xtHtml} <span style="font-size:0.8rem;color:#756e5c;margin-left:6px;">${r.plates_solved}/${r.plates_seen} · D${r.difficulty || 0}</span></div>
                         <span style="font-size:0.8rem;color:#756e5c;">${dateStr}</span>
                     </div>`;
                 });
@@ -502,8 +502,8 @@
             html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Daily Challenge</div>';
             html += '<div class="stats-section-box">';
             html += statsRow('Games Played', s.daily_games || '--');
-            html += statsRow('Best Time', s.daily_best_time ? s.daily_best_time.toFixed(1) + 's' : '--');
-            html += statsRow('Avg Time', s.daily_avg_time ? s.daily_avg_time.toFixed(1) + 's' : '--');
+            html += statsRow('Best Time', s.daily_best_time ? s.daily_best_time.toFixed(1) : '--');
+            html += statsRow('Avg Time', s.daily_avg_time ? s.daily_avg_time.toFixed(1) : '--');
             html += statsRow('Skip Rate', s.daily_skip_rate != null ? s.daily_skip_rate + '%' : '--');
             html += statsRow('Current Streak', s.daily_current_streak || '--');
             html += statsRow('Longest Streak', s.daily_longest_streak || '--');
@@ -513,7 +513,7 @@
             html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Head to Head</div>';
             html += '<div class="stats-section-box">';
             html += statsRow('Record', (s.h2h_wins || 0) + 'W - ' + (s.h2h_losses || 0) + 'L');
-            html += statsRow('Best Time', s.h2h_best_time ? s.h2h_best_time.toFixed(1) + 's' : '--');
+            html += statsRow('Best Time', s.h2h_best_time ? s.h2h_best_time.toFixed(1) : '--');
             html += statsRow('Skip Rate', s.h2h_skip_rate != null ? s.h2h_skip_rate + '%' : '--');
             html += '</div>';
 
@@ -521,7 +521,7 @@
             html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Practice</div>';
             html += '<div class="stats-section-box">';
             html += statsRow('Games', s.practice_games || '--');
-            html += statsRow('Fastest Run', s.practice_fastest_run ? s.practice_fastest_run.toFixed(1) + 's' : '--');
+            html += statsRow('Fastest Run', s.practice_fastest_run ? s.practice_fastest_run.toFixed(1) : '--');
             html += statsRow('Skip Rate', s.practice_skip_rate != null ? s.practice_skip_rate + '%' : '--');
             html += '</div>';
 
@@ -552,19 +552,19 @@
             // Records
             html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Records</div>';
             html += '<div class="stats-section-box">';
-            html += statsRow('Fastest Run', r.fastest_run?.total_seconds ? r.fastest_run.total_seconds.toFixed(1) + 's — ' + (r.fastest_run.display_name || 'Anonymous') : '--');
-            html += statsRow('Fastest Word', r.fastest_word?.thinking_seconds ? r.fastest_word.thinking_seconds.toFixed(2) + 's "' + r.fastest_word.word + '" — ' + (r.fastest_word.display_name || 'Anonymous') : '--');
+            html += statsRow('Fastest Run', r.fastest_run?.total_seconds ? r.fastest_run.total_seconds.toFixed(1) + ' — ' + (r.fastest_run.display_name || 'Anonymous') : '--');
+            html += statsRow('Fastest Word', r.fastest_word?.thinking_seconds ? r.fastest_word.thinking_seconds.toFixed(2) + ' "' + r.fastest_word.word + '" — ' + (r.fastest_word.display_name || 'Anonymous') : '--');
             html += statsRow('Longest Streak', r.longest_streak?.streak ? r.longest_streak.streak + ' days — ' + (r.longest_streak.display_name || 'Anonymous') : '--');
             html += statsRow('Hardest Solve', r.hardest_solve?.skip_pct ? r.hardest_solve.skip_pct + '% skip "' + r.hardest_solve.word + '" — ' + (r.hardest_solve.display_name || 'Anonymous') : '--');
-            html += statsRow('Reigning Champ', r.reigning_champ?.total_seconds ? r.reigning_champ.total_seconds.toFixed(1) + 's — ' + (r.reigning_champ.display_name || 'Anonymous') : '--');
+            html += statsRow('Reigning Champ', r.reigning_champ?.total_seconds ? r.reigning_champ.total_seconds.toFixed(1) + ' — ' + (r.reigning_champ.display_name || 'Anonymous') : '--');
             html += '</div>';
 
             // Averages
             html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Averages</div>';
             html += '<div class="stats-section-box">';
-            html += statsRow('Run Time', r.mean_run_time.toFixed(1) + 's / ' + r.median_run_time.toFixed(1) + 's', 'mean / median');
-            html += statsRow('Solve Time', r.mean_solve_time.toFixed(1) + 's / ' + r.median_solve_time.toFixed(1) + 's', 'mean / median');
-            html += statsRow('Skip Time', r.mean_skip_time.toFixed(1) + 's / ' + r.median_skip_time.toFixed(1) + 's', 'mean / median');
+            html += statsRow('Run Time', r.mean_run_time.toFixed(1) + ' / ' + r.median_run_time.toFixed(1), 'mean / median');
+            html += statsRow('Solve Time', r.mean_solve_time.toFixed(1) + ' / ' + r.median_solve_time.toFixed(1), 'mean / median');
+            html += statsRow('Skip Time', r.mean_skip_time.toFixed(1) + ' / ' + r.median_skip_time.toFixed(1), 'mean / median');
             html += statsRow('Skip Rate', r.avg_skip_pct.toFixed(1) + '%');
             html += '</div>';
 
@@ -1138,7 +1138,7 @@
         practiceSettingsBtn.style.display = '';
         const played = await checkIfPlayedToday();
         if (played && todaysDailyTime) {
-            btn.textContent = `Daily Challenge: ${todaysDailyTime.toFixed(2)}s`;
+            btn.textContent = `Daily Challenge: ${todaysDailyTime.toFixed(2)}`;
             btn.style.background = '#e5e7eb';
             btn.style.color = '#9ca3af';
             btn.style.cursor = 'not-allowed';
@@ -1611,7 +1611,7 @@
                 const bg = idx % 2 === 0 ? '#fff' : '#f9fafb';
 
                 html += `<tr style="background:${bg};">`;
-                html += `<td style="padding:12px;font-weight:bold;position:sticky;left:0;background:${bg};z-index:5;white-space:nowrap;">${player.name}<br><span style="font-size:0.85rem;color:#6b7280;">(${player.time.toFixed(2)}s)</span></td>`;
+                html += `<td style="padding:12px;font-weight:bold;position:sticky;left:0;background:${bg};z-index:5;white-space:nowrap;">${player.name}<br><span style="font-size:0.85rem;color:#6b7280;">(${player.time.toFixed(2)})</span></td>`;
 
                 for (let i = 0; i < maxPlates; i++) {
                     if (i < player.history.length) {
@@ -1622,14 +1622,14 @@
                             ? (entry.thinkingSeconds || 0) + entry.penaltySeconds
                             : entry.thinkingSeconds;
 
-                        const displayTime = `${totalTime.toFixed(2)}s`;
+                        const displayTime = `${totalTime.toFixed(2)}`;
 
                         const bgColor = entry.skipped ? '#000000' : getTimeColor(totalTime);
                         const textColor = entry.skipped ? '#ffffff' : (totalTime > 15 ? '#fff' : '#000');
 
                         const tooltip = entry.skipped
-                            ? `Skipped\nThinking: ${(entry.thinkingSeconds || 0).toFixed(2)}s\nPenalty: +${entry.penaltySeconds}s\nTotal: ${totalTime.toFixed(2)}s`
-                            : `Word: ${entry.word}\nTime: ${totalTime.toFixed(2)}s`;
+                            ? `Skipped\nThinking: ${(entry.thinkingSeconds || 0).toFixed(2)}\nPenalty: +${entry.penaltySeconds}\nTotal: ${totalTime.toFixed(2)}`
+                            : `Word: ${entry.word}\nTime: ${totalTime.toFixed(2)}`;
 
                         html += `<td style="padding:8px;text-align:center;background:${bgColor};color:${textColor};border:2px solid #fff;" title="${tooltip}">`;
                         html += `<div style="font-weight:600;font-size:0.9rem;">${word}</div>`;
@@ -1700,7 +1700,7 @@
                 const myScore = scores.find(s => s.isMe || s.userId === currentUser?.id);
                 if (myScore) {
                     document.getElementById('myRunRow').style.display = 'flex';
-                    document.getElementById('myRunTime').textContent = myScore.totalTime.toFixed(2) + 's';
+                    document.getElementById('myRunTime').textContent = myScore.totalTime.toFixed(2);
                 }
             }
 
@@ -2377,7 +2377,7 @@
             skipButtonEl.textContent = 'Skip';
         } else {
             const nextPenalty = (skipCount + 1) * 5;
-            skipButtonEl.textContent = `Skip +${nextPenalty}s`;
+            skipButtonEl.textContent = `Skip +${nextPenalty}`;
         }
     }
 
@@ -2643,7 +2643,7 @@
         } else if (gameMode === 'practice' && !practiceTimed) {
             timerDisplayEl.textContent = "UNTIMED";
         } else {
-            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(2) + " s";
+            timerDisplayEl.textContent = "Time: " + totalSec.toFixed(2);
         }
 
         // H2H timeout removed — handled server-side
@@ -3204,7 +3204,7 @@
                     bkHtml += `<td style="padding:4px 6px;color:#9ca3af;">${i + 1}</td>`;
                     bkHtml += `<td style="padding:4px 6px;font-weight:600;font-family:monospace;">${b.plate}${isProrated ? ' <span style="font-size:0.7rem;color:#9ca3af;font-weight:400;">(' + Math.round(b.fraction * 100) + '%)</span>' : ''}</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;color:#9ca3af;">${b.plays}</td>`;
-                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}s</td>`;
+                    bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;">${Math.round(b.skipRate * 100)}%</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSolves.toFixed(2)}</td>`;
                     bkHtml += `<td style="padding:4px 6px;text-align:right;">${b.cumulSkips.toFixed(2)}</td>`;
@@ -3212,7 +3212,7 @@
                 });
                 bkHtml += '</tbody></table>';
                 bkHtml += `<div style="font-size:0.8rem;color:#6b7280;margin-top:6px;padding:6px;background:#f9fafb;border-radius:6px;">`;
-                bkHtml += `Thinking: ${totalThinking.toFixed(1)}s + Penalty: ${penalty.toFixed(1)}s (${skips.toFixed(1)} skips) = <strong>${expectedTime.toFixed(1)}s</strong>`;
+                bkHtml += `Thinking: ${totalThinking.toFixed(1)} + Penalty: ${penalty.toFixed(1)} (${skips.toFixed(1)} skips) = <strong>${expectedTime.toFixed(1)}</strong>`;
                 bkHtml += `</div></div>`;
 
                 el.innerHTML = `The expected time for this practice round was <a href="#" onclick="event.preventDefault();document.getElementById('expectedBreakdown').style.display=document.getElementById('expectedBreakdown').style.display==='none'?'block':'none';" style="font-weight:700;color:#2563eb;text-decoration:underline;">${expectedTime.toFixed(1)} seconds</a>.
@@ -3368,7 +3368,7 @@
                             label: function(context) {
                                 const label = context.dataset.label || "";
                                 const value = context.parsed.y;
-                                return `${label}: ${value.toFixed(2)}s`;
+                                return `${label}: ${value.toFixed(2)}`;
                             }
                         }
                     }
@@ -3476,7 +3476,7 @@
         let thinkingSeconds = 0;
         if (plateStartTime != null) {
             thinkingSeconds = (performance.now() - plateStartTime) / 1000;
-            timeLabel = `${thinkingSeconds.toFixed(2)}s`;
+            timeLabel = `${thinkingSeconds.toFixed(2)}`;
         }
 
         gameHistory.push({
@@ -3531,7 +3531,7 @@
         const added = skipCount * 5;
         penaltySeconds += added;
 
-        resultEl.textContent = `Skipped ${currentPlate}. +${added}s penalty.`;
+        resultEl.textContent = `Skipped ${currentPlate}. +${added} penalty.`;
         resultEl.style.color = "orange";
         playSFX('skip');
 
@@ -3544,7 +3544,7 @@
         let thinkingSeconds = 0;
         if (plateStartTime != null) {
             thinkingSeconds = (performance.now() - plateStartTime) / 1000;
-            timeLabel = `${thinkingSeconds.toFixed(2)}s (+${added}s)`;
+            timeLabel = `${thinkingSeconds.toFixed(2)} (+${added})`;
         }
 
         gameHistory.push({
@@ -3668,11 +3668,11 @@
             // Stats card
             let html = '<div style="background:#f9fafb;border-radius:12px;padding:16px;margin-bottom:20px;">';
             html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
-            html += `<span>Total time</span><span style="font-weight:600;color:#16a34a;">${data.totalTime.toFixed(2)}s${percentile ? '  (Top ' + Math.max(1, Math.round(100 - percentile)) + '%)' : ''}</span>`;
+            html += `<span>Total time</span><span style="font-weight:600;color:#16a34a;">${data.totalTime.toFixed(2)}${percentile ? '  (Top ' + Math.max(1, Math.round(100 - percentile)) + '%)' : ''}</span>`;
             html += `</div>`;
             if (median) {
                 html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
-                html += `<span>Median time</span><span style="color:#6b7280;">${parseFloat(median).toFixed(2)}s</span>`;
+                html += `<span>Median time</span><span style="color:#6b7280;">${parseFloat(median).toFixed(2)}</span>`;
                 html += `</div>`;
             }
             if (rank && totalPlayers) {
@@ -3699,11 +3699,11 @@
 
                 if (entry.skipped) {
                     html += `<span style="flex:1;color:#ef4444;font-weight:500;">skipped</span>`;
-                    html += `<span style="color:#ef4444;font-weight:600;">${entry.thinkingSeconds.toFixed(2)}s</span>`;
-                    html += `<span style="color:#ef4444;margin-left:4px;">(+${entry.penaltySeconds}s)</span>`;
+                    html += `<span style="color:#ef4444;font-weight:600;">${entry.thinkingSeconds.toFixed(2)}</span>`;
+                    html += `<span style="color:#ef4444;margin-left:4px;">(+${entry.penaltySeconds})</span>`;
                 } else {
                     html += `<span style="flex:1;color:${textColor};font-weight:500;">${entry.word || ''}</span>`;
-                    html += `<span style="color:${textColor};font-weight:600;">${time.toFixed(2)}s</span>`;
+                    html += `<span style="color:${textColor};font-weight:600;">${time.toFixed(2)}</span>`;
                 }
 
                 html += `<span style="margin-left:8px;color:${entry.skipped ? '#ef4444' : '#9ca3af'};">&#8250;</span>`;
@@ -3894,16 +3894,16 @@
         let headerHtml = '';
         // Show what the current user played
         if (wordsModalMySkipped) {
-            headerHtml += `<span style="color:#6b7280;">You skipped: </span><strong style="color:#ef4444;">${wordsModalMyTime.toFixed(2)}s (+${wordsModalMyPenalty}s)</strong>`;
+            headerHtml += `<span style="color:#6b7280;">You skipped: </span><strong style="color:#ef4444;">${wordsModalMyTime.toFixed(2)} (+${wordsModalMyPenalty})</strong>`;
         } else if (wordsModalMyWord === '__not_played__') {
             headerHtml += `<span style="color:#6b7280;">You finished before this plate</span>`;
         } else if (wordsModalMyWord) {
-            headerHtml += `<span style="color:#6b7280;">You played: </span><strong>${wordsModalMyWord}</strong> <span style="color:#6b7280;">(${wordsModalMyTime.toFixed(2)}s)</span>`;
+            headerHtml += `<span style="color:#6b7280;">You played: </span><strong>${wordsModalMyWord}</strong> <span style="color:#6b7280;">(${wordsModalMyTime.toFixed(2)})</span>`;
         }
         if (wordsModalAvgTime > 0) {
             if (headerHtml) headerHtml += '<br>';
             headerHtml += `<span style="color:#6b7280;">Skip: ${wordsModalSkipPct}%</span>`;
-            headerHtml += `<span style="color:#6b7280;margin-left:16px;">Avg: ${wordsModalAvgTime.toFixed(2)}s</span>`;
+            headerHtml += `<span style="color:#6b7280;margin-left:16px;">Avg: ${wordsModalAvgTime.toFixed(2)}</span>`;
         }
         statusEl.innerHTML = headerHtml;
     }
@@ -3975,8 +3975,8 @@
                         entry.users.sort((a, b) => a.time - b.time).forEach(u => {
                             const isMe = currentUser && u.userId === currentUser.id;
                             const nameStyle = isMe ? 'color:#9370db;font-weight:600;' : 'color:#374151;';
-                            let timeDisplay = u.time.toFixed(2) + 's';
-                            if (u.skipped && u.penalty) timeDisplay = `${u.time.toFixed(2)}s (+${u.penalty}s)`;
+                            let timeDisplay = u.time.toFixed(2);
+                            if (u.skipped && u.penalty) timeDisplay = `${u.time.toFixed(2)} (+${u.penalty})`;
                             html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.9rem;">`;
                             html += `<span style="${nameStyle}">${u.name}</span>`;
                             html += `<span style="color:#6b7280;">${timeDisplay}</span>`;
@@ -4782,8 +4782,8 @@
                 const myRun = ch._runs && ch._runs[currentUser.id];
                 const oppId = isChallenger ? ch.opponent_id : ch.challenger_id;
                 const oppRun = ch._runs && ch._runs[oppId];
-                const myScore = myRun && myRun.forfeited ? 'Forfeit' : (myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(1) + 's' : (myRun ? 'In progress' : 'Not played'));
-                const oppScore = oppRun && oppRun.forfeited ? 'Forfeit' : (oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(1) + 's' : '—');
+                const myScore = myRun && myRun.forfeited ? 'Forfeit' : (myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(1) : (myRun ? 'In progress' : 'Not played'));
+                const oppScore = oppRun && oppRun.forfeited ? 'Forfeit' : (oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(1) : '—');
 
                 const canPlay = (!myRun || (myRun && myRun.totalSeconds == null)) && ch.status === 'accepted';
                 const statusLabel = ch.status === 'pending' ? 'Waiting for response' : (canPlay ? 'Tap to play' : 'Waiting for opponent');
@@ -4828,8 +4828,8 @@
                     else { resultLabel = 'Tie'; resultBg = '#fefce8'; resultBorder = '#fde68a'; }
                 }
 
-                const myDisplay = myForfeit ? 'Forfeit' : (myTime !== null ? myTime.toFixed(1) + 's' : '--');
-                const oppDisplay = oppForfeit ? 'Forfeit' : (oppTime !== null ? oppTime.toFixed(1) + 's' : '--');
+                const myDisplay = myForfeit ? 'Forfeit' : (myTime !== null ? myTime.toFixed(1) : '--');
+                const oppDisplay = oppForfeit ? 'Forfeit' : (oppTime !== null ? oppTime.toFixed(1) : '--');
                 const myColor = resultLabel === 'Win' ? '#16a34a' : resultLabel === 'Loss' ? '#dc2626' : '#374151';
                 const oppColor = resultLabel === 'Loss' ? '#16a34a' : resultLabel === 'Win' ? '#dc2626' : '#374151';
 
@@ -5820,7 +5820,7 @@
         html += '<div class="stats-section-label">Stats</div>';
         html += '<div class="stats-section-box">';
         html += statsRow('Daily Challenges', s.daily_games ?? 0);
-        html += statsRow('Avg Time', s.daily_avg_time != null ? s.daily_avg_time.toFixed(1) + ' seconds' : '--');
+        html += statsRow('Avg Time', s.daily_avg_time != null ? s.daily_avg_time.toFixed(1) : '--');
         html += statsRow('Beat', s.daily_beat_pct != null ? (s.daily_beat_pct * 100).toFixed(1) + '%' : '--');
         html += statsRow('Overall', s.daily_overall_pct != null ? 'Top ' + (100 - s.daily_overall_pct).toFixed(1) + '%' : '--');
         html += statsRow('Current Streak', s.daily_current_streak ?? 0);
@@ -5832,7 +5832,7 @@
         html += '<div class="stats-section-box">';
         html += statsRow('Best Finish (Rank)', finishStr(s.daily_best_finish_rank, s.daily_best_finish_total), formatStatsDate(s.daily_best_finish_date));
         html += statsRow('Best Finish (Percentile)', finishStr(s.daily_best_pct_rank, s.daily_best_pct_total), formatStatsDate(s.daily_best_pct_date));
-        html += statsRow('Best Time', s.daily_best_time != null ? s.daily_best_time.toFixed(1) + ' seconds' : '--', formatStatsDate(s.daily_best_date));
+        html += statsRow('Best Time', s.daily_best_time != null ? s.daily_best_time.toFixed(1) : '--', formatStatsDate(s.daily_best_date));
         const fpD = s.daily_fastest_plate && s.daily_fastest_time != null ? `[${s.daily_fastest_plate}] ${s.daily_fastest_time.toFixed(2)} seconds` : '--';
         html += statsRow('Fastest Plate', fpD, [s.daily_fastest_word ? s.daily_fastest_word.charAt(0).toUpperCase() + s.daily_fastest_word.slice(1) : '', formatStatsDate(s.daily_fastest_date)].filter(Boolean).join(' — '));
         const hpD = s.daily_hardest_plate && s.daily_hardest_pct != null ? `[${s.daily_hardest_plate}] ${s.daily_hardest_pct}% skipped` : '--';
@@ -5859,7 +5859,7 @@
 
         html += '<div class="stats-section-label">Personal Bests</div>';
         html += '<div class="stats-section-box">';
-        html += statsRow('Best Time', s.h2h_best_time != null ? s.h2h_best_time.toFixed(1) + ' seconds' : '--',
+        html += statsRow('Best Time', s.h2h_best_time != null ? s.h2h_best_time.toFixed(1) : '--',
             [formatStatsDate(s.h2h_best_date), s.h2h_best_opponent ? 'vs ' + s.h2h_best_opponent : ''].filter(Boolean).join(' — '));
         const fpH = s.h2h_fastest_plate && s.h2h_fastest_time != null ? `[${s.h2h_fastest_plate}] ${s.h2h_fastest_time.toFixed(2)} seconds` : '--';
         html += statsRow('Fastest Plate', fpH,
@@ -5884,7 +5884,7 @@
 
         html += '<div class="stats-section-label">Personal Bests</div>';
         html += '<div class="stats-section-box">';
-        html += statsRow('Fastest Run', s.practice_fastest_run != null ? s.practice_fastest_run.toFixed(1) + ' seconds' : '--');
+        html += statsRow('Fastest Run', s.practice_fastest_run != null ? s.practice_fastest_run.toFixed(1) : '--');
         const fpP = s.practice_fastest_plate && s.practice_fastest_time != null ? `[${s.practice_fastest_plate}] ${s.practice_fastest_time.toFixed(2)} seconds` : '--';
         html += statsRow('Fastest Plate', fpP, s.practice_fastest_word ? s.practice_fastest_word.charAt(0).toUpperCase() + s.practice_fastest_word.slice(1) : '');
         html += '</div>';
@@ -5950,7 +5950,7 @@
 
                 // Your word from current game
                 const myEntry = gameHistory[i];
-                const yourWordStr = myEntry ? (myEntry.skipped ? `❌ (${myEntry.thinkingSeconds.toFixed(1)}s)` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)}s)`) : '--';
+                const yourWordStr = myEntry ? (myEntry.skipped ? `❌ (${myEntry.thinkingSeconds.toFixed(1)})` : `${myEntry.word} (${myEntry.thinkingSeconds.toFixed(1)})`) : '--';
 
                 // Row color
                 const t = Math.min(Math.max(skipPct, 0), 100) / 100;
@@ -6024,7 +6024,7 @@
             html += `<td style="padding:4px 6px;color:#9ca3af;">${i + 1}</td>`;
             html += `<td style="padding:4px 6px;font-weight:600;font-family:monospace;">${b.plate}${isProrated ? ' <span style="font-size:0.7rem;color:#9ca3af;font-weight:400;">(' + Math.round(b.fraction * 100) + '%)</span>' : ''}</td>`;
             html += `<td style="padding:4px 6px;text-align:right;color:#9ca3af;">${b.plays}</td>`;
-            html += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}s</td>`;
+            html += `<td style="padding:4px 6px;text-align:right;">${b.medianThink.toFixed(1)}</td>`;
             html += `<td style="padding:4px 6px;text-align:right;">${Math.round(b.skipRate * 100)}%</td>`;
             html += `<td style="padding:4px 6px;text-align:right;">${b.cumulSolves.toFixed(2)}</td>`;
             html += `<td style="padding:4px 6px;text-align:right;">${b.cumulSkips.toFixed(2)}</td>`;
@@ -6032,7 +6032,7 @@
         });
         html += '</tbody></table>';
         html += `<div style="font-size:0.8rem;color:#6b7280;margin-top:8px;padding:6px;background:#f9fafb;border-radius:6px;">`;
-        html += `Thinking: ${d.totalThinking.toFixed(1)}s + Penalty: ${d.penalty.toFixed(1)}s (${d.skips.toFixed(1)} skips) = <strong>${d.expectedTime.toFixed(1)}s</strong>`;
+        html += `Thinking: ${d.totalThinking.toFixed(1)} + Penalty: ${d.penalty.toFixed(1)} (${d.skips.toFixed(1)} skips) = <strong>${d.expectedTime.toFixed(1)}</strong>`;
         html += `</div>`;
 
         content.innerHTML = html;
