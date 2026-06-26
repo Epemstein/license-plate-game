@@ -1,6 +1,22 @@
 
     // === TAB SWITCHING ===
+    // Restore tab from URL hash on load
+    const validTabs = ['game', 'leaderboard', 'challenges', 'profile', 'feedback'];
+    const hashTab = window.location.hash.replace('#', '');
+    if (validTabs.includes(hashTab)) {
+        // Defer to after DOM is ready — switchTab runs below
+        setTimeout(() => switchTab(hashTab), 0);
+    }
+    window.addEventListener('hashchange', () => {
+        const t = window.location.hash.replace('#', '');
+        if (validTabs.includes(t)) switchTab(t);
+    });
+
     function switchTab(tabName) {
+        // Update URL hash without triggering hashchange loop
+        if (window.location.hash !== '#' + tabName) {
+            history.replaceState(null, '', '#' + tabName);
+        }
         // Hide all tabs
         document.getElementById('gameTab').classList.remove('active');
         document.getElementById('leaderboardTab').classList.remove('active');
