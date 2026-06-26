@@ -74,8 +74,16 @@
         leaderboardFilter = filter;
         document.getElementById('lbGlobalBtn').classList.toggle('active', filter === 'global');
         document.getElementById('lbFriendsBtn').classList.toggle('active', filter === 'friends');
-        // Re-render from cached scores (no refetch, no button flash)
-        if (cachedScores.length) renderLeaderboardRows(cachedScores);
+        // Refetch scores but only re-render the rows (not buttons above)
+        const dateStr = currentViewingDate || getTodayString();
+        (async () => {
+            const oldIds = previousLeaderboardIds;
+            const scores = await loadLeaderboard(dateStr);
+            if (scores.length) {
+                cachedScores = scores;
+                renderLeaderboardRows(scores, oldIds);
+            }
+        })();
     }
     window.setLeaderboardFilter = setLeaderboardFilter;
 
