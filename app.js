@@ -4637,7 +4637,7 @@
     async function loadH2HChallenges() {
         const contentEl = document.getElementById('challengesContent');
         if (!currentUser) {
-            contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:40px 0;">Sign in to view challenges</p>';
+            contentEl.innerHTML = '<div style="text-align:center;padding:40px 0;"><p style="color:#756e5c;margin-bottom:16px;">Sign in to view challenges</p><button onclick="switchTab(\'profile\')" style="padding:10px 24px;background:#9370db;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:700;cursor:pointer;box-shadow:3px 3px 0 #1a1714;">Sign In</button></div>';
             return;
         }
         contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
@@ -4745,7 +4745,7 @@
     function renderChallengesList() {
         const contentEl = document.getElementById('challengesContent');
         if (!currentUser) {
-            contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:40px 0;">Sign in to view challenges</p>';
+            contentEl.innerHTML = '<div style="text-align:center;padding:40px 0;"><p style="color:#756e5c;margin-bottom:16px;">Sign in to view challenges</p><button onclick="switchTab(\'profile\')" style="padding:10px 24px;background:#9370db;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:700;cursor:pointer;box-shadow:3px 3px 0 #1a1714;">Sign In</button></div>';
             return;
         }
 
@@ -4871,6 +4871,60 @@
     }
 
     // === H2H Leaderboard ===
+    function renderH2HTable(data, myId, limit) {
+        const shown = data.slice(0, limit);
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">';
+        html += '<thead><tr style="font-size:0.7rem;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #d9cfb6;">';
+        html += '<th style="padding:6px 8px;text-align:center;width:28px;">#</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Player</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Elo</th>';
+        html += '<th style="padding:6px 8px;text-align:right;">W</th>';
+        html += '<th style="padding:6px 8px;text-align:right;">L</th>';
+        html += '<th style="padding:6px 8px;text-align:right;">PCT</th>';
+        html += '</tr></thead><tbody>';
+
+        shown.forEach((r, i) => {
+            const isMe = r.id === myId;
+            const total = r.wins + r.losses;
+            const pct = total > 0 ? Math.round(r.wins / total * 100) : 0;
+            const todayStr = r.today > 0 ? `<span style="color:#16a34a;font-size:0.75rem;margin-left:3px;">(+${r.today})</span>`
+                : r.today < 0 ? `<span style="color:#dc2626;font-size:0.75rem;margin-left:3px;">(${r.today})</span>` : '';
+            const bg = isMe ? 'background:rgba(124,58,237,0.05);' : '';
+            const bold = isMe ? 'font-weight:700;' : '';
+
+            html += `<tr style="${bg}border-bottom:1px solid #eee9db;">`;
+            html += `<td style="padding:8px;text-align:center;color:#756e5c;font-size:0.8rem;">${i + 1}</td>`;
+            const nameContent = r.anonymous || isMe
+                ? `<span style="color:${r.anonymous ? '#9ca3af' : 'inherit'};">${r.anonymous ? 'Anonymous' : r.name}</span>`
+                : `<span style="color:#7c3aed;cursor:pointer;" onclick="event.stopPropagation();preselectedChallengeUserId='${r.id}';preselectedChallengeUserName='${r.name.replace(/'/g,"\\'")}';openNewChallengeModal()">${r.name}</span>`;
+            html += `<td style="padding:8px;${bold}max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nameContent}</td>`;
+            html += `<td style="padding:8px;font-weight:700;font-variant-numeric:tabular-nums;">${r.elo.toLocaleString()}${todayStr}</td>`;
+            html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.wins}</td>`;
+            html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.losses}</td>`;
+            html += `<td style="padding:8px;text-align:right;color:#756e5c;font-variant-numeric:tabular-nums;">${pct}%</td>`;
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        if (limit < data.length) {
+            html += `<div style="text-align:center;margin-top:12px;"><button onclick="showMoreH2HRankings()" style="padding:8px 20px;background:#eee9db;color:#4a4338;border:2px solid #d9cfb6;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:none;">Show 10 More</button></div>`;
+        }
+        return html;
+    }
+
+    function showMoreH2HRankings() {
+        window._h2hRankingsShown = (window._h2hRankingsShown || 10) + 10;
+        const data = window._h2hRankingsData || [];
+        const myId = currentUser?.id;
+        // Rebuild just the table portion (keep stats card)
+        const contentEl = document.getElementById('challengesContent');
+        const tableStart = contentEl.innerHTML.indexOf('<table');
+        if (tableStart >= 0) {
+            contentEl.innerHTML = contentEl.innerHTML.substring(0, tableStart) + renderH2HTable(data, myId, window._h2hRankingsShown);
+        }
+    }
+    window.showMoreH2HRankings = showMoreH2HRankings;
+
     async function renderH2HLeaderboard() {
         const contentEl = document.getElementById('challengesContent');
         contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:40px 0;">Loading rankings...</p>';
@@ -4908,39 +4962,9 @@
                 html += `</div>`;
             }
 
-            html += '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">';
-            html += '<thead><tr style="font-size:0.7rem;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">';
-            html += '<th style="padding:6px 8px;text-align:center;width:28px;">#</th>';
-            html += '<th style="padding:6px 8px;text-align:left;">Player</th>';
-            html += '<th style="padding:6px 8px;text-align:left;">Elo</th>';
-            html += '<th style="padding:6px 8px;text-align:right;">W</th>';
-            html += '<th style="padding:6px 8px;text-align:right;">L</th>';
-            html += '<th style="padding:6px 8px;text-align:right;">PCT</th>';
-            html += '</tr></thead><tbody>';
-
-            data.forEach((r, i) => {
-                const isMe = r.id === myId;
-                const total = r.wins + r.losses;
-                const pct = total > 0 ? Math.round(r.wins / total * 100) : 0;
-                const todayStr = r.today > 0 ? `<span style="color:#16a34a;font-size:0.75rem;margin-left:3px;">(+${r.today})</span>`
-                    : r.today < 0 ? `<span style="color:#dc2626;font-size:0.75rem;margin-left:3px;">(${r.today})</span>` : '';
-                const bg = isMe ? 'background:rgba(124,58,237,0.05);' : '';
-                const bold = isMe ? 'font-weight:700;' : '';
-
-                html += `<tr style="${bg}border-bottom:1px solid #f3f4f6;">`;
-                html += `<td style="padding:8px;text-align:center;color:#9ca3af;font-size:0.8rem;">${i + 1}</td>`;
-                const nameContent = r.anonymous || isMe
-                    ? `<span style="color:${r.anonymous ? '#9ca3af' : 'inherit'};">${r.anonymous ? 'Anonymous' : r.name}</span>`
-                    : `<span style="color:#7c3aed;cursor:pointer;" onclick="event.stopPropagation();preselectedChallengeUserId='${r.id}';preselectedChallengeUserName='${r.name.replace(/'/g,"\\'")}';openNewChallengeModal()">${r.name}</span>`;
-                html += `<td style="padding:8px;${bold}max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nameContent}</td>`;
-                html += `<td style="padding:8px;font-weight:700;font-variant-numeric:tabular-nums;">${r.elo.toLocaleString()}${todayStr}</td>`;
-                html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.wins}</td>`;
-                html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.losses}</td>`;
-                html += `<td style="padding:8px;text-align:right;color:#6b7280;font-variant-numeric:tabular-nums;">${pct}%</td>`;
-                html += '</tr>';
-            });
-
-            html += '</tbody></table>';
+            window._h2hRankingsData = data;
+            window._h2hRankingsShown = 10;
+            html += renderH2HTable(data, myId, 10);
             contentEl.innerHTML = html;
         } catch (e) {
             console.error('[H2H Leaderboard]', e);
