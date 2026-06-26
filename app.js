@@ -69,13 +69,88 @@
         leaderboardFilter = filter;
         document.getElementById('lbGlobalBtn').classList.toggle('active', filter === 'global');
         document.getElementById('lbFriendsBtn').classList.toggle('active', filter === 'friends');
-        // Re-render with current date
-        const v = document.getElementById('leaderboardDatePicker').value;
-        if (v) displayLeaderboard(v);
+        // Re-render from cached scores (no refetch, no button flash)
+        if (cachedScores.length) renderLeaderboardRows(cachedScores);
     }
     window.setLeaderboardFilter = setLeaderboardFilter;
 
     let cachedScores = [];
+    let previousLeaderboardIds = new Set();
+
+    function renderLeaderboardRows(scores, oldIds) {
+        let displayScores = scores;
+        if (leaderboardFilter === 'friends') {
+            displayScores = scores.filter(s => s.isFriend || s.isMe);
+            if (displayScores.length === 0) {
+                document.getElementById('leaderboardContent').innerHTML = '<p style="text-align:center;color:#756e5c;padding:20px;">No friends have played this date</p>';
+                return;
+            }
+        }
+
+        const userHasPlayed = currentUser && scores.some(s => s.userId === currentUser.id || s.isMe);
+        const isPastDate = currentViewingDate !== getTodayString();
+        const newIds = oldIds || new Set();
+
+        let h = '';
+        displayScores.forEach((s, i) => {
+            const rank = i + 1;
+            let rankDisplay;
+            if (rank === 1) rankDisplay = '\uD83E\uDD47';
+            else if (rank === 2) rankDisplay = '\uD83E\uDD48';
+            else if (rank === 3) rankDisplay = '\uD83E\uDD49';
+            else rankDisplay = rank + '.';
+
+            const isMe = s.isMe || (currentUser && s.userId === currentUser.id);
+            const meClass = isMe ? ' is-me' : '';
+            const isNew = newIds.size > 0 && !newIds.has(s.userId);
+            const newClass = isNew ? ' lb-new-arrival' : '';
+
+            const streakHtml = s.streak && s.streak > 1 ? `<span class="lb-streak">\uD83D\uDD25${s.streak}</span>` : '';
+
+            let badgeHtml = '';
+            if (isMe) badgeHtml += '<span class="lb-badge lb-badge-you">You</span>';
+            if (s.isFriend && !isMe) badgeHtml += '<span class="lb-badge lb-badge-friend">Friend</span>';
+
+            let timeHtml;
+            if (userHasPlayed || isPastDate) {
+                timeHtml = `<span class="lb-time">${s.totalTime.toFixed(2)}s</span>`;
+            } else {
+                timeHtml = `<span class="lb-time blurred-score">${s.totalTime.toFixed(2)}s</span>`;
+            }
+
+            let clickAttr = '';
+            if (userHasPlayed || isPastDate) {
+                clickAttr = `onclick="viewPlayerRun('${s.userId}','${currentViewingDate}','${s.userName.replace(/'/g,"\\'")}',${s.totalTime},${Math.round(s.percentile||0)},${s.median||0},${s.totalPlayers||0},${s.rank||0})"`;
+            }
+
+            h += `<div class="lb-row${meClass}${newClass}" ${clickAttr}>`;
+            h += `<div class="lb-rank">${rankDisplay}</div>`;
+            if (s.userName === 'Anonymous') {
+                h += `<div class="lb-name"><span style="color:#9ca3af;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
+            } else {
+                h += `<div class="lb-name"><span onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')" style="cursor:pointer;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
+            }
+            h += timeHtml;
+            if (userHasPlayed || isPastDate) {
+                h += `<div class="lb-chevron">&#8250;</div>`;
+            } else {
+                h += `<div class="lb-locked">\uD83D\uDD12</div>`;
+            }
+            h += `</div>`;
+        });
+
+        document.getElementById('leaderboardContent').innerHTML = h;
+
+        // Track current IDs for next refresh
+        previousLeaderboardIds = new Set(scores.map(s => s.userId));
+
+        // Remove green flash after 5s
+        if (newIds.size > 0) {
+            setTimeout(() => {
+                document.querySelectorAll('.lb-new-arrival').forEach(el => el.classList.remove('lb-new-arrival'));
+            }, 5000);
+        }
+    }
 
     // View my run shortcut
     function viewMyRun() {
@@ -1326,68 +1401,7 @@
             document.getElementById('lbGlobalBtn').textContent = `Global (${scores.length})`;
             document.getElementById('lbFriendsBtn').textContent = `Friends (${friendCount})`;
 
-            // Filter by friends if needed
-            let displayScores = scores;
-            if (leaderboardFilter === 'friends') {
-                displayScores = scores.filter(s => s.isFriend || s.isMe);
-                if (displayScores.length === 0) {
-                    document.getElementById('leaderboardContent').innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">No friends have played this date</p>';
-                    return;
-                }
-            }
-
-            // Build list-style leaderboard
-            let h = '';
-            displayScores.forEach((s, i) => {
-                const rank = i + 1;
-                let rankDisplay;
-                if (rank === 1) rankDisplay = '\uD83E\uDD47';
-                else if (rank === 2) rankDisplay = '\uD83E\uDD48';
-                else if (rank === 3) rankDisplay = '\uD83E\uDD49';
-                else rankDisplay = rank + '.';
-
-                const isMe = s.isMe || (currentUser && s.userId === currentUser.id);
-                const meClass = isMe ? ' is-me' : '';
-
-                // Streak display
-                const streakHtml = s.streak && s.streak > 1 ? `<span class="lb-streak">\uD83D\uDD25${s.streak}</span>` : '';
-
-                // Badges
-                let badgeHtml = '';
-                if (isMe) badgeHtml += '<span class="lb-badge lb-badge-you">You</span>';
-                if (s.isFriend && !isMe) badgeHtml += '<span class="lb-badge lb-badge-friend">Friend</span>';
-
-                // Time display
-                let timeHtml;
-                if (userHasPlayed || isPastDate) {
-                    timeHtml = `<span class="lb-time">${s.totalTime.toFixed(2)}s</span>`;
-                } else {
-                    timeHtml = `<span class="lb-time blurred-score">${s.totalTime.toFixed(2)}s</span>`;
-                }
-
-                // Click handler — store score data for access in viewPlayerRun
-                let clickAttr = '';
-                if (userHasPlayed || isPastDate) {
-                    clickAttr = `onclick="viewPlayerRun('${s.userId}','${dateStr}','${s.userName.replace(/'/g,"\\'")}',${s.totalTime},${Math.round(s.percentile||0)},${s.median||0},${s.totalPlayers||0},${s.rank||0})"`;
-                }
-
-                h += `<div class="lb-row${meClass}" ${clickAttr}>`;
-                h += `<div class="lb-rank">${rankDisplay}</div>`;
-                if (s.userName === 'Anonymous') {
-                    h += `<div class="lb-name"><span style="color:#9ca3af;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
-                } else {
-                    h += `<div class="lb-name"><span onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')" style="cursor:pointer;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
-                }
-                h += timeHtml;
-                if (userHasPlayed || isPastDate) {
-                    h += `<div class="lb-chevron">&#8250;</div>`;
-                } else {
-                    h += `<div class="lb-locked">\uD83D\uDD12</div>`;
-                }
-                h += `</div>`;
-            });
-
-            document.getElementById('leaderboardContent').innerHTML = h;
+            renderLeaderboardRows(scores, previousLeaderboardIds);
 
         } catch(e) {
             console.error('Leaderboard error:', e);
@@ -1401,10 +1415,11 @@
             if (statsBtn) {
                 statsBtn.disabled = !canView;
                 statsBtn.style.cursor = canView ? 'pointer' : 'not-allowed';
-                statsBtn.style.opacity = canView ? '1' : '0.6';
-                statsBtn.style.background = canView ? 'rgba(37,99,235,0.08)' : '#f3f4f6';
-                statsBtn.style.color = canView ? '#2563eb' : '#9ca3af';
-                statsBtn.style.border = canView ? '1px solid rgba(37,99,235,0.25)' : '1px solid #e5e7eb';
+                statsBtn.style.opacity = canView ? '1' : '0.55';
+                statsBtn.style.background = canView ? '#faf5ff' : '#eee9db';
+                statsBtn.style.color = canView ? '#9370db' : '#756e5c';
+                statsBtn.style.border = canView ? '2px solid #9370db' : '2px solid #d9cfb6';
+                statsBtn.style.boxShadow = canView ? '3px 3px 0 #9370db' : 'none';
                 statsBtn.textContent = canView ? 'Plate Stats' : '\uD83D\uDD12 Complete Daily';
             }
             // Show row if user played or past date
