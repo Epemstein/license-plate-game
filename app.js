@@ -3218,7 +3218,7 @@
                     <div id="expectedBreakdown" style="display:none;">${bkHtml}</div>`;
             }
             // Save expected_seconds to the source run table
-            if (currentUser && expectedTime > 0) {
+            if (expectedTime > 0) {
                 if (gameMode === 'practice') {
                     const runId = window._lastPracticeRunId;
                     if (runId) {
