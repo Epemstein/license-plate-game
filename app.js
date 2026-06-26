@@ -2321,6 +2321,8 @@
 
         const baseElapsedSec = (performance.now() - startTime) / 1000;
         const totalSec = baseElapsedSec + penaltySeconds;
+        // Computed time from plate entries (matches iOS)
+        const computedSec = gameHistory.reduce((s, e) => s + (e.thinkingSeconds || 0) + (e.penaltySeconds || 0), 0);
 
         if (timerIntervalId) {
             clearInterval(timerIntervalId);
@@ -2330,7 +2332,7 @@
         if (gameMode === 'practice' && !practiceTimed) {
             resultEl.textContent = `Finished! ${solvedCount} plates solved.`;
         } else {
-            resultEl.textContent = `Finished! Time: ${totalSec.toFixed(2)} s`;
+            resultEl.textContent = `Finished! Time: ${computedSec.toFixed(2)} s`;
         }
         resultEl.style.color = "green";
         wordInputEl.blur();
@@ -2340,7 +2342,7 @@
         wordInputEl.disabled = true;
         wordInputEl.readOnly = true;
 
-        openEndModal(totalSec);
+        openEndModal(computedSec);
         if (gameMode !== 'daily' && gameMode !== 'h2h_challenge') {
             showRestartGameButton();
         }
@@ -2352,9 +2354,9 @@
 
         if (currentUser) {
             if (gameMode === 'daily') {
-                saveScore(totalSec, solvedCount, skipCount);
+                saveScore(computedSec, solvedCount, skipCount);
             } else if (gameMode === 'h2h_challenge' && currentH2HRunId) {
-                saveChallengeResult(totalSec, solvedCount, skipCount);
+                saveChallengeResult(computedSec, solvedCount, skipCount);
             } else if (gameMode === 'practice') {
                 submitPracticePlateStats();
             }
@@ -2703,7 +2705,8 @@
         gameModalTitleEl.textContent = "Run complete!";
 
         let expectedHtml = '';
-        if (gameMode === 'practice') {
+        const solved = gameHistory.filter(e => !e.skipped).length;
+        if (solved >= 10 && gameMode !== 'endless') {
             expectedHtml = '<p id="expectedTimeText" style="color:#6b7280;">Calculating expected time...</p>';
             computeExpectedTime(finalTimeSec);
         }
@@ -2872,9 +2875,15 @@
             }
             // Save expected_seconds to the source run table
             if (currentUser && expectedTime > 0) {
-                const runId = window._lastPracticeRunId;
-                if (runId) {
-                    sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', runId).then(() => {});
+                if (gameMode === 'practice') {
+                    const runId = window._lastPracticeRunId;
+                    if (runId) {
+                        sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', runId).then(() => {});
+                    }
+                } else if (gameMode === 'daily' && currentDailyRunId) {
+                    sb.from('daily_runs').update({ expected_seconds: expectedTime }).eq('id', currentDailyRunId).then(() => {});
+                } else if (gameMode === 'h2h_challenge' && currentH2HRunId) {
+                    sb.from('h2h_runs').update({ expected_seconds: expectedTime }).eq('id', currentH2HRunId).then(() => {});
                 }
             }
         } catch (e) {
@@ -4974,7 +4983,7 @@
             } else {
                 console.log('H2H run submitted successfully');
                 const solved = entries.filter(e => !e.skipped).length;
-                pushCompletedRun('h2h', totalSeconds, currentH2HDifficulty, solved, entries.length);
+                pushCompletedRun('h2h', totalSeconds, currentH2HDifficulty, solved, entries.length, currentH2HRunId);
             }
         } catch (e) {
             console.error('Error submitting H2H run:', e);
