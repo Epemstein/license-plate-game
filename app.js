@@ -133,7 +133,7 @@
 
             let clickAttr = '';
             if (userHasPlayed || isPastDate) {
-                clickAttr = `onclick="viewPlayerRun('${s.userId}','${currentViewingDate}','${s.userName.replace(/'/g,"\\'")}',${s.totalTime},${Math.round(s.percentile||0)},${s.median||0},${s.totalPlayers||0},${s.rank||0})"`;
+                clickAttr = `onclick="viewPlayerRun('${s.userId}','${currentViewingDate}','${s.userName.replace(/'/g,"\\'")}',${s.totalTime},${s.percentile||0},${s.median||0},${s.totalPlayers||0},${i+1})"`;
             }
 
             h += `<div class="lb-row${meClass}${newClass}" ${clickAttr}>`;
@@ -3373,7 +3373,7 @@
             // Stats card
             let html = '<div style="background:#f9fafb;border-radius:12px;padding:16px;margin-bottom:20px;">';
             html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
-            html += `<span>Total time</span><span style="font-weight:600;color:#16a34a;">${data.totalTime.toFixed(2)}s${percentile ? '  (Top ' + percentile + '%)' : ''}</span>`;
+            html += `<span>Total time</span><span style="font-weight:600;color:#16a34a;">${data.totalTime.toFixed(2)}s${percentile ? '  (Top ' + Math.max(1, Math.round(100 - percentile)) + '%)' : ''}</span>`;
             html += `</div>`;
             if (median) {
                 html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
