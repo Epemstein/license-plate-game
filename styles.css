@@ -607,17 +607,26 @@
 
         /* My Run card */
         .my-run-card {
-            border: 2px solid #9370db;
-            border-radius: 10px;
+            border: 2px solid #1a1714;
+            border-radius: 5px;
             padding: 14px 16px;
             margin-bottom: 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             cursor: pointer;
-            background: #faf5ff;
+            background: #fefcf7;
+            box-shadow: 3px 3px 0 #1a1714;
+            transition: transform 110ms cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 110ms cubic-bezier(0.2, 0.9, 0.3, 1);
         }
-        .my-run-card:hover { background: #f3e8ff; }
+        .my-run-card:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 5px 5px 0 #1a1714;
+        }
+        .my-run-card:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0 0 0 #1a1714;
+        }
         .my-run-card .my-run-label {
             font-size: 0.85rem;
             color: #756e5c;
