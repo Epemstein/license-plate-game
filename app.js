@@ -92,6 +92,8 @@
 
     let cachedScores = [];
     let previousLeaderboardIds = new Set();
+    let newlyArrivedIds = new Set();
+    let arrivalClearTimer = null;
 
     function renderLeaderboardRows(scores, oldIds) {
         let displayScores = scores;
@@ -105,7 +107,20 @@
 
         const userHasPlayed = currentUser && scores.some(s => s.userId === currentUser.id || s.isMe);
         const isPastDate = currentViewingDate !== getTodayString();
-        const newIds = oldIds || new Set();
+
+        // Detect new arrivals (skip on first load when oldIds is empty/undefined)
+        if (oldIds && oldIds.size > 0) {
+            const currentIds = new Set(scores.map(s => s.userId));
+            const arrived = new Set([...currentIds].filter(id => !oldIds.has(id)));
+            if (arrived.size > 0) {
+                newlyArrivedIds = arrived;
+                if (arrivalClearTimer) clearTimeout(arrivalClearTimer);
+                arrivalClearTimer = setTimeout(() => {
+                    newlyArrivedIds = new Set();
+                    renderLeaderboardRows(cachedScores);
+                }, 5000);
+            }
+        }
 
         let h = '';
         displayScores.forEach((s, i) => {
@@ -118,8 +133,7 @@
 
             const isMe = s.isMe || (currentUser && s.userId === currentUser.id);
             const meClass = isMe ? ' is-me' : '';
-            const isNew = newIds.size > 0 && !newIds.has(s.userId);
-            const newClass = isNew ? ' lb-new-arrival' : '';
+            const newClass = newlyArrivedIds.has(s.userId) ? ' lb-new-arrival' : '';
 
             const streakHtml = s.streak && s.streak > 1 ? `<span class="lb-streak">\uD83D\uDD25${s.streak}</span>` : '';
 
@@ -159,13 +173,6 @@
 
         // Track current IDs for next refresh
         previousLeaderboardIds = new Set(scores.map(s => s.userId));
-
-        // Remove green flash after 5s
-        if (newIds.size > 0) {
-            setTimeout(() => {
-                document.querySelectorAll('.lb-new-arrival').forEach(el => el.classList.remove('lb-new-arrival'));
-            }, 5000);
-        }
     }
 
     // View my run shortcut
