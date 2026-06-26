@@ -2,10 +2,14 @@
     // === TAB SWITCHING ===
     // Restore tab from URL hash on load (but don't touch auth callback hashes)
     const validTabs = ['game', 'leaderboard', 'challenges', 'profile', 'feedback'];
-    const initialHash = window.location.hash.replace('#', '');
+    const initialHash = window.location.hash;
     const isAuthCallback = initialHash.includes('access_token') || initialHash.includes('error');
-    if (!isAuthCallback && validTabs.includes(initialHash)) {
-        setTimeout(() => switchTab(initialHash), 0);
+    console.log('[Hash] initial:', initialHash.substring(0, 80), 'isAuth:', isAuthCallback);
+    if (!isAuthCallback) {
+        const tabName = initialHash.replace('#', '');
+        if (validTabs.includes(tabName)) {
+            setTimeout(() => switchTab(tabName), 0);
+        }
     }
     window.addEventListener('hashchange', () => {
         const t = window.location.hash.replace('#', '');
@@ -15,7 +19,9 @@
     function switchTab(tabName) {
         // Don't overwrite hash if it contains auth tokens (Supabase OAuth callback)
         const currentHash = window.location.hash;
-        if (!currentHash.includes('access_token') && currentHash !== '#' + tabName) {
+        if (currentHash.includes('access_token')) {
+            console.log('[Hash] Preserved auth hash in switchTab');
+        } else if (currentHash !== '#' + tabName) {
             history.replaceState(null, '', '#' + tabName);
         }
         // Hide all tabs
