@@ -4186,7 +4186,7 @@
                 } catch (e) { console.error('[Endless] Session restore error:', e); }
             }, 1500);
         } else {
-            mi.textContent = 'Practice Mode - Unlimited attempts';
+            mi.textContent = 'Practice Mode - Difficulty ' + (typeof practiceDifficulty === 'number' ? practiceDifficulty : 50);
             mi.style.background = '#f3e8ff';
             mi.style.color = '#6b21a8';
             mi.style.border = '2px solid #e9d5ff';
