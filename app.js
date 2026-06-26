@@ -1,29 +1,13 @@
 
     // === TAB SWITCHING ===
-    // Restore tab from URL hash on load (but don't touch auth callback hashes)
     const validTabs = ['game', 'leaderboard', 'challenges', 'profile', 'feedback'];
-    const initialHash = window.location.hash;
-    const isAuthCallback = initialHash.includes('access_token') || initialHash.includes('error');
-    console.log('[Hash] initial:', initialHash.substring(0, 80), 'isAuth:', isAuthCallback);
-    if (!isAuthCallback) {
-        const tabName = initialHash.replace('#', '');
-        if (validTabs.includes(tabName)) {
-            setTimeout(() => switchTab(tabName), 0);
-        }
+    const savedTab = sessionStorage.getItem('activeTab');
+    if (savedTab && validTabs.includes(savedTab)) {
+        setTimeout(() => switchTab(savedTab), 0);
     }
-    window.addEventListener('hashchange', () => {
-        const t = window.location.hash.replace('#', '');
-        if (validTabs.includes(t)) switchTab(t);
-    });
 
     function switchTab(tabName) {
-        // Don't overwrite hash if it contains auth tokens (Supabase OAuth callback)
-        const currentHash = window.location.hash;
-        if (currentHash.includes('access_token')) {
-            console.log('[Hash] Preserved auth hash in switchTab');
-        } else if (currentHash !== '#' + tabName) {
-            history.replaceState(null, '', '#' + tabName);
-        }
+        sessionStorage.setItem('activeTab', tabName);
         // Hide all tabs
         document.getElementById('gameTab').classList.remove('active');
         document.getElementById('leaderboardTab').classList.remove('active');
@@ -822,12 +806,7 @@
     // === SUPABASE ===
     const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTkwNTUsImV4cCI6MjA5MTQ5NTA1NX0.RRQA0fW02H6XKj7xKUTSnR9zrGbWuE2kSmspCeHCfyQ';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-            flowType: 'implicit',
-            detectSessionInUrl: true
-        }
-    });
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Capture referral from URL
     const urlRef = new URLSearchParams(window.location.search).get('ref');
