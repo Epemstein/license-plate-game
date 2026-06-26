@@ -35,7 +35,7 @@
         const tabMap = { game: 0, leaderboard: 1, challenges: 2, profile: 3, feedback: 4 };
         buttons[tabMap[tabName]].classList.add('active');
 
-        // On leaderboard tab, auto-load today
+        // On leaderboard tab, auto-load today (skip refetch if cached)
         if (tabName === 'leaderboard') {
             const t = getTodayString();
             const picker = document.getElementById('leaderboardDatePicker');
@@ -43,7 +43,12 @@
                 picker.value = t;
                 picker.max = t;
             }
-            displayLeaderboard(t);
+            if (cachedScores.length && currentViewingDate === t) {
+                // Already have data — just re-render without hiding buttons
+                renderLeaderboardRows(cachedScores);
+            } else {
+                displayLeaderboard(t);
+            }
         }
 
         // On challenges tab, load challenges
