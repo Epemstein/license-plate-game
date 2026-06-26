@@ -1706,25 +1706,32 @@
     }
 
     let definitionsLoading = false;
+    let definitionsLoadPromise = null;
     async function ensureDefinitionsLoaded() {
         if (Object.keys(DEFINITIONS).length > 0) return;
-        if (definitionsLoading) return;
-        definitionsLoading = true;
-        try {
-            console.log('[Defs] Downloading definitions.json...');
-            const res = await fetch(`${STORAGE_BASE}/definitions.json`);
-            DEFINITIONS = await res.json();
-            console.log(`[Defs] Loaded ${Object.keys(DEFINITIONS).length} definitions`);
-        } catch (e) {
-            console.warn('[Defs] Failed to load:', e);
-            // Fallback: try local file
+        if (definitionsLoadPromise) return definitionsLoadPromise;
+        definitionsLoadPromise = (async () => {
+            definitionsLoading = true;
             try {
-                const res = await fetch('definitions.json');
+                console.log('[Defs] Downloading definitions.json...');
+                const res = await fetch(`${STORAGE_BASE}/definitions.json`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 DEFINITIONS = await res.json();
-            } catch (e2) { DEFINITIONS = {}; }
-        }
-        definitionsLoading = false;
+                console.log(`[Defs] Loaded ${Object.keys(DEFINITIONS).length} definitions`);
+            } catch (e) {
+                console.warn('[Defs] Remote failed:', e.message);
+                try {
+                    const res = await fetch('definitions.json');
+                    if (res.ok) DEFINITIONS = await res.json();
+                } catch (e2) { console.warn('[Defs] Local fallback also failed'); }
+            }
+            definitionsLoading = false;
+            definitionsLoadPromise = null;
+        })();
+        return definitionsLoadPromise;
     }
+    // Pre-load definitions in background after page load
+    setTimeout(() => ensureDefinitionsLoaded(), 3000);
 
     async function loadDifficulty() {
         try {
