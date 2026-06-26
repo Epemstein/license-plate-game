@@ -1,20 +1,11 @@
 
-    // Clear stale Supabase auth data from incompatible versions
-    try {
-        const authKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-        if (authKey) {
-            const raw = localStorage.getItem(authKey);
-            // If stored data contains PKCE artifacts or can't be parsed, clear it
-            if (raw && (raw.includes('code_verifier') || raw.includes('pkce'))) {
-                localStorage.removeItem(authKey);
-                console.log('[Auth] Cleared stale PKCE auth data');
-            }
-        }
-        // Also clear any standalone code verifiers
-        Object.keys(localStorage).filter(k => k.includes('code_verifier') || k.includes('pkce')).forEach(k => {
-            localStorage.removeItem(k);
-        });
-    } catch(e) {}
+    // One-time cleanup of stale auth data from Supabase version mismatch (v242)
+    if (!localStorage.getItem('auth_cleanup_v242')) {
+        try {
+            Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+            localStorage.setItem('auth_cleanup_v242', '1');
+        } catch(e) {}
+    }
 
     // === TAB SWITCHING ===
     const validTabs = ['game', 'leaderboard', 'challenges', 'profile', 'feedback'];
