@@ -21,6 +21,7 @@
         }
 
         * { box-sizing: border-box; }
+        html { overflow-y: scroll; }
 
         body {
             font-family: "Newsreader", Georgia, serif;
