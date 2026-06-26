@@ -4274,6 +4274,7 @@
         });
 
         document.getElementById('chooseEndlessBtn').addEventListener('click', () => {
+            if (!currentUser) { switchTab('profile'); document.getElementById('practiceModeBackdrop').classList.remove('show'); return; }
             document.getElementById('practiceModeBackdrop').classList.remove('show');
             const btn = document.getElementById('practiceBtn');
             btn.textContent = 'Endless Mode';
