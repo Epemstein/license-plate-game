@@ -204,9 +204,20 @@
                     <div style="font-size:0.75rem;color:#6b7280;">overall</div>
                 </div>
             </div>
-            <button onclick="showHistoricalScores()" style="width:100%;padding:14px;background:#fbbf24;color:#92400e;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-                <span>Historical Scores</span><span>&#8250;</span>
-            </button>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <button onclick="showHistoricalScores()" style="width:100%;padding:14px;background:#fbbf24;color:#92400e;border:2px solid #1a1714;border-radius:5px;font-size:0.95rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-shadow:3px 3px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #1a1714'">
+                    <span>Historical Scores</span><span>&#8250;</span>
+                </button>
+                <button onclick="showPracticeHistory()" style="width:100%;padding:14px;background:#f3e8ff;color:#7c5cbf;border:2px solid #1a1714;border-radius:5px;font-size:0.95rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-shadow:3px 3px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #1a1714'">
+                    <span>Practice History</span><span>&#8250;</span>
+                </button>
+                <button onclick="showMyStats()" style="width:100%;padding:14px;background:rgba(37,99,235,0.08);color:#2563eb;border:2px solid #1a1714;border-radius:5px;font-size:0.95rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-shadow:3px 3px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #1a1714'">
+                    <span>Your Stats</span><span>&#8250;</span>
+                </button>
+                <button onclick="showGlobalStats()" style="width:100%;padding:14px;background:rgba(251,146,60,0.1);color:#c2410c;border:2px solid #1a1714;border-radius:5px;font-size:0.95rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-shadow:3px 3px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #1a1714'">
+                    <span>Global Stats</span><span>&#8250;</span>
+                </button>
+            </div>
             <button class="profile-signout-btn" onclick="signOut()" style="margin-top:24px;">Sign Out</button>
         `;
         // Load stats asynchronously
@@ -320,6 +331,142 @@
         }
     }
     window.showHistoricalScores = showHistoricalScores;
+
+    // === PRACTICE HISTORY ===
+    async function showPracticeHistory() {
+        const container = document.getElementById('profileContent');
+        container.innerHTML = '<p style="text-align:center;color:#756e5c;padding:20px;">Loading practice history...</p>';
+
+        try {
+            const { data, error } = await sb.from('practice_runs')
+                .select('id, total_seconds, difficulty, plates_solved, plates_seen, expected_seconds, created_at')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            let html = '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;margin-bottom:12px;">&larr; Back</button>';
+            html += '<h3 style="margin:0 0 12px;">Practice History</h3>';
+
+            if (!data || data.length === 0) {
+                html += '<p style="color:#756e5c;">No practice runs yet.</p>';
+            } else {
+                data.forEach(r => {
+                    const date = new Date(r.created_at);
+                    const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                    const xtDelta = r.expected_seconds != null ? (r.expected_seconds - r.total_seconds) : null;
+                    const xtHtml = xtDelta != null
+                        ? `<span style="font-size:0.8rem;font-weight:600;color:${xtDelta >= 0 ? '#14a06b' : '#ff3b30'};">(${xtDelta >= 0 ? '+' : ''}${xtDelta.toFixed(1)})</span>`
+                        : '';
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #d9cfb6;">
+                        <div><span style="font-weight:600;">${r.total_seconds.toFixed(1)}s</span> ${xtHtml} <span style="font-size:0.8rem;color:#756e5c;margin-left:6px;">${r.plates_solved}/${r.plates_seen} · D${r.difficulty || 0}</span></div>
+                        <span style="font-size:0.8rem;color:#756e5c;">${dateStr}</span>
+                    </div>`;
+                });
+            }
+            container.innerHTML = html;
+        } catch (e) {
+            container.innerHTML = '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;">&larr; Back</button><p style="color:#ff3b30;">Error loading practice history</p>';
+        }
+    }
+    window.showPracticeHistory = showPracticeHistory;
+
+    // === MY STATS ===
+    async function showMyStats() {
+        const container = document.getElementById('profileContent');
+        container.innerHTML = '<p style="text-align:center;color:#756e5c;padding:20px;">Loading stats...</p>';
+
+        try {
+            const { data: stats } = await sb.rpc('player_stats', { p_user_id: currentUser.id });
+            const s = stats;
+
+            let html = '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;margin-bottom:12px;">&larr; Back</button>';
+            html += '<h3 style="margin:0 0 12px;">Your Stats</h3>';
+
+            // Daily section
+            html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Daily Challenge</div>';
+            html += '<div class="stats-section-box">';
+            html += statsRow('Games Played', s.daily_games || '--');
+            html += statsRow('Best Time', s.daily_best_time ? s.daily_best_time.toFixed(1) + 's' : '--');
+            html += statsRow('Avg Time', s.daily_avg_time ? s.daily_avg_time.toFixed(1) + 's' : '--');
+            html += statsRow('Skip Rate', s.daily_skip_rate != null ? s.daily_skip_rate + '%' : '--');
+            html += statsRow('Current Streak', s.daily_current_streak || '--');
+            html += statsRow('Longest Streak', s.daily_longest_streak || '--');
+            html += '</div>';
+
+            // H2H section
+            html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Head to Head</div>';
+            html += '<div class="stats-section-box">';
+            html += statsRow('Record', (s.h2h_wins || 0) + 'W - ' + (s.h2h_losses || 0) + 'L');
+            html += statsRow('Best Time', s.h2h_best_time ? s.h2h_best_time.toFixed(1) + 's' : '--');
+            html += statsRow('Skip Rate', s.h2h_skip_rate != null ? s.h2h_skip_rate + '%' : '--');
+            html += '</div>';
+
+            // Practice section
+            html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Practice</div>';
+            html += '<div class="stats-section-box">';
+            html += statsRow('Games', s.practice_games || '--');
+            html += statsRow('Fastest Run', s.practice_fastest_run ? s.practice_fastest_run.toFixed(1) + 's' : '--');
+            html += statsRow('Skip Rate', s.practice_skip_rate != null ? s.practice_skip_rate + '%' : '--');
+            html += '</div>';
+
+            container.innerHTML = html;
+        } catch (e) {
+            container.innerHTML = '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;">&larr; Back</button><p style="color:#ff3b30;">Error loading stats</p>';
+        }
+    }
+    window.showMyStats = showMyStats;
+
+    function statsRow(label, value, subtitle) {
+        const sub = subtitle ? `<div class="stats-row-subtitle">${subtitle}</div>` : '';
+        return `<div class="stats-row"><span class="stats-row-label">${label}</span><div class="stats-row-right"><span class="stats-row-value">${value}</span>${sub}</div></div>`;
+    }
+
+    // === GLOBAL STATS ===
+    async function showGlobalStats() {
+        const container = document.getElementById('profileContent');
+        container.innerHTML = '<p style="text-align:center;color:#756e5c;padding:20px;">Loading global stats...</p>';
+
+        try {
+            const { data: records } = await sb.rpc('global_records');
+            const r = records;
+
+            let html = '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;margin-bottom:12px;">&larr; Back</button>';
+            html += '<h3 style="margin:0 0 12px;">Global Stats</h3>';
+
+            // Records
+            html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Records</div>';
+            html += '<div class="stats-section-box">';
+            html += statsRow('Fastest Run', r.fastest_run?.total_seconds ? r.fastest_run.total_seconds.toFixed(1) + 's — ' + (r.fastest_run.display_name || 'Anonymous') : '--');
+            html += statsRow('Fastest Word', r.fastest_word?.thinking_seconds ? r.fastest_word.thinking_seconds.toFixed(2) + 's "' + r.fastest_word.word + '" — ' + (r.fastest_word.display_name || 'Anonymous') : '--');
+            html += statsRow('Longest Streak', r.longest_streak?.streak ? r.longest_streak.streak + ' days — ' + (r.longest_streak.display_name || 'Anonymous') : '--');
+            html += statsRow('Hardest Solve', r.hardest_solve?.skip_pct ? r.hardest_solve.skip_pct + '% skip "' + r.hardest_solve.word + '" — ' + (r.hardest_solve.display_name || 'Anonymous') : '--');
+            html += statsRow('Reigning Champ', r.reigning_champ?.total_seconds ? r.reigning_champ.total_seconds.toFixed(1) + 's — ' + (r.reigning_champ.display_name || 'Anonymous') : '--');
+            html += '</div>';
+
+            // Averages
+            html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Averages</div>';
+            html += '<div class="stats-section-box">';
+            html += statsRow('Run Time', r.mean_run_time.toFixed(1) + 's / ' + r.median_run_time.toFixed(1) + 's', 'mean / median');
+            html += statsRow('Solve Time', r.mean_solve_time.toFixed(1) + 's / ' + r.median_solve_time.toFixed(1) + 's', 'mean / median');
+            html += statsRow('Skip Time', r.mean_skip_time.toFixed(1) + 's / ' + r.median_skip_time.toFixed(1) + 's', 'mean / median');
+            html += statsRow('Skip Rate', r.avg_skip_pct.toFixed(1) + '%');
+            html += '</div>';
+
+            // Totals
+            html += '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;margin:14px 0 6px 4px;">Totals</div>';
+            html += '<div class="stats-section-box">';
+            html += statsRow('Daily Runs', r.total_runs.toLocaleString());
+            html += statsRow('Daily Plates', r.total_daily_plates.toLocaleString());
+            html += statsRow('All Plates', r.total_all_plates.toLocaleString());
+            html += '</div>';
+
+            container.innerHTML = html;
+        } catch (e) {
+            console.error('Global stats error:', e);
+            container.innerHTML = '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;">&larr; Back</button><p style="color:#ff3b30;">Error loading global stats</p>';
+        }
+    }
+    window.showGlobalStats = showGlobalStats;
 
     function renderHistoricalCalendar() {
         const container = histCalContainer || document.getElementById('profileContent');
@@ -5506,16 +5653,6 @@
         if (!iso) return '';
         const d = new Date(iso + 'T00:00:00');
         return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-
-    function statsRow(label, value, subtitle) {
-        let html = '<div class="stats-row">';
-        html += `<div class="stats-row-label">${label}</div>`;
-        html += '<div class="stats-row-right">';
-        html += `<div class="stats-row-value">${value}</div>`;
-        if (subtitle) html += `<div class="stats-row-subtitle">${subtitle}</div>`;
-        html += '</div></div>';
-        return html;
     }
 
     function skipRateStr(perGame, rate) {
