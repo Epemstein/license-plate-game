@@ -5600,6 +5600,7 @@
     window.showPracticePlateStatsModal = async function() {
         const backdrop = document.getElementById('practiceStatsModalBackdrop');
         const content = document.getElementById('practiceStatsModalContent');
+        document.querySelector('#practiceStatsModalBackdrop .modal-title').textContent = 'Plate Stats';
         backdrop.classList.add('show');
         content.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading plate stats...</p>';
 
