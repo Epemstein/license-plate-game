@@ -966,6 +966,7 @@
             document.getElementById('userName').textContent = session.user.email || 'Player';
             updateProfileTab();
             updateDailyBtnState();
+            if (event === 'SIGNED_IN') switchTab('game');
             retryPendingSubmission();
             submitPendingPracticeStats();
             submitPendingEndlessState();
