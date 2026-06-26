@@ -4203,7 +4203,7 @@
                 return;
             }
 
-            if (!currentUser && !await signInWithApple()) { console.log('Blocked: no user'); return; }
+            if (!currentUser) { switchTab('profile'); return; }
 
             console.log('Checking if played today...');
             const alreadyPlayed = await checkIfPlayedToday();
@@ -4252,9 +4252,7 @@
         });
 
         document.getElementById('practiceBtn').addEventListener('click', async () => {
-            if (!currentUser) {
-                if (!await signInWithApple()) return;
-            }
+            if (!currentUser) { switchTab('profile'); return; }
             // Show mode choice modal
             document.getElementById('practiceModeBackdrop').classList.add('show');
         });
