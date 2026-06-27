@@ -6662,6 +6662,7 @@ window.addEventListener('load', function() {
         // Success!
         tryItSolved++;
         tryItIndex++;
+        document.getElementById('tryItInput').textContent = '';
         document.getElementById('tryItResult').innerHTML = `<span style="color:#14a06b;font-weight:700;">✓ Correct!</span>`;
         setTimeout(nextTryItPlate, 800);
     }
