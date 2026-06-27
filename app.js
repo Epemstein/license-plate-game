@@ -191,9 +191,13 @@
                     <div style="font-weight:700;font-size:1.1rem;" id="statBeat">--</div>
                     <div style="font-size:0.75rem;color:#6b7280;">beat</div>
                 </div>
-                <div style="flex:1;text-align:center;">
+                <div style="flex:1;text-align:center;border-right:1px solid #e5e7eb;">
                     <div style="font-weight:700;font-size:1.1rem;" id="statOverall">--</div>
                     <div style="font-size:0.75rem;color:#6b7280;">overall</div>
+                </div>
+                <div style="flex:1;text-align:center;cursor:pointer;" onclick="showFriendsPage()">
+                    <div style="font-weight:700;font-size:1.1rem;color:#9370db;" id="statFriends">--</div>
+                    <div style="font-size:0.75rem;color:#6b7280;">friends</div>
                 </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:8px;">
@@ -211,14 +215,6 @@
                 </button>
             </div>
             <div id="friendRequestsSection" style="margin-top:16px;"></div>
-            <div style="margin-top:16px;">
-                <div style="display:flex;gap:8px;max-width:400px;margin:0 auto;">
-                    <input id="addFriendInput" type="text" placeholder="Add friend by @handle" style="flex:1;padding:10px 12px;border:2px solid #d9cfb6;border-radius:5px;font-size:0.9rem;background:#fefcf7;">
-                    <button onclick="sendFriendRequest()" style="padding:10px 16px;background:#14a06b;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:2px 2px 0 #1a1714;">Add</button>
-                </div>
-                <div id="addFriendResult" style="text-align:center;font-size:0.85rem;margin-top:6px;"></div>
-            </div>
-            <div id="friendsList" style="margin-top:16px;"></div>
             <div style="display:flex;gap:10px;margin-top:24px;justify-content:center;">
                 <button onclick="showEditProfile()" style="padding:10px 20px;background:#eee9db;color:#4a4338;border:2px solid #d9cfb6;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:none;">Edit Profile</button>
                 <button class="profile-signout-btn" onclick="signOut()">Sign Out</button>
@@ -229,10 +225,8 @@
             loadProfileStats();
             setTimeout(() => {
                 if (typeof loadFriendRequests === 'function') loadFriendRequests();
-                if (typeof loadFriendsList === 'function') loadFriendsList();
+                if (typeof loadFriendCount === 'function') loadFriendCount();
             }, 100);
-            const afi = document.getElementById('addFriendInput');
-            if (afi) afi.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendFriendRequest(); });
         }
     }
 
@@ -6435,30 +6429,60 @@ window.addEventListener('load', function() {
     }
     window.respondFriend = respondFriend;
 
-    async function loadFriendsList() {
-        const container = document.getElementById('friendsList');
-        if (!container || !currentUser) return;
+    async function loadFriendCount() {
+        const el = document.getElementById('statFriends');
+        if (!el || !currentUser) return;
+        try {
+            const { data } = await sb.from('friendships')
+                .select('id')
+                .eq('status', 'accepted')
+                .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
+            el.textContent = data ? data.length : 0;
+        } catch (e) { el.textContent = '0'; }
+    }
+
+    async function showFriendsPage() {
+        const container = document.getElementById('profileContent');
+        container.innerHTML = '<p style="text-align:center;color:#756e5c;padding:20px;">Loading friends...</p>';
         try {
             const { data } = await sb.from('friendships')
                 .select('user_a, user_b')
                 .eq('status', 'accepted')
                 .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
-            if (!data || data.length === 0) { container.innerHTML = ''; return; }
 
-            const friendIds = data.map(f => f.user_a === currentUser.id ? f.user_b : f.user_a);
-            const { data: profiles } = await sb.from('profiles').select('id, display_name, handle').in('id', friendIds);
+            const friendIds = (data || []).map(f => f.user_a === currentUser.id ? f.user_b : f.user_a);
+            const { data: profiles } = friendIds.length > 0
+                ? await sb.from('profiles').select('id, display_name, handle').in('id', friendIds)
+                : { data: [] };
 
-            let html = '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Friends (' + (profiles || []).length + ')</div>';
-            (profiles || []).forEach(p => {
-                const name = p.display_name || '@' + p.handle;
-                html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #eee9db;">`;
-                html += `<span style="font-weight:500;">${name}</span>`;
-                html += `<span style="color:#756e5c;font-size:0.8rem;">@${p.handle || ''}</span>`;
-                html += '</div>';
-            });
+            let html = '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;margin-bottom:12px;">&larr; Back</button>';
+            html += '<h3 style="margin:0 0 12px;">Friends</h3>';
+
+            html += '<div style="display:flex;gap:8px;max-width:400px;margin-bottom:16px;">';
+            html += '<input id="addFriendInput" type="text" placeholder="Add friend by @handle" style="flex:1;padding:10px 12px;border:2px solid #d9cfb6;border-radius:5px;font-size:0.9rem;background:#fefcf7;">';
+            html += '<button onclick="sendFriendRequest()" style="padding:10px 16px;background:#14a06b;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:2px 2px 0 #1a1714;">Add</button>';
+            html += '</div>';
+            html += '<div id="addFriendResult" style="font-size:0.85rem;margin-bottom:12px;"></div>';
+
+            if (!profiles || profiles.length === 0) {
+                html += '<p style="color:#756e5c;">No friends yet. Add friends by their @handle!</p>';
+            } else {
+                (profiles || []).forEach(p => {
+                    const name = p.display_name || '@' + p.handle;
+                    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #eee9db;">`;
+                    html += `<span style="font-weight:600;cursor:pointer;color:#9370db;" onclick="closeProfileModal();openProfileModal('${p.id}','${name.replace(/'/g,"\\'")}')">${name}</span>`;
+                    html += `<span style="color:#756e5c;font-size:0.8rem;">@${p.handle || ''}</span>`;
+                    html += '</div>';
+                });
+            }
             container.innerHTML = html;
-        } catch (e) { console.error('[Friends]', e); }
+            const afi = document.getElementById('addFriendInput');
+            if (afi) afi.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendFriendRequest(); });
+        } catch (e) {
+            container.innerHTML = '<button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;">&larr; Back</button><p style="color:#ff3b30;">Error loading friends</p>';
+        }
     }
+    window.showFriendsPage = showFriendsPage;
 
     // === TRY IT OUT (How to Play) ===
     const tryItPlates = ['BRD', 'CLM', 'SCP', 'HDN', 'WEV', 'MAJ', 'LGT', 'GAE', 'FOG', 'RNT'];
