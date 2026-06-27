@@ -212,13 +212,28 @@
                     <span>Global Stats</span><span>&#8250;</span>
                 </button>
             </div>
+            <div id="friendRequestsSection" style="margin-top:16px;"></div>
+            <div style="margin-top:16px;">
+                <div style="display:flex;gap:8px;max-width:400px;margin:0 auto;">
+                    <input id="addFriendInput" type="text" placeholder="Add friend by @handle" style="flex:1;padding:10px 12px;border:2px solid #d9cfb6;border-radius:5px;font-size:0.9rem;background:#fefcf7;">
+                    <button onclick="sendFriendRequest()" style="padding:10px 16px;background:#14a06b;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:2px 2px 0 #1a1714;">Add</button>
+                </div>
+                <div id="addFriendResult" style="text-align:center;font-size:0.85rem;margin-top:6px;"></div>
+            </div>
+            <div id="friendsList" style="margin-top:16px;"></div>
             <div style="display:flex;gap:10px;margin-top:24px;justify-content:center;">
                 <button onclick="showEditProfile()" style="padding:10px 20px;background:#eee9db;color:#4a4338;border:2px solid #d9cfb6;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:none;">Edit Profile</button>
                 <button class="profile-signout-btn" onclick="signOut()">Sign Out</button>
             </div>
         `;
         // Load stats asynchronously
-        if (currentUser) loadProfileStats();
+        if (currentUser) {
+            loadProfileStats();
+            loadFriendRequests();
+            loadFriendsList();
+            const afi = document.getElementById('addFriendInput');
+            if (afi) afi.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendFriendRequest(); });
+        }
     }
 
     function renderProfileSetup(container, currentName) {
@@ -6295,6 +6310,111 @@ window.addEventListener('load', function() {
         }
     }
     window.sendFeedback = sendFeedback;
+
+    // === FRIENDS ===
+    async function sendFriendRequest() {
+        const input = document.getElementById('addFriendInput');
+        const resultEl = document.getElementById('addFriendResult');
+        const handle = (input.value || '').trim().toLowerCase().replace('@', '');
+        if (!handle) return;
+        resultEl.innerHTML = '';
+
+        try {
+            const { data: target } = await sb.from('profiles').select('id, display_name').eq('handle', handle).single();
+            if (!target) { resultEl.innerHTML = '<span style="color:#ff3b30;">User not found</span>'; return; }
+            if (target.id === currentUser.id) { resultEl.innerHTML = '<span style="color:#ff3b30;">That\'s you!</span>'; return; }
+
+            // Check existing friendship
+            const { data: existing } = await sb.from('friendships')
+                .select('id, status')
+                .or(`and(user_a.eq.${currentUser.id},user_b.eq.${target.id}),and(user_a.eq.${target.id},user_b.eq.${currentUser.id})`);
+            if (existing && existing.length > 0) {
+                const f = existing[0];
+                if (f.status === 'accepted') { resultEl.innerHTML = '<span style="color:#756e5c;">Already friends!</span>'; return; }
+                resultEl.innerHTML = '<span style="color:#756e5c;">Request already pending</span>'; return;
+            }
+
+            const ids = [currentUser.id, target.id].sort();
+            await sb.from('friendships').insert({
+                user_a: ids[0], user_b: ids[1],
+                status: 'pending', requested_by: currentUser.id
+            });
+            input.value = '';
+            resultEl.innerHTML = `<span style="color:#14a06b;">Request sent to ${target.display_name || '@' + handle}!</span>`;
+        } catch (e) {
+            resultEl.innerHTML = `<span style="color:#ff3b30;">${e.message || 'Error'}</span>`;
+        }
+    }
+    window.sendFriendRequest = sendFriendRequest;
+
+    async function loadFriendRequests() {
+        const container = document.getElementById('friendRequestsSection');
+        if (!container || !currentUser) return;
+        try {
+            const { data } = await sb.from('friendships')
+                .select('id, user_a, user_b, requested_by')
+                .eq('status', 'pending')
+                .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
+            const incoming = (data || []).filter(f => f.requested_by !== currentUser.id);
+            if (incoming.length === 0) { container.innerHTML = ''; return; }
+
+            const otherIds = incoming.map(f => f.user_a === currentUser.id ? f.user_b : f.user_a);
+            const { data: profiles } = await sb.from('profiles').select('id, display_name, handle').in('id', otherIds);
+            const nameMap = {};
+            (profiles || []).forEach(p => nameMap[p.id] = p.display_name || '@' + p.handle);
+
+            let html = '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Friend Requests</div>';
+            incoming.forEach(f => {
+                const otherId = f.user_a === currentUser.id ? f.user_b : f.user_a;
+                const name = nameMap[otherId] || 'Unknown';
+                html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fefcf7;border:1px solid #d9cfb6;border-radius:5px;margin-bottom:4px;">`;
+                html += `<span style="font-weight:600;">${name}</span>`;
+                html += `<div style="display:flex;gap:6px;">`;
+                html += `<button onclick="respondFriend('${f.id}','accepted')" style="padding:4px 12px;background:#14a06b;color:white;border:none;border-radius:4px;font-weight:600;font-size:0.8rem;cursor:pointer;">Accept</button>`;
+                html += `<button onclick="respondFriend('${f.id}','declined')" style="padding:4px 12px;background:#ff3b30;color:white;border:none;border-radius:4px;font-weight:600;font-size:0.8rem;cursor:pointer;">Decline</button>`;
+                html += '</div></div>';
+            });
+            container.innerHTML = html;
+        } catch (e) { console.error('[Friends]', e); }
+    }
+
+    async function respondFriend(friendshipId, status) {
+        try {
+            if (status === 'declined') {
+                await sb.from('friendships').delete().eq('id', friendshipId);
+            } else {
+                await sb.from('friendships').update({ status, responded_at: new Date().toISOString() }).eq('id', friendshipId);
+            }
+            loadFriendRequests();
+            loadFriendsList();
+        } catch (e) { console.error('[Friends]', e); }
+    }
+    window.respondFriend = respondFriend;
+
+    async function loadFriendsList() {
+        const container = document.getElementById('friendsList');
+        if (!container || !currentUser) return;
+        try {
+            const { data } = await sb.from('friendships')
+                .select('user_a, user_b')
+                .eq('status', 'accepted')
+                .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
+            if (!data || data.length === 0) { container.innerHTML = ''; return; }
+
+            const friendIds = data.map(f => f.user_a === currentUser.id ? f.user_b : f.user_a);
+            const { data: profiles } = await sb.from('profiles').select('id, display_name, handle').in('id', friendIds);
+
+            let html = '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Friends (' + (profiles || []).length + ')</div>';
+            (profiles || []).forEach(p => {
+                const name = p.display_name || '@' + p.handle;
+                html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #eee9db;">`;
+                html += `<span style="font-weight:500;">${name}</span>`;
+                html += `<span style="color:#756e5c;font-size:0.8rem;">@${p.handle || ''}</span>`;
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        } catch (e) { console.error('[Friends]', e); }
+    }
 
     // === TRY IT OUT (How to Play) ===
     const tryItPlates = ['BRD', 'CLM', 'SCP', 'HDN', 'WEV', 'MAJ', 'LGT', 'GAE', 'FOG', 'RNT'];
