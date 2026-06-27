@@ -2820,17 +2820,29 @@
             const solved = gameHistory.filter(e => !e.skipped).length;
             const totalTime = gameHistory.reduce((s, e) => s + (e.thinkingSeconds || 0) + (e.penaltySeconds || 0), 0);
 
-            // Try to create practice_runs entry to get run_id
+            // Wait for expected time calculation to finish (runs in parallel)
+            let expectedSec = null;
+            for (let i = 0; i < 20; i++) {
+                if (window._lastExpectedData && window._lastExpectedData.expectedTime) {
+                    expectedSec = window._lastExpectedData.expectedTime;
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 250));
+            }
+
+            // Create practice_runs entry with expected time included
             let practiceRunId = null;
             try {
-                const { data: runData, error: runErr } = await sb.from('practice_runs').insert({
+                const insertData = {
                     user_id: userId,
                     total_seconds: Math.floor(totalTime * 100) / 100,
                     difficulty: diff,
                     source: 'practice',
                     plates_solved: solved,
                     plates_seen: gameHistory.length
-                }).select('id').single();
+                };
+                if (expectedSec) insertData.expected_seconds = expectedSec;
+                const { data: runData, error: runErr } = await sb.from('practice_runs').insert(insertData).select('id').single();
                 if (runErr) console.error('[Practice] practice_runs FAILED:', runErr.message);
                 else practiceRunId = runData?.id || null;
             } catch (e) {
@@ -3303,17 +3315,7 @@
             // Save expected_seconds to the source run table (using captured values)
             if (expectedTime > 0) {
                 if (capturedMode === 'practice') {
-                    // Practice run ID may not be set yet (async insert). Wait and retry.
-                    const prId = capturedPracticeRunId || window._lastPracticeRunId;
-                    if (prId) {
-                        sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', prId).then(() => {});
-                    } else {
-                        // Wait for practice run to be created
-                        setTimeout(() => {
-                            const delayedId = window._lastPracticeRunId;
-                            if (delayedId) sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', delayedId).then(() => {});
-                        }, 3000);
-                    }
+                    // Practice xT is included in the initial insert — no update needed
                 } else if (capturedMode === 'daily' && capturedDailyRunId) {
                     sb.from('daily_runs').update({ expected_seconds: expectedTime }).eq('id', capturedDailyRunId).then(() => {});
                 } else if (capturedMode === 'h2h_challenge' && capturedH2HRunId) {
