@@ -178,6 +178,7 @@
             <div class="profile-avatar">${initials}</div>
             <div class="profile-name">${displayName}</div>
             ${handle ? `<div class="profile-handle">@${handle}</div>` : ''}
+            <div id="friendRequestsSection"></div>
             <div id="profileStats" style="display:flex;justify-content:center;gap:0;margin:20px 0;background:#f9fafb;border-radius:12px;padding:12px 0;">
                 <div style="flex:1;text-align:center;border-right:1px solid #e5e7eb;">
                     <div style="font-weight:700;font-size:1.1rem;" id="statDailies">--</div>
@@ -214,7 +215,6 @@
                     <span>Global Stats</span><span>&#8250;</span>
                 </button>
             </div>
-            <div id="friendRequestsSection" style="margin-top:16px;"></div>
             <div style="display:flex;gap:10px;margin-top:24px;justify-content:center;">
                 <button onclick="showEditProfile()" style="padding:10px 20px;background:#eee9db;color:#4a4338;border:2px solid #d9cfb6;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:none;">Edit Profile</button>
                 <button class="profile-signout-btn" onclick="signOut()">Sign Out</button>
@@ -6403,17 +6403,18 @@ window.addEventListener('load', function() {
             const nameMap = {};
             (profiles || []).forEach(p => nameMap[p.id] = p.display_name || '@' + p.handle);
 
-            let html = '<div style="font-size:0.8rem;font-weight:600;color:#756e5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Friend Requests</div>';
+            let html = '<div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;">';
             incoming.forEach(f => {
                 const otherId = f.user_a === currentUser.id ? f.user_b : f.user_a;
                 const name = nameMap[otherId] || 'Unknown';
-                html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fefcf7;border:1px solid #d9cfb6;border-radius:5px;margin-bottom:4px;">`;
-                html += `<span style="font-weight:600;">${name}</span>`;
+                html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fefcf7;border:2px solid #1a1714;border-radius:5px;box-shadow:3px 3px 0 #1a1714;">`;
+                html += `<span style="font-weight:700;font-size:0.95rem;">${name}</span>`;
                 html += `<div style="display:flex;gap:6px;">`;
-                html += `<button onclick="respondFriend('${f.id}','accepted')" style="padding:4px 12px;background:#14a06b;color:white;border:none;border-radius:4px;font-weight:600;font-size:0.8rem;cursor:pointer;">Accept</button>`;
-                html += `<button onclick="respondFriend('${f.id}','declined')" style="padding:4px 12px;background:#ff3b30;color:white;border:none;border-radius:4px;font-weight:600;font-size:0.8rem;cursor:pointer;">Decline</button>`;
+                html += `<button onclick="respondFriend('${f.id}','accepted')" style="padding:6px 14px;background:#14a06b;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:700;font-size:0.8rem;cursor:pointer;box-shadow:2px 2px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='3px 3px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='2px 2px 0 #1a1714'">Accept</button>`;
+                html += `<button onclick="respondFriend('${f.id}','declined')" style="padding:6px 14px;background:#ff3b30;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:700;font-size:0.8rem;cursor:pointer;box-shadow:2px 2px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='3px 3px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='2px 2px 0 #1a1714'">Decline</button>`;
                 html += '</div></div>';
             });
+            html += '</div>';
             container.innerHTML = html;
         } catch (e) { console.error('[Friends]', e); }
     }
