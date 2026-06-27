@@ -3703,8 +3703,10 @@
                 html += `</div>`;
             });
 
-            // Comments section
-            if (data.runId && currentUser) {
+            // Comments section (only for own or friend's runs)
+            const isMyRun = currentUser && userId === currentUser.id;
+            const isFriendRun = cachedScores.some(s => s.userId === userId && s.isFriend);
+            if (data.runId && currentUser && (isMyRun || isFriendRun)) {
                 html += '<div style="border-top:2px solid #d9cfb6;margin-top:16px;padding-top:12px;">';
                 html += '<div style="font-size:0.8rem;color:#756e5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Comments</div>';
                 html += `<div id="runComments" style="margin-bottom:8px;"></div>`;
@@ -3717,7 +3719,7 @@
             contentEl.innerHTML = html;
 
             // Load comments
-            if (data.runId && currentUser) {
+            if (data.runId && currentUser && (isMyRun || isFriendRun)) {
                 loadRunComments(data.runId);
                 const commentInput = document.getElementById('runCommentInput');
                 if (commentInput) commentInput.addEventListener('keydown', (e) => {
