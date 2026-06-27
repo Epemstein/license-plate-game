@@ -1761,7 +1761,8 @@
                 const myScore = scores.find(s => s.isMe || s.userId === currentUser?.id);
                 if (myScore) {
                     document.getElementById('myRunRow').style.display = 'flex';
-                    document.getElementById('myRunTime').textContent = myScore.totalTime.toFixed(2);
+                    const myRank = scores.indexOf(myScore) + 1;
+                    document.getElementById('myRunTime').innerHTML = `${myScore.totalTime.toFixed(2)} <span style="font-size:0.8rem;color:#756e5c;font-weight:500;">(#${myRank} of ${scores.length})</span>`;
                 }
             }
 
