@@ -4245,12 +4245,13 @@
             });
         }
 
-        // Enter key on try-it input
+        // Enter key and live highlighting on try-it input
         const tryItInputEl = document.getElementById('tryItInput');
         if (tryItInputEl) {
             tryItInputEl.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') tryItSubmit();
             });
+            tryItInputEl.addEventListener('input', () => tryItHighlight());
         }
 
         document.getElementById('rulesModalCloseBtn').addEventListener('click', () => {
@@ -6228,7 +6229,6 @@ window.addEventListener('load', function() {
     let tryItSolved = 0;
 
     function initTryIt() {
-        console.log('[TryIt] init');
         tryItIndex = 0;
         tryItSolved = 0;
         document.getElementById('tryItResult').innerHTML = '';
@@ -6236,6 +6236,7 @@ window.addEventListener('load', function() {
         document.getElementById('tryItInput').value = '';
         document.getElementById('tryItInput').style.display = '';
         document.getElementById('tryItCheckBtn').style.display = '';
+        document.getElementById('tryItTyped').innerHTML = '';
         nextTryItPlate();
         setTimeout(() => document.getElementById('tryItInput').focus(), 200);
     }
@@ -6247,12 +6248,68 @@ window.addEventListener('load', function() {
             document.getElementById('tryItResult').innerHTML = `<span style="color:#14a06b;font-weight:700;">You solved ${tryItSolved}/${tryItPlates.length} plates!</span>`;
             document.getElementById('tryItInput').style.display = 'none';
             document.getElementById('tryItCheckBtn').style.display = 'none';
+            document.getElementById('tryItTyped').innerHTML = '';
             return;
         }
         document.getElementById('tryItPlate').textContent = tryItPlates[tryItIndex];
         document.getElementById('tryItInput').value = '';
         document.getElementById('tryItInput').style.display = '';
+        document.getElementById('tryItTyped').innerHTML = '';
         document.getElementById('tryItResult').innerHTML = `<span style="color:#756e5c;">${tryItSolved}/${tryItIndex} solved</span>`;
+    }
+
+    function tryItHighlight() {
+        const input = document.getElementById('tryItInput');
+        const word = (input.value || '').toLowerCase();
+        const plate = tryItPlates[tryItIndex] || '';
+        const typedEl = document.getElementById('tryItTyped');
+        const resultEl = document.getElementById('tryItResult');
+
+        if (!word) {
+            typedEl.innerHTML = '';
+            resultEl.innerHTML = `<span style="color:#756e5c;">${tryItSolved}/${tryItIndex} solved</span>`;
+            return;
+        }
+
+        // Track which plate letters are matched in order
+        let plateIdx = 0;
+        let html = '';
+        let outOfOrder = false;
+        let outOfOrderLetter = '';
+        let expectedLetter = '';
+
+        for (let i = 0; i < word.length; i++) {
+            const ch = word[i];
+            const upper = ch.toUpperCase();
+
+            if (plateIdx < plate.length && upper === plate[plateIdx]) {
+                // Correct plate letter in order
+                html += `<span style="color:#14a06b;">${upper}</span>`;
+                plateIdx++;
+            } else if (!outOfOrder && plate.includes(upper) && plateIdx < plate.length) {
+                // It's a plate letter but out of order
+                const expectedIdx = plateIdx;
+                if (plate.indexOf(upper) > expectedIdx) {
+                    // This plate letter comes later — typed too early
+                    html += `<span style="color:#ff3b30;">${upper}</span>`;
+                    outOfOrder = true;
+                    outOfOrderLetter = upper;
+                    expectedLetter = plate[plateIdx];
+                } else {
+                    html += `<span style="color:#1a1714;">${upper}</span>`;
+                }
+            } else {
+                html += `<span style="color:#1a1714;">${upper}</span>`;
+            }
+        }
+
+        typedEl.innerHTML = html;
+
+        if (outOfOrder) {
+            resultEl.innerHTML = `<span style="color:#ff3b30;">Letters must be in order — ${outOfOrderLetter} comes after ${expectedLetter}</span>`;
+        } else {
+            resultEl.innerHTML = `<span style="color:#756e5c;">${tryItSolved}/${tryItIndex} solved</span>`;
+        }
     }
 
     function tryItSubmit() {
@@ -6278,19 +6335,8 @@ window.addEventListener('load', function() {
         }
         // Success!
         tryItSolved++;
-        // Highlight matched letters
-        let matchPi = 0;
-        let highlighted = '';
-        for (const ch of word) {
-            if (matchPi < plate.length && ch.toUpperCase() === plate[matchPi]) {
-                highlighted += `<span style="color:#14a06b;font-weight:800;">${ch}</span>`;
-                matchPi++;
-            } else {
-                highlighted += ch;
-            }
-        }
-        document.getElementById('tryItResult').innerHTML = `<span style="color:#14a06b;">✓ ${highlighted}</span>`;
         tryItIndex++;
+        document.getElementById('tryItResult').innerHTML = `<span style="color:#14a06b;font-weight:700;">✓ Correct!</span>`;
         setTimeout(nextTryItPlate, 800);
     }
     window.tryItSubmit = tryItSubmit;
