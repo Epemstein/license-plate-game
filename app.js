@@ -5825,10 +5825,34 @@
             const isSelf = currentUser && currentUser.id === userId;
             const streakHtml = streak >= 3 ? `<span style="margin-left:8px;">🔥 ${streak}</span>` : '';
 
+            // Check friendship status early
+            let friendStatus = null;
+            if (!isSelf && currentUser) {
+                try {
+                    const { data: fs } = await sb.from('friendships')
+                        .select('id, status, requested_by')
+                        .or(`and(user_a.eq.${currentUser.id},user_b.eq.${userId}),and(user_a.eq.${userId},user_b.eq.${currentUser.id})`);
+                    if (fs && fs.length > 0) friendStatus = fs[0];
+                } catch(e) {}
+            }
+
             let html = '';
             html += `<div class="profile-modal-avatar">${initials}</div>`;
             html += `<div class="profile-modal-name">${name}${streakHtml}</div>`;
             if (handle) html += `<div class="profile-modal-handle">@${handle}</div>`;
+
+            // Friend button under handle
+            if (!isSelf && currentUser) {
+                if (!friendStatus) {
+                    html += `<button class="profile-modal-challenge-btn" style="background:rgba(20,160,107,0.1);color:#14a06b;border-color:rgba(20,160,107,0.25);margin-bottom:12px;" onclick="sendFriendRequestTo('${userId}','${name.replace(/'/g,"\\'")}',this)">+ Add Friend</button>`;
+                } else if (friendStatus.status === 'pending' && friendStatus.requested_by !== currentUser.id) {
+                    html += `<button class="profile-modal-challenge-btn" style="background:rgba(20,160,107,0.1);color:#14a06b;border-color:rgba(20,160,107,0.25);margin-bottom:12px;" onclick="respondFriend('${friendStatus.id}','accepted');this.textContent='Friends ✓';this.disabled=true;">Accept Request</button>`;
+                } else if (friendStatus.status === 'pending') {
+                    html += `<button class="profile-modal-challenge-btn" style="background:#eee9db;color:#756e5c;border-color:#d9cfb6;margin-bottom:12px;" disabled>Request Pending</button>`;
+                } else if (friendStatus.status === 'accepted') {
+                    html += `<button class="profile-modal-challenge-btn" style="background:#eee9db;color:#14a06b;border-color:#d9cfb6;margin-bottom:12px;" disabled>Friends ✓</button>`;
+                }
+            }
 
             html += '<div class="profile-modal-stats">';
             html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value" style="color:#d97706;">${dailies}</div><div class="profile-modal-stat-label">dailies</div></div>`;
@@ -5840,25 +5864,6 @@
 
             if (!isSelf && currentUser) {
                 html += `<button class="profile-modal-challenge-btn" onclick="closeProfileModal();preselectedChallengeUserId='${userId}';preselectedChallengeUserName='${name.replace(/'/g,"\\'")}';openNewChallengeModal();">⚔ Challenge</button>`;
-
-                // Check friendship status
-                let friendStatus = null;
-                try {
-                    const { data: fs } = await sb.from('friendships')
-                        .select('id, status, requested_by')
-                        .or(`and(user_a.eq.${currentUser.id},user_b.eq.${userId}),and(user_a.eq.${userId},user_b.eq.${currentUser.id})`);
-                    if (fs && fs.length > 0) friendStatus = fs[0];
-                } catch(e) {}
-
-                if (!friendStatus) {
-                    html += `<button class="profile-modal-challenge-btn" style="background:rgba(20,160,107,0.1);color:#14a06b;border-color:rgba(20,160,107,0.25);" onclick="sendFriendRequestTo('${userId}','${name.replace(/'/g,"\\'")}',this)">+ Add Friend</button>`;
-                } else if (friendStatus.status === 'pending' && friendStatus.requested_by !== currentUser.id) {
-                    html += `<button class="profile-modal-challenge-btn" style="background:rgba(20,160,107,0.1);color:#14a06b;border-color:rgba(20,160,107,0.25);" onclick="respondFriend('${friendStatus.id}','accepted');this.textContent='Friends ✓';this.disabled=true;">Accept Request</button>`;
-                } else if (friendStatus.status === 'pending') {
-                    html += `<button class="profile-modal-challenge-btn" style="background:#eee9db;color:#756e5c;border-color:#d9cfb6;" disabled>Request Pending</button>`;
-                } else if (friendStatus.status === 'accepted') {
-                    html += `<button class="profile-modal-challenge-btn" style="background:#eee9db;color:#14a06b;border-color:#d9cfb6;" disabled>Friends ✓</button>`;
-                }
             }
 
             html += `<button class="profile-modal-stats-btn" onclick="openPlayerStats('${userId}','${name.replace(/'/g,"\\'")}')">Stats</button>`;
