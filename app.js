@@ -6493,31 +6493,14 @@ window.addEventListener('load', function() {
             }
         }
 
-        // Replace content while preserving cursor position
-        const sel = window.getSelection();
-        const cursorPos = sel.rangeCount ? sel.getRangeAt(0).startOffset : word.length;
         inp.innerHTML = html;
-        // Restore cursor
-        try {
-            const range = document.createRange();
-            const textNodes = [];
-            function walk(node) {
-                if (node.nodeType === 3) textNodes.push(node);
-                else node.childNodes.forEach(walk);
-            }
-            walk(inp);
-            let pos = cursorPos;
-            for (const tn of textNodes) {
-                if (pos <= tn.length) {
-                    range.setStart(tn, pos);
-                    range.collapse(true);
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                    break;
-                }
-                pos -= tn.length;
-            }
-        } catch(e) {}
+        // Place cursor at end
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(inp);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
 
         if (outOfOrder) {
             resultEl.innerHTML = `<span style="color:#ff3b30;">${outOfOrderLetter} must come after ${neededLetter}</span>`;
