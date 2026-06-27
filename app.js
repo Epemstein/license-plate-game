@@ -6639,13 +6639,17 @@ window.addEventListener('load', function() {
         }
     }
 
+    let tryItPending = false;
     function tryItSubmit() {
+        if (tryItPending) return;
         const input = document.getElementById('tryItInput');
         const word = (input.textContent || '').replace(/\s/g, '').trim().toLowerCase();
-        if (!word || word.length < 4) {
+        if (!word) return;
+        if (word.length < 4) {
             document.getElementById('tryItResult').innerHTML = '<span style="color:#ff3b30;">Words must be at least 4 letters</span>';
             return;
         }
+        if (tryItIndex >= tryItPlates.length) return;
         const plate = tryItPlates[tryItIndex];
         if (DICTIONARY.size > 0 && !DICTIONARY.has(word.toUpperCase())) {
             document.getElementById('tryItResult').innerHTML = `<span style="color:#ff3b30;">"${word.toUpperCase()}" isn't in the dictionary</span>`;
@@ -6663,9 +6667,10 @@ window.addEventListener('load', function() {
         // Success!
         tryItSolved++;
         tryItIndex++;
+        tryItPending = true;
         document.getElementById('tryItInput').textContent = '';
-        document.getElementById('tryItResult').innerHTML = `<span style="color:#14a06b;font-weight:700;">✓ Correct!</span>`;
-        setTimeout(nextTryItPlate, 800);
+        document.getElementById('tryItResult').innerHTML = `<span style="color:#14a06b;font-weight:700;">✓ ${word.toUpperCase()} matches ${plate}</span>`;
+        setTimeout(() => { tryItPending = false; nextTryItPlate(); }, 800);
     }
     window.tryItSubmit = tryItSubmit;
 });
