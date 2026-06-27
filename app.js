@@ -223,10 +223,15 @@
         // Load stats asynchronously
         if (currentUser) {
             loadProfileStats();
-            setTimeout(() => {
-                if (typeof loadFriendRequests === 'function') loadFriendRequests();
-                if (typeof loadFriendCount === 'function') loadFriendCount();
-            }, 100);
+            // Defer friend loading to ensure DOM + functions are ready
+            const waitForFriends = setInterval(() => {
+                if (typeof loadFriendRequests === 'function' && document.getElementById('statFriends')) {
+                    clearInterval(waitForFriends);
+                    loadFriendRequests();
+                    loadFriendCount();
+                }
+            }, 200);
+            setTimeout(() => clearInterval(waitForFriends), 5000); // safety timeout
         }
     }
 
