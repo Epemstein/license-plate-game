@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v250</title>
+    <title>License Plate Game v251</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -296,7 +296,7 @@
 </div>
 
 <!-- MODAL: Rules -->
-<div id="rulesModalBackdrop" class="modal-backdrop">
+<div id="rulesModalBackdrop" class="modal-backdrop" style="background:rgba(0,0,0,0.15);">
     <div class="modal" style="max-width:600px;">
         <div class="modal-header" style="background:#9370db;">
             <div class="modal-title" style="color:#fff;">How to Play</div>
@@ -311,41 +311,20 @@
                     <li>You can press <strong>Skip</strong>, but it adds a time penalty: +5s, then +10s, +15s, etc.</li>
                 </ul>
             </div>
-            <div style="height:1px;background:#e5e7eb;margin:16px 0;"></div>
+            <div style="height:1px;background:#d9cfb6;margin:16px 0;"></div>
             <div style="margin-bottom:20px;">
-                <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1f2937;">Examples</div>
-                <div style="text-align:center;margin-bottom:20px;">
-                    <div style="background:white;border:3px solid #374151;border-radius:6px;padding:12px 20px;display:inline-block;font-size:32px;font-weight:900;letter-spacing:4px;font-family:'Courier New',monospace;">RSE</div>
+                <div style="font-size:18px;font-weight:600;margin-bottom:16px;color:#1a1714;">Try it out!</div>
+                <div style="text-align:center;margin-bottom:12px;">
+                    <div id="tryItPlate" style="background:white;border:3px solid #1a1714;border-radius:6px;padding:12px 20px;display:inline-block;font-size:32px;font-weight:900;letter-spacing:4px;font-family:'Courier New',monospace;">---</div>
                 </div>
-                <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:8px;padding:12px;margin-bottom:10px;">
-                    <div style="font-size:26px;font-weight:600;margin-bottom:6px;letter-spacing:1px;">
-                        <span style="color:#16a34a;font-weight:800;">r</span><span style="color:#1f2937;">i</span><span style="color:#16a34a;font-weight:800;">s</span><span style="color:#16a34a;font-weight:800;">e</span>
-                    </div>
-                    <div style="font-size:13px;color:#6b7280;font-style:italic;">R, then S, then E</div>
+                <div id="tryItResult" style="text-align:center;min-height:28px;font-weight:600;font-size:0.9rem;margin-bottom:8px;"></div>
+                <div style="display:flex;gap:8px;max-width:360px;margin:0 auto;">
+                    <input id="tryItInput" type="text" placeholder="Type a word..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1;padding:10px 14px;border:2px solid #d9cfb6;border-radius:5px;font-size:1rem;background:#fefcf7;text-transform:uppercase;">
+                    <button onclick="tryItSubmit()" style="padding:10px 18px;background:#9370db;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:700;cursor:pointer;box-shadow:2px 2px 0 #1a1714;">Go</button>
                 </div>
-                <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:8px;padding:12px;margin-bottom:10px;">
-                    <div style="font-size:26px;font-weight:600;margin-bottom:6px;letter-spacing:1px;">
-                        <span style="color:#1f2937;">coa</span><span style="color:#16a34a;font-weight:800;">r</span><span style="color:#16a34a;font-weight:800;">s</span><span style="color:#16a34a;font-weight:800;">e</span>
-                    </div>
-                    <div style="font-size:13px;color:#6b7280;font-style:italic;">R, then S, then E (letters don't need to be consecutive)</div>
-                </div>
-                <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:8px;padding:12px;margin-bottom:10px;">
-                    <div style="font-size:26px;font-weight:600;margin-bottom:6px;letter-spacing:1px;">
-                        <span style="color:#1f2937;">b</span><span style="color:#16a34a;font-weight:800;">r</span><span style="color:#1f2937;">i</span><span style="color:#16a34a;font-weight:800;">s</span><span style="color:#1f2937;">k</span><span style="color:#16a34a;font-weight:800;">e</span><span style="color:#1f2937;">t</span>
-                    </div>
-                    <div style="font-size:13px;color:#6b7280;font-style:italic;">R appears first, then S, then E (can have letters in between)</div>
-                </div>
+                <div id="tryItScore" style="text-align:center;margin-top:12px;font-size:0.85rem;color:#756e5c;"></div>
             </div>
-            <div style="height:1px;background:#e5e7eb;margin:16px 0;"></div>
-            <div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:10px;">
-                <div style="font-size:26px;font-weight:600;margin-bottom:6px;letter-spacing:1px;">
-                    <span style="color:#dc2626;font-weight:800;">s</span><span style="color:#1f2937;">u</span><span style="color:#16a34a;font-weight:800;">r</span><span style="color:#1f2937;">mi</span><span style="color:#16a34a;font-weight:800;">s</span><span style="color:#16a34a;font-weight:800;">e</span>
-                </div>
-                <div style="font-size:13px;color:#6b7280;font-style:italic;">
-                    First S comes BEFORE the R - wrong order!
-                </div>
-            </div>
-            <button id="rulesModalCloseBtnBottom" style="width:100%;padding:14px;background:#9370db;color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;margin-top:24px;">Got it!</button>
+            <button id="rulesModalCloseBtnBottom" style="width:100%;padding:14px;background:#9370db;color:white;border:none;border-radius:5px;font-size:16px;font-weight:600;cursor:pointer;margin-top:16px;border:2px solid #1a1714;box-shadow:3px 3px 0 #1a1714;">Got it!</button>
         </div>
     </div>
 </div>
@@ -470,7 +449,7 @@
     &copy; 2026 Ezra Pemstein. All rights reserved.
 </footer>
 
-<script src="app.js?v=250"></script>
+<script src="app.js?v=251"></script>
 
 </body>
 </html>
