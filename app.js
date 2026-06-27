@@ -1,7 +1,9 @@
 
-    // Debug: check if session exists on load
-    const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('auth-token'));
-    console.log('[Auth] Session key on load:', sbKey ? 'EXISTS (' + localStorage.getItem(sbKey).substring(0, 50) + '...)' : 'MISSING');
+    // One-time migration from implicit to PKCE flow (v266)
+    if (!localStorage.getItem('pkce_migrated_v266')) {
+        Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+        localStorage.setItem('pkce_migrated_v266', '1');
+    }
 
     // === TAB SWITCHING ===
     const validTabs = ['game', 'leaderboard', 'challenges', 'profile', 'feedback'];
@@ -810,7 +812,9 @@
     // === SUPABASE ===
     const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTkwNTUsImV4cCI6MjA5MTQ5NTA1NX0.RRQA0fW02H6XKj7xKUTSnR9zrGbWuE2kSmspCeHCfyQ';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { flowType: 'pkce', persistSession: true }
+    });
 
     // Capture referral from URL
     const urlRef = new URLSearchParams(window.location.search).get('ref');
