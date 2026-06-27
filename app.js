@@ -146,17 +146,16 @@
             h += `<div style="width:40px;text-align:center;font-weight:800;font-size:${rank <= 3 ? '1.1rem' : '0.9rem'};color:${rankColor};font-family:'Public Sans',system-ui,sans-serif;">${rankDisplay}</div>`;
             h += `<div style="width:32px;height:32px;border-radius:50%;background:${isMe ? '#9370db' : '#d9cfb6'};color:${isMe ? '#fff' : '#4a4338'};display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;margin-right:10px;flex-shrink:0;">${initials}</div>`;
 
-            const nameStyle = s.userName === 'Anonymous' ? 'color:#9ca3af;' : 'cursor:pointer;';
+            const nameColor = s.userName === 'Anonymous' ? '#9ca3af' : isMe ? '#9370db' : (s.isFriend ? '#14a06b' : '#1a1714');
             const nameClick = s.userName !== 'Anonymous' ? `onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')"` : '';
             h += `<div style="flex:1;min-width:0;display:flex;align-items:center;gap:4px;">`;
-            h += `<span style="font-family:'Public Sans',system-ui,sans-serif;font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle}" ${nameClick}>${s.userName}</span>`;
+            h += `<span style="font-family:'Public Sans',system-ui,sans-serif;font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${nameColor};cursor:pointer;" ${nameClick}>${s.userName}</span>`;
             h += streakHtml;
-            if (isMe) h += '<span class="lb-badge lb-badge-you">You</span>';
-            if (s.isFriend && !isMe) h += '<span class="lb-badge lb-badge-friend">Friend</span>';
             h += '</div>';
 
+            const timeColor = isMe ? '#9370db' : (s.isFriend ? '#14a06b' : '#1a1714');
             if (userHasPlayed || isPastDate) {
-                h += `<div style="width:80px;text-align:right;font-weight:700;font-size:0.95rem;font-variant-numeric:tabular-nums;font-family:'Public Sans',system-ui,sans-serif;">${s.totalTime.toFixed(2)}</div>`;
+                h += `<div style="width:80px;text-align:right;font-weight:700;font-size:0.95rem;font-variant-numeric:tabular-nums;font-family:'Public Sans',system-ui,sans-serif;color:${timeColor};">${s.totalTime.toFixed(2)}</div>`;
             } else {
                 h += `<div style="width:80px;text-align:right;font-weight:700;font-size:0.95rem;filter:blur(5px);user-select:none;">${s.totalTime.toFixed(2)}</div>`;
             }
