@@ -3156,6 +3156,11 @@
     }
 
     async function computeExpectedTime(actualTime) {
+        // Capture mode and IDs before async — they may be reset during fetch
+        const capturedMode = gameMode;
+        const capturedH2HRunId = currentH2HRunId;
+        const capturedDailyRunId = currentDailyRunId;
+        const capturedPracticeRunId = window._lastPracticeRunId;
         // Use the full plate sequence (up to 200), not just the 10 played
         const plateSequence = dailyPlateSequence || gameHistory.map(e => e.plate);
         if (plateSequence.length === 0) return;
@@ -3295,17 +3300,14 @@
                     <br><span style="color:${color};font-weight:600;">You were ${absDiff} seconds ${word} than expected.</span>
                     <div id="expectedBreakdown" style="display:none;">${bkHtml}</div>`;
             }
-            // Save expected_seconds to the source run table
+            // Save expected_seconds to the source run table (using captured values)
             if (expectedTime > 0) {
-                if (gameMode === 'practice') {
-                    const runId = window._lastPracticeRunId;
-                    if (runId) {
-                        sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', runId).then(() => {});
-                    }
-                } else if (gameMode === 'daily' && currentDailyRunId) {
-                    sb.from('daily_runs').update({ expected_seconds: expectedTime }).eq('id', currentDailyRunId).then(() => {});
-                } else if (gameMode === 'h2h_challenge' && currentH2HRunId) {
-                    sb.from('h2h_runs').update({ expected_seconds: expectedTime }).eq('id', currentH2HRunId).then(() => {});
+                if (capturedMode === 'practice' && capturedPracticeRunId) {
+                    sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', capturedPracticeRunId).then(() => {});
+                } else if (capturedMode === 'daily' && capturedDailyRunId) {
+                    sb.from('daily_runs').update({ expected_seconds: expectedTime }).eq('id', capturedDailyRunId).then(() => {});
+                } else if (capturedMode === 'h2h_challenge' && capturedH2HRunId) {
+                    sb.from('h2h_runs').update({ expected_seconds: expectedTime }).eq('id', capturedH2HRunId).then(() => {});
                 }
             }
         } catch (e) {
