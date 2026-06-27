@@ -4261,6 +4261,20 @@
         document.getElementById('practiceBtn').addEventListener('click', async () => {
             // Show mode choice modal
             document.getElementById('practiceModeBackdrop').classList.add('show');
+            const endlessBtn = document.getElementById('chooseEndlessBtn');
+            if (!currentUser) {
+                endlessBtn.disabled = true;
+                endlessBtn.style.background = '#d9cfb6';
+                endlessBtn.style.color = '#756e5c';
+                endlessBtn.style.cursor = 'not-allowed';
+                endlessBtn.innerHTML = 'Endless Mode (Sign in required)<br><span style="font-size:0.8rem;font-weight:400;opacity:0.9;">Endless Plates</span>';
+            } else {
+                endlessBtn.disabled = false;
+                endlessBtn.style.background = '#14b8a6';
+                endlessBtn.style.color = 'white';
+                endlessBtn.style.cursor = 'pointer';
+                endlessBtn.innerHTML = 'Endless Mode<br><span style="font-size:0.8rem;font-weight:400;opacity:0.9;">Endless Plates</span>';
+            }
         });
 
         document.getElementById('choosePracticeBtn').addEventListener('click', () => {
