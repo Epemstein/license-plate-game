@@ -223,15 +223,45 @@
         // Load stats asynchronously
         if (currentUser) {
             loadProfileStats();
-            // Defer friend loading to ensure DOM + functions are ready
-            const waitForFriends = setInterval(() => {
-                if (typeof loadFriendRequests === 'function' && document.getElementById('statFriends')) {
-                    clearInterval(waitForFriends);
-                    loadFriendRequests();
-                    loadFriendCount();
-                }
-            }, 200);
-            setTimeout(() => clearInterval(waitForFriends), 5000); // safety timeout
+            // Load friends inline to avoid timing issues
+            (async () => {
+                try {
+                    // Friend count
+                    const [{ data: fa }, { data: fb }] = await Promise.all([
+                        sb.from('friendships').select('id').eq('status', 'accepted').eq('user_a', currentUser.id),
+                        sb.from('friendships').select('id').eq('status', 'accepted').eq('user_b', currentUser.id)
+                    ]);
+                    const fc = document.getElementById('statFriends');
+                    if (fc) fc.textContent = (fa ? fa.length : 0) + (fb ? fb.length : 0);
+
+                    // Friend requests
+                    const [{ data: ra }, { data: rb }] = await Promise.all([
+                        sb.from('friendships').select('id, user_a, user_b, requested_by').eq('status', 'pending').eq('user_a', currentUser.id),
+                        sb.from('friendships').select('id, user_a, user_b, requested_by').eq('status', 'pending').eq('user_b', currentUser.id)
+                    ]);
+                    const incoming = [...(ra || []), ...(rb || [])].filter(f => f.requested_by !== currentUser.id);
+                    const frSection = document.getElementById('friendRequestsSection');
+                    if (frSection && incoming.length > 0) {
+                        const otherIds = incoming.map(f => f.user_a === currentUser.id ? f.user_b : f.user_a);
+                        const { data: profiles } = await sb.from('profiles').select('id, display_name, handle').in('id', otherIds);
+                        const nameMap = {};
+                        (profiles || []).forEach(p => nameMap[p.id] = p.display_name || '@' + p.handle);
+                        let html = '<div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;">';
+                        incoming.forEach(f => {
+                            const otherId = f.user_a === currentUser.id ? f.user_b : f.user_a;
+                            const name = nameMap[otherId] || 'Unknown';
+                            html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fefcf7;border:2px solid #1a1714;border-radius:5px;box-shadow:3px 3px 0 #1a1714;">`;
+                            html += `<span style="font-weight:700;font-size:0.95rem;">${name}</span>`;
+                            html += `<div style="display:flex;gap:6px;">`;
+                            html += `<button onclick="respondFriend('${f.id}','accepted')" style="padding:6px 14px;background:#14a06b;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:700;font-size:0.8rem;cursor:pointer;box-shadow:2px 2px 0 #1a1714;">Accept</button>`;
+                            html += `<button onclick="respondFriend('${f.id}','declined')" style="padding:6px 14px;background:#ff3b30;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:700;font-size:0.8rem;cursor:pointer;box-shadow:2px 2px 0 #1a1714;">Decline</button>`;
+                            html += '</div></div>';
+                        });
+                        html += '</div>';
+                        frSection.innerHTML = html;
+                    }
+                } catch (e) { console.error('[Friends]', e); }
+            })();
         }
     }
 
