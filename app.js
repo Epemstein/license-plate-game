@@ -125,7 +125,8 @@
             const isMe = s.isMe || (currentUser && s.userId === currentUser.id);
             const initials = s.userName === 'Anonymous' ? '?' : s.userName.split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
             const streakHtml = s.streak && s.streak > 1 ? `<span style="color:#f59e0b;font-size:0.8rem;margin-left:6px;">🔥${s.streak}</span>` : '';
-            const rankColor = rank === 1 ? '#ff3b30' : rank === 2 ? '#ff3b30' : rank === 3 ? '#ff3b30' : '#756e5c';
+            const rankColor = rank <= 3 ? '#ff3b30' : '#756e5c';
+            const rankDisplay = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank;
 
             let clickAttr = '';
             if (userHasPlayed || isPastDate) {
@@ -135,13 +136,13 @@
             const bgColor = isMe ? 'rgba(147,112,219,0.06)' : 'transparent';
 
             h += `<div style="display:flex;align-items:center;padding:10px 12px;border-bottom:1px solid #d9cfb6;cursor:pointer;background:${bgColor};" ${clickAttr}>`;
-            h += `<div style="width:40px;text-align:center;font-weight:800;font-size:0.9rem;color:${rankColor};font-family:'Public Sans',system-ui,sans-serif;">#${rank}</div>`;
+            h += `<div style="width:40px;text-align:center;font-weight:800;font-size:${rank <= 3 ? '1.1rem' : '0.9rem'};color:${rankColor};font-family:'Public Sans',system-ui,sans-serif;">${rankDisplay}</div>`;
             h += `<div style="width:32px;height:32px;border-radius:50%;background:${isMe ? '#9370db' : '#d9cfb6'};color:${isMe ? '#fff' : '#4a4338'};display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;margin-right:10px;flex-shrink:0;">${initials}</div>`;
 
             const nameStyle = s.userName === 'Anonymous' ? 'color:#9ca3af;' : 'cursor:pointer;';
             const nameClick = s.userName !== 'Anonymous' ? `onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')"` : '';
             h += `<div style="flex:1;min-width:0;display:flex;align-items:center;gap:4px;">`;
-            h += `<span style="font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle}" ${nameClick}>${s.userName}</span>`;
+            h += `<span style="font-family:'Public Sans',system-ui,sans-serif;font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle}" ${nameClick}>${s.userName}</span>`;
             h += streakHtml;
             if (isMe) h += '<span class="lb-badge lb-badge-you">You</span>';
             if (s.isFriend && !isMe) h += '<span class="lb-badge lb-badge-friend">Friend</span>';
