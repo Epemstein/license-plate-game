@@ -6260,7 +6260,7 @@ window.addEventListener('load', function() {
             return;
         }
         const plate = tryItPlates[tryItIndex];
-        if (!DICTIONARY.has(word)) {
+        if (DICTIONARY.size > 0 && !DICTIONARY.has(word.toUpperCase())) {
             document.getElementById('tryItResult').innerHTML = `<span style="color:#ff3b30;">"${word.toUpperCase()}" isn't in the dictionary</span>`;
             return;
         }
