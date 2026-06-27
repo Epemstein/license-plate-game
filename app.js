@@ -69,6 +69,7 @@
     let leaderboardFilter = 'global';
     function setLeaderboardFilter(filter) {
         leaderboardFilter = filter;
+        window._lbPage = 0;
         document.getElementById('lbGlobalBtn').classList.toggle('active', filter === 'global');
         document.getElementById('lbFriendsBtn').classList.toggle('active', filter === 'friends');
         // Refetch scores but only re-render the rows (not buttons above)
@@ -104,58 +105,79 @@
         const userHasPlayed = currentUser && scores.some(s => s.userId === currentUser.id || s.isMe);
         const isPastDate = currentViewingDate !== getTodayString();
 
-        let h = '';
-        displayScores.forEach((s, i) => {
-            const rank = i + 1;
-            let rankDisplay;
-            if (rank === 1) rankDisplay = '\uD83E\uDD47';
-            else if (rank === 2) rankDisplay = '\uD83E\uDD48';
-            else if (rank === 3) rankDisplay = '\uD83E\uDD49';
-            else rankDisplay = rank + '.';
+        // Pagination
+        const pageSize = 50;
+        const lbPage = window._lbPage || 0;
+        const start = lbPage * pageSize;
+        const paged = displayScores.slice(start, start + pageSize);
+        const totalPages = Math.ceil(displayScores.length / pageSize);
 
+        // Header row
+        let h = '<div style="max-width:640px;margin:0 auto;">';
+        h += '<div style="display:flex;align-items:center;padding:8px 12px;font-size:0.75rem;font-weight:600;color:#756e5c;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #1a1714;">';
+        h += '<div style="width:40px;text-align:center;">#</div>';
+        h += '<div style="flex:1;padding-left:8px;">Player</div>';
+        h += '<div style="width:80px;text-align:right;">Time</div>';
+        h += '</div>';
+
+        paged.forEach((s, i) => {
+            const rank = start + i + 1;
             const isMe = s.isMe || (currentUser && s.userId === currentUser.id);
-            const meClass = isMe ? ' is-me' : '';
-            const newClass = '';
-
-            const streakHtml = s.streak && s.streak > 1 ? `<span class="lb-streak">\uD83D\uDD25${s.streak}</span>` : '';
-
-            let badgeHtml = '';
-            if (isMe) badgeHtml += '<span class="lb-badge lb-badge-you">You</span>';
-            if (s.isFriend && !isMe) badgeHtml += '<span class="lb-badge lb-badge-friend">Friend</span>';
-
-            let timeHtml;
-            if (userHasPlayed || isPastDate) {
-                timeHtml = `<span class="lb-time">${s.totalTime.toFixed(2)}</span>`;
-            } else {
-                timeHtml = `<span class="lb-time blurred-score">${s.totalTime.toFixed(2)}</span>`;
-            }
+            const initials = s.userName === 'Anonymous' ? '?' : s.userName.split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+            const streakHtml = s.streak && s.streak > 1 ? `<span style="color:#f59e0b;font-size:0.8rem;margin-left:6px;">🔥${s.streak}</span>` : '';
+            const rankColor = rank === 1 ? '#ff3b30' : rank === 2 ? '#ff3b30' : rank === 3 ? '#ff3b30' : '#756e5c';
 
             let clickAttr = '';
             if (userHasPlayed || isPastDate) {
-                clickAttr = `onclick="viewPlayerRun('${s.userId}','${currentViewingDate}','${s.userName.replace(/'/g,"\\'")}',${s.totalTime},${s.percentile||0},${s.median||0},${s.totalPlayers||0},${i+1})"`;
+                clickAttr = `onclick="viewPlayerRun('${s.userId}','${currentViewingDate}','${s.userName.replace(/'/g,"\\'")}',${s.totalTime},${s.percentile||0},${s.median||0},${s.totalPlayers||0},${rank})"`;
             }
 
-            h += `<div class="lb-row${meClass}${newClass}" ${clickAttr}>`;
-            h += `<div class="lb-rank">${rankDisplay}</div>`;
-            if (s.userName === 'Anonymous') {
-                h += `<div class="lb-name"><span style="color:#9ca3af;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
-            } else {
-                h += `<div class="lb-name"><span onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')" style="cursor:pointer;">${s.userName}</span>${streakHtml}${badgeHtml}</div>`;
-            }
-            h += timeHtml;
+            const bgColor = isMe ? 'rgba(147,112,219,0.06)' : 'transparent';
+
+            h += `<div style="display:flex;align-items:center;padding:10px 12px;border-bottom:1px solid #d9cfb6;cursor:pointer;background:${bgColor};" ${clickAttr}>`;
+            h += `<div style="width:40px;text-align:center;font-weight:800;font-size:0.9rem;color:${rankColor};font-family:'Public Sans',system-ui,sans-serif;">#${rank}</div>`;
+            h += `<div style="width:32px;height:32px;border-radius:50%;background:${isMe ? '#9370db' : '#d9cfb6'};color:${isMe ? '#fff' : '#4a4338'};display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;margin-right:10px;flex-shrink:0;">${initials}</div>`;
+
+            const nameStyle = s.userName === 'Anonymous' ? 'color:#9ca3af;' : 'cursor:pointer;';
+            const nameClick = s.userName !== 'Anonymous' ? `onclick="event.stopPropagation();openProfileModal('${s.userId}','${s.userName.replace(/'/g,"\\'")}')"` : '';
+            h += `<div style="flex:1;min-width:0;display:flex;align-items:center;gap:4px;">`;
+            h += `<span style="font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle}" ${nameClick}>${s.userName}</span>`;
+            h += streakHtml;
+            if (isMe) h += '<span class="lb-badge lb-badge-you">You</span>';
+            if (s.isFriend && !isMe) h += '<span class="lb-badge lb-badge-friend">Friend</span>';
+            h += '</div>';
+
             if (userHasPlayed || isPastDate) {
-                h += `<div class="lb-chevron">&#8250;</div>`;
+                h += `<div style="width:80px;text-align:right;font-weight:700;font-size:0.95rem;font-variant-numeric:tabular-nums;font-family:'Public Sans',system-ui,sans-serif;">${s.totalTime.toFixed(2)}</div>`;
             } else {
-                h += `<div class="lb-locked">\uD83D\uDD12</div>`;
+                h += `<div style="width:80px;text-align:right;font-weight:700;font-size:0.95rem;filter:blur(5px);user-select:none;">${s.totalTime.toFixed(2)}</div>`;
             }
-            h += `</div>`;
+            h += '</div>';
         });
+
+        // Pagination footer
+        if (totalPages > 1) {
+            h += `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-top:2px solid #1a1714;font-size:0.85rem;font-family:'Public Sans',system-ui,sans-serif;">`;
+            h += `<span style="color:#756e5c;font-style:italic;">${formatDateForDisplay(currentViewingDate)}</span>`;
+            h += `<div style="display:flex;align-items:center;gap:8px;">`;
+            h += `<button onclick="lbPrevPage()" style="padding:4px 10px;border:2px solid ${lbPage > 0 ? '#1a1714' : '#d9cfb6'};border-radius:4px;background:#fefcf7;cursor:${lbPage > 0 ? 'pointer' : 'default'};font-weight:700;box-shadow:none;" ${lbPage === 0 ? 'disabled' : ''}>&lt;</button>`;
+            h += `<span style="font-weight:600;">${start + 1}–${Math.min(start + pageSize, displayScores.length)} of ${displayScores.length}</span>`;
+            h += `<button onclick="lbNextPage()" style="padding:4px 10px;border:2px solid ${start + pageSize < displayScores.length ? '#1a1714' : '#d9cfb6'};border-radius:4px;background:#fefcf7;cursor:${start + pageSize < displayScores.length ? 'pointer' : 'default'};font-weight:700;box-shadow:none;" ${start + pageSize >= displayScores.length ? 'disabled' : ''}>&gt;</button>`;
+            h += '</div></div>';
+        }
+        h += '</div>';
 
         document.getElementById('leaderboardContent').innerHTML = h;
 
         // Track current IDs for next refresh
         previousLeaderboardIds = new Set(scores.map(s => s.userId));
     }
+
+    window._lbPage = 0;
+    function lbNextPage() { window._lbPage++; renderLeaderboardRows(cachedScores); }
+    function lbPrevPage() { if (window._lbPage > 0) { window._lbPage--; renderLeaderboardRows(cachedScores); } }
+    window.lbNextPage = lbNextPage;
+    window.lbPrevPage = lbPrevPage;
 
     // View my run shortcut
     function viewMyRun() {
