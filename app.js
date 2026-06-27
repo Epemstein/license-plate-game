@@ -6234,6 +6234,8 @@ window.addEventListener('load', function() {
         document.getElementById('tryItResult').innerHTML = '';
         document.getElementById('tryItScore').textContent = '';
         document.getElementById('tryItInput').value = '';
+        document.getElementById('tryItInput').style.display = '';
+        document.getElementById('tryItCheckBtn').style.display = '';
         nextTryItPlate();
         setTimeout(() => document.getElementById('tryItInput').focus(), 200);
     }
@@ -6244,6 +6246,7 @@ window.addEventListener('load', function() {
             document.getElementById('tryItPlate').textContent = '🎉';
             document.getElementById('tryItResult').innerHTML = `<span style="color:#14a06b;font-weight:700;">You solved ${tryItSolved}/${tryItPlates.length} plates!</span>`;
             document.getElementById('tryItInput').style.display = 'none';
+            document.getElementById('tryItCheckBtn').style.display = 'none';
             return;
         }
         document.getElementById('tryItPlate').textContent = tryItPlates[tryItIndex];
