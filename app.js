@@ -227,8 +227,10 @@
         // Load stats asynchronously
         if (currentUser) {
             loadProfileStats();
-            loadFriendRequests();
-            loadFriendsList();
+            setTimeout(() => {
+                if (typeof loadFriendRequests === 'function') loadFriendRequests();
+                if (typeof loadFriendsList === 'function') loadFriendsList();
+            }, 100);
             const afi = document.getElementById('addFriendInput');
             if (afi) afi.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendFriendRequest(); });
         }
