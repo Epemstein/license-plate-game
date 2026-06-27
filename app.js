@@ -5825,9 +5825,10 @@
             let friendStatus = null;
             if (!isSelf && currentUser) {
                 try {
+                    const fIds = [currentUser.id, userId].sort();
                     const { data: fs } = await sb.from('friendships')
                         .select('id, status, requested_by')
-                        .or(`and(user_a.eq.${currentUser.id},user_b.eq.${userId}),and(user_a.eq.${userId},user_b.eq.${currentUser.id})`);
+                        .eq('user_a', fIds[0]).eq('user_b', fIds[1]);
                     if (fs && fs.length > 0) friendStatus = fs[0];
                 } catch(e) {}
             }
@@ -6345,9 +6346,10 @@ window.addEventListener('load', function() {
             if (target.id === currentUser.id) { resultEl.innerHTML = '<span style="color:#ff3b30;">That\'s you!</span>'; return; }
 
             // Check existing friendship
+            const ids = [currentUser.id, target.id].sort();
             const { data: existing } = await sb.from('friendships')
                 .select('id, status')
-                .or(`and(user_a.eq.${currentUser.id},user_b.eq.${target.id}),and(user_a.eq.${target.id},user_b.eq.${currentUser.id})`);
+                .eq('user_a', ids[0]).eq('user_b', ids[1]);
             if (existing && existing.length > 0) {
                 const f = existing[0];
                 if (f.status === 'accepted') { resultEl.innerHTML = '<span style="color:#756e5c;">Already friends!</span>'; return; }
@@ -6389,10 +6391,11 @@ window.addEventListener('load', function() {
         const container = document.getElementById('friendRequestsSection');
         if (!container || !currentUser) return;
         try {
-            const { data } = await sb.from('friendships')
-                .select('id, user_a, user_b, requested_by')
-                .eq('status', 'pending')
-                .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
+            const [{ data: d1 }, { data: d2 }] = await Promise.all([
+                sb.from('friendships').select('id, user_a, user_b, requested_by').eq('status', 'pending').eq('user_a', currentUser.id),
+                sb.from('friendships').select('id, user_a, user_b, requested_by').eq('status', 'pending').eq('user_b', currentUser.id)
+            ]);
+            const data = [...(d1 || []), ...(d2 || [])];
             const incoming = (data || []).filter(f => f.requested_by !== currentUser.id);
             if (incoming.length === 0) { container.innerHTML = ''; return; }
 
@@ -6433,11 +6436,11 @@ window.addEventListener('load', function() {
         const el = document.getElementById('statFriends');
         if (!el || !currentUser) return;
         try {
-            const { data } = await sb.from('friendships')
-                .select('id')
-                .eq('status', 'accepted')
-                .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
-            el.textContent = data ? data.length : 0;
+            const [{ data: d1 }, { data: d2 }] = await Promise.all([
+                sb.from('friendships').select('id').eq('status', 'accepted').eq('user_a', currentUser.id),
+                sb.from('friendships').select('id').eq('status', 'accepted').eq('user_b', currentUser.id)
+            ]);
+            el.textContent = (d1 ? d1.length : 0) + (d2 ? d2.length : 0);
         } catch (e) { el.textContent = '0'; }
     }
 
@@ -6445,10 +6448,11 @@ window.addEventListener('load', function() {
         const container = document.getElementById('profileContent');
         container.innerHTML = '<p style="text-align:center;color:#756e5c;padding:20px;">Loading friends...</p>';
         try {
-            const { data } = await sb.from('friendships')
-                .select('user_a, user_b')
-                .eq('status', 'accepted')
-                .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
+            const [{ data: fa }, { data: fb }] = await Promise.all([
+                sb.from('friendships').select('user_a, user_b').eq('status', 'accepted').eq('user_a', currentUser.id),
+                sb.from('friendships').select('user_a, user_b').eq('status', 'accepted').eq('user_b', currentUser.id)
+            ]);
+            const data = [...(fa || []), ...(fb || [])];
 
             const friendIds = (data || []).map(f => f.user_a === currentUser.id ? f.user_b : f.user_a);
             const { data: profiles } = friendIds.length > 0
