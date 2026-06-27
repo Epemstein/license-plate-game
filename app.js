@@ -1,12 +1,4 @@
 
-    // One-time cleanup of stale auth data from Supabase version mismatch (v242)
-    if (!localStorage.getItem('auth_cleanup_v242')) {
-        try {
-            Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
-            localStorage.setItem('auth_cleanup_v242', '1');
-        } catch(e) {}
-    }
-
     // === TAB SWITCHING ===
     const validTabs = ['game', 'leaderboard', 'challenges', 'profile', 'feedback'];
     const savedTab = sessionStorage.getItem('activeTab');
