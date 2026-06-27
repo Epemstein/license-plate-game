@@ -447,6 +447,7 @@
             z-index: 900;
         }
 
+        #rulesModalBackdrop { background: rgba(0,0,0,0.08) !important; }
         #gameModalBackdrop { z-index: 900; }
         #chartModalBackdrop { z-index: 950; }
         #wordsModalBackdrop { z-index: 1000; }

@@ -6228,6 +6228,7 @@ window.addEventListener('load', function() {
     let tryItSolved = 0;
 
     function initTryIt() {
+        console.log('[TryIt] init');
         tryItIndex = 0;
         tryItSolved = 0;
         document.getElementById('tryItResult').innerHTML = '';
@@ -6236,6 +6237,7 @@ window.addEventListener('load', function() {
         nextTryItPlate();
         setTimeout(() => document.getElementById('tryItInput').focus(), 200);
     }
+    window.initTryIt = initTryIt;
 
     function nextTryItPlate() {
         if (tryItIndex >= tryItPlates.length) {
