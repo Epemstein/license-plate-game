@@ -6356,7 +6356,6 @@ window.addEventListener('load', function() {
                 resultEl.innerHTML = '<span style="color:#756e5c;">Request already pending</span>'; return;
             }
 
-            const ids = [currentUser.id, target.id].sort();
             await sb.from('friendships').insert({
                 user_a: ids[0], user_b: ids[1],
                 status: 'pending', requested_by: currentUser.id
