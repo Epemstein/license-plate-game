@@ -1289,6 +1289,7 @@
             .eq('run_id', run.id)
             .order('plate_index');
         const result = {
+            runId: run.id,
             totalTime: run.total_seconds,
             history: (entries || []).map(e => ({
                 plate: e.plate,
@@ -3663,20 +3664,14 @@
                 return;
             }
 
-            // Stats card
-            let html = '<div style="background:#f9fafb;border-radius:12px;padding:16px;margin-bottom:20px;">';
-            html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
-            html += `<span>Total time</span><span style="font-weight:600;color:#16a34a;">${data.totalTime.toFixed(2)}${percentile ? '  (Top ' + Math.max(1, Math.round(100 - percentile)) + '%)' : ''}</span>`;
-            html += `</div>`;
+            // Stats rows with drop shadow
+            let html = '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">';
+            html += `<div class="stats-section-box" style="box-shadow:2px 2px 0 #1a1714;border:2px solid #1a1714;border-radius:5px;"><div class="stats-row"><span class="stats-row-label">Total time</span><div class="stats-row-right"><span class="stats-row-value" style="color:#14a06b;">${data.totalTime.toFixed(2)}${percentile ? '  (Top ' + Math.max(1, Math.round(100 - percentile)) + '%)' : ''}</span></div></div></div>`;
             if (median) {
-                html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">`;
-                html += `<span>Median time</span><span style="color:#6b7280;">${parseFloat(median).toFixed(2)}</span>`;
-                html += `</div>`;
+                html += `<div class="stats-section-box" style="box-shadow:2px 2px 0 #1a1714;border:2px solid #1a1714;border-radius:5px;"><div class="stats-row"><span class="stats-row-label">Median time</span><div class="stats-row-right"><span class="stats-row-value">${parseFloat(median).toFixed(2)}</span></div></div></div>`;
             }
             if (rank && totalPlayers) {
-                html += `<div style="display:flex;justify-content:space-between;padding:8px 0;">`;
-                html += `<span>Global rank</span><span style="color:#6b7280;">${rank} of ${totalPlayers}</span>`;
-                html += `</div>`;
+                html += `<div class="stats-section-box" style="box-shadow:2px 2px 0 #1a1714;border:2px solid #1a1714;border-radius:5px;"><div class="stats-row"><span class="stats-row-label">Global rank</span><div class="stats-row-right"><span class="stats-row-value">${rank} of ${totalPlayers}</span></div></div></div>`;
             }
             html += '</div>';
 
@@ -3708,12 +3703,89 @@
                 html += `</div>`;
             });
 
+            // Comments section
+            if (data.runId && currentUser) {
+                html += '<div style="border-top:2px solid #d9cfb6;margin-top:16px;padding-top:12px;">';
+                html += '<div style="font-size:0.8rem;color:#756e5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Comments</div>';
+                html += `<div id="runComments" style="margin-bottom:8px;"></div>`;
+                html += `<div style="display:flex;gap:6px;">`;
+                html += `<input id="runCommentInput" type="text" placeholder="Add a comment..." style="flex:1;padding:8px 12px;border:2px solid #d9cfb6;border-radius:5px;font-size:0.85rem;background:#fefcf7;">`;
+                html += `<button onclick="submitRunComment('${data.runId}')" style="padding:8px 14px;background:#9370db;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:600;font-size:0.85rem;cursor:pointer;box-shadow:2px 2px 0 #1a1714;">Send</button>`;
+                html += '</div></div>';
+            }
+
             contentEl.innerHTML = html;
+
+            // Load comments
+            if (data.runId && currentUser) {
+                loadRunComments(data.runId);
+                const commentInput = document.getElementById('runCommentInput');
+                if (commentInput) commentInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') submitRunComment(data.runId);
+                });
+            }
 
         } catch (error) {
             console.error('Error loading run details:', error);
             contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;">Failed to load run details</p>';
         }
+    }
+
+    async function loadRunComments(runId) {
+        const container = document.getElementById('runComments');
+        if (!container) return;
+        try {
+            const { data } = await sb.from('run_comments')
+                .select('id, text, user_id, created_at')
+                .eq('run_id', runId)
+                .order('created_at', { ascending: true });
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div style="color:#756e5c;font-size:0.8rem;font-style:italic;">No comments yet</div>';
+                return;
+            }
+            // Resolve user names
+            const userIds = [...new Set(data.map(c => c.user_id))];
+            const { data: profiles } = await sb.from('profiles').select('id, display_name, handle').in('id', userIds);
+            const nameMap = {};
+            (profiles || []).forEach(p => nameMap[p.id] = p.display_name || ('@' + p.handle) || 'Anon');
+
+            let html = '';
+            data.forEach(c => {
+                const name = nameMap[c.user_id] || 'Anon';
+                const ago = timeSince(new Date(c.created_at));
+                const isMe = currentUser && c.user_id === currentUser.id;
+                html += `<div style="padding:6px 0;border-bottom:1px solid #eee9db;font-size:0.85rem;">`;
+                html += `<span style="font-weight:600;${isMe ? 'color:#9370db;' : ''}">${name}</span>`;
+                html += `<span style="color:#756e5c;font-size:0.75rem;margin-left:6px;">${ago}</span>`;
+                html += `<div style="margin-top:2px;">${c.text}</div>`;
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        } catch (e) {
+            console.error('[Comments]', e);
+        }
+    }
+
+    async function submitRunComment(runId) {
+        const input = document.getElementById('runCommentInput');
+        const text = (input.value || '').trim();
+        if (!text || !currentUser) return;
+        input.value = '';
+        try {
+            await sb.from('run_comments').insert({ run_id: runId, user_id: currentUser.id, text });
+            loadRunComments(runId);
+        } catch (e) {
+            console.error('[Comment submit]', e);
+        }
+    }
+    window.submitRunComment = submitRunComment;
+
+    function timeSince(date) {
+        const s = Math.floor((Date.now() - date.getTime()) / 1000);
+        if (s < 60) return 'just now';
+        if (s < 3600) return Math.floor(s / 60) + 'm ago';
+        if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+        return Math.floor(s / 86400) + 'd ago';
     }
 
     window.viewPlayerRun = viewPlayerRun;
