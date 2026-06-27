@@ -82,6 +82,13 @@
                 const friendCount = scores.filter(s => s.isFriend || s.isMe).length;
                 document.getElementById('lbGlobalBtn').textContent = `Global (${scores.length})`;
                 document.getElementById('lbFriendsBtn').textContent = `Friends (${friendCount})`;
+                // Update My Run rank
+                const myScore = currentUser ? scores.find(s => s.isMe || s.userId === currentUser.id) : null;
+                if (myScore) {
+                    const myRank = scores.indexOf(myScore) + 1;
+                    const el = document.getElementById('myRunTime');
+                    if (el) el.innerHTML = `${myScore.totalTime.toFixed(2)} <span style="font-size:0.8rem;color:#756e5c;font-weight:500;">(#${myRank} of ${scores.length})</span>`;
+                }
                 renderLeaderboardRows(scores, oldIds);
             }
         })();
