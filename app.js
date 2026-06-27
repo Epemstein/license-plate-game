@@ -1,4 +1,8 @@
 
+    // Debug: check if session exists on load
+    const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('auth-token'));
+    console.log('[Auth] Session key on load:', sbKey ? 'EXISTS (' + localStorage.getItem(sbKey).substring(0, 50) + '...)' : 'MISSING');
+
     // === TAB SWITCHING ===
     const validTabs = ['game', 'leaderboard', 'challenges', 'profile', 'feedback'];
     const savedTab = sessionStorage.getItem('activeTab');
