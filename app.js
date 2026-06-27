@@ -4317,13 +4317,12 @@
             });
         }
 
-        // Enter key and live highlighting on try-it input
+        // Enter key on try-it input
         const tryItInputEl = document.getElementById('tryItInput');
         if (tryItInputEl) {
             tryItInputEl.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') tryItSubmit();
             });
-            tryItInputEl.addEventListener('input', () => tryItHighlight());
         }
 
         document.getElementById('rulesModalCloseBtn').addEventListener('click', () => {
@@ -6305,12 +6304,14 @@ window.addEventListener('load', function() {
         tryItSolved = 0;
         document.getElementById('tryItResult').innerHTML = '';
         document.getElementById('tryItScore').textContent = '';
-        document.getElementById('tryItInput').value = '';
-        document.getElementById('tryItInput').style.display = '';
+        const inp = document.getElementById('tryItInput');
+        inp.value = '';
+        inp.style.display = '';
+        inp.oninput = tryItHighlight;
         document.getElementById('tryItCheckBtn').style.display = '';
         document.getElementById('tryItTyped').innerHTML = '';
         nextTryItPlate();
-        setTimeout(() => document.getElementById('tryItInput').focus(), 200);
+        setTimeout(() => inp.focus(), 200);
     }
     window.initTryIt = initTryIt;
 
