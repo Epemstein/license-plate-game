@@ -3302,8 +3302,18 @@
             }
             // Save expected_seconds to the source run table (using captured values)
             if (expectedTime > 0) {
-                if (capturedMode === 'practice' && capturedPracticeRunId) {
-                    sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', capturedPracticeRunId).then(() => {});
+                if (capturedMode === 'practice') {
+                    // Practice run ID may not be set yet (async insert). Wait and retry.
+                    const prId = capturedPracticeRunId || window._lastPracticeRunId;
+                    if (prId) {
+                        sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', prId).then(() => {});
+                    } else {
+                        // Wait for practice run to be created
+                        setTimeout(() => {
+                            const delayedId = window._lastPracticeRunId;
+                            if (delayedId) sb.from('practice_runs').update({ expected_seconds: expectedTime }).eq('id', delayedId).then(() => {});
+                        }, 3000);
+                    }
                 } else if (capturedMode === 'daily' && capturedDailyRunId) {
                     sb.from('daily_runs').update({ expected_seconds: expectedTime }).eq('id', capturedDailyRunId).then(() => {});
                 } else if (capturedMode === 'h2h_challenge' && capturedH2HRunId) {
