@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Players v1</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        h1 { font-size: 1.3rem; margin-bottom: 16px; }
+
+        /* Search */
+        .search-row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .search-row input { flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+        .search-row input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+        .search-results { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; max-height: 300px; overflow-y: auto; }
+        .search-result { padding: 10px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; }
+        .search-result:hover { background: #f9fafb; }
+        .search-result:last-child { border-bottom: none; }
+        .sr-name { font-weight: 600; }
+        .sr-handle { color: #6b7280; font-size: 13px; }
+        .sr-games { color: #9ca3af; font-size: 12px; }
+
+        /* Player card */
+        .player-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .player-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .player-name { font-size: 1.2rem; font-weight: 700; }
+        .player-handle { color: #6b7280; font-size: 14px; }
+        .player-meta { color: #9ca3af; font-size: 12px; margin-top: 4px; }
+        .stats-row { display: flex; gap: 12px; flex-wrap: wrap; }
+        .mini-stat { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; min-width: 100px; text-align: center; }
+        .mini-stat .label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .mini-stat .val { font-size: 1.1rem; font-weight: 700; margin-top: 2px; }
+
+        /* Charts */
+        .charts-row { display: flex; gap: 20px; margin-bottom: 20px; }
+        .chart-box { flex: 1; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; min-width: 0; }
+        .chart-box h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+
+        /* Runs table */
+        .runs-table { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+        .runs-table h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; padding: 14px 16px 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #e5e7eb; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; }
+        tr:hover { background: #f9fafb; }
+        .positive { color: #16a34a; font-weight: 600; }
+        .negative { color: #dc2626; font-weight: 600; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+
+        @media (max-width: 768px) { .charts-row { flex-direction: column; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Players</h1>
+
+    <div class="search-row">
+        <input type="text" id="searchInput" placeholder="Search by name or @handle..." autocomplete="off">
+    </div>
+    <div id="searchResults" class="search-results" style="display:none;"></div>
+
+    <div id="playerView" style="display:none;">
+        <div id="playerCard" class="player-card"></div>
+
+        <div class="charts-row">
+            <div class="chart-box">
+                <h3>xT Performance (Actual vs Expected)</h3>
+                <canvas id="xtChart" height="200"></canvas>
+            </div>
+        </div>
+        <div class="charts-row">
+            <div class="chart-box">
+                <h3>xT Delta Over Time (higher = outperforming)</h3>
+                <canvas id="deltaChart" height="160"></canvas>
+            </div>
+        </div>
+
+        <div id="runsTable" class="runs-table"></div>
+    </div>
+
+    <div id="emptyState" class="empty-state">
+        Search for a player to view their stats and xT trends.
+    </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTkxOTA1NSwiZXhwIjoyMDkxNDk1MDU1fQ.b_qDqjP-Nadk_M_kACc5mJB_OR_-Cx80vOgOfLYsDLQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false }
+});
+
+let xtChart = null;
+let deltaChart = null;
+
+// Search
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+let searchTimeout = null;
+
+searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    const q = searchInput.value.trim();
+    if (q.length < 2) { searchResults.style.display = 'none'; return; }
+    searchTimeout = setTimeout(() => doSearch(q), 300);
+});
+
+async function doSearch(q) {
+    const { data: profiles } = await sb.from('profiles')
+        .select('id, display_name, handle')
+        .or(`handle.ilike.%${q}%,display_name.ilike.%${q}%`)
+        .order('display_name')
+        .limit(20);
+
+    if (!profiles || !profiles.length) {
+        searchResults.innerHTML = '<div class="search-result"><span class="sr-name">No players found</span></div>';
+        searchResults.style.display = 'block';
+        return;
+    }
+
+    // Get game counts
+    const ids = profiles.map(p => p.id);
+    const { data: counts } = await sb.from('daily_runs')
+        .select('user_id')
+        .in('user_id', ids)
+        .not('total_seconds', 'is', null);
+
+    const countMap = {};
+    (counts || []).forEach(r => { countMap[r.user_id] = (countMap[r.user_id] || 0) + 1; });
+
+    searchResults.innerHTML = profiles.map(p => `
+        <div class="search-result" onclick="loadPlayer('${p.id}')">
+            <div>
+                <span class="sr-name">${p.display_name || 'No name'}</span>
+                ${p.handle ? `<span class="sr-handle">@${p.handle}</span>` : ''}
+            </div>
+            <span class="sr-games">${countMap[p.id] || 0} games</span>
+        </div>
+    `).join('');
+    searchResults.style.display = 'block';
+}
+
+async function loadPlayer(userId) {
+    searchResults.style.display = 'none';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('playerView').style.display = 'block';
+
+    // Fetch profile
+    const { data: profile } = await sb.from('profiles')
+        .select('id, display_name, handle, is_public, created_at')
+        .eq('id', userId)
+        .single();
+
+    // Fetch all daily runs
+    const { data: runs } = await sb.from('daily_runs')
+        .select('date, total_seconds, expected_seconds')
+        .eq('user_id', userId)
+        .not('total_seconds', 'is', null)
+        .order('date', { ascending: true });
+
+    // Fetch overall stats
+    const { data: statsRows } = await sb.rpc('user_overall_stats', { p_user_id: userId });
+    const stats = statsRows?.[0];
+
+    // Fetch streak
+    const { data: streakDates } = await sb.from('daily_runs')
+        .select('date')
+        .eq('user_id', userId)
+        .not('total_seconds', 'is', null)
+        .order('date', { ascending: false })
+        .limit(400);
+
+    const streak = computeStreak(streakDates || []);
+
+    // Render player card
+    const gamesPlayed = runs ? runs.length : 0;
+    const avgTime = gamesPlayed > 0 ? (runs.reduce((s, r) => s + parseFloat(r.total_seconds), 0) / gamesPlayed).toFixed(1) : '--';
+    const beatPct = stats?.ratio != null ? (stats.ratio * 100).toFixed(1) + '%' : '--';
+    const overallRank = stats?.percentile_rank != null ? 'Top ' + Math.max(1, Math.round(100 - stats.percentile_rank)) + '%' : '--';
+    const runsWithXt = runs ? runs.filter(r => r.expected_seconds != null) : [];
+    const avgXtDelta = runsWithXt.length > 0
+        ? (runsWithXt.reduce((s, r) => s + (r.expected_seconds - parseFloat(r.total_seconds)), 0) / runsWithXt.length).toFixed(1)
+        : '--';
+    const signupDate = profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
+
+    document.getElementById('playerCard').innerHTML = `
+        <div class="player-header">
+            <div>
+                <div class="player-name">${profile?.display_name || 'Unknown'}</div>
+                ${profile?.handle ? `<div class="player-handle">@${profile.handle}</div>` : ''}
+                <div class="player-meta">Joined ${signupDate} · ${profile?.is_public ? 'Public' : 'Private'}</div>
+            </div>
+        </div>
+        <div class="stats-row">
+            <div class="mini-stat"><div class="label">Games</div><div class="val">${gamesPlayed}</div></div>
+            <div class="mini-stat"><div class="label">Avg Time</div><div class="val">${avgTime}s</div></div>
+            <div class="mini-stat"><div class="label">Streak</div><div class="val">${streak}</div></div>
+            <div class="mini-stat"><div class="label">Beat</div><div class="val">${beatPct}</div></div>
+            <div class="mini-stat"><div class="label">Overall</div><div class="val">${overallRank}</div></div>
+            <div class="mini-stat"><div class="label">Avg xT+</div><div class="val ${parseFloat(avgXtDelta) > 0 ? 'positive' : 'negative'}">${avgXtDelta}s</div></div>
+        </div>
+    `;
+
+    // Render charts
+    renderXtChart(runs || []);
+    renderDeltaChart(runs || []);
+
+    // Render runs table
+    renderRunsTable(runs || []);
+}
+
+function computeStreak(dateRows) {
+    const dates = new Set(dateRows.map(r => r.date));
+    if (!dates.size) return 0;
+    const today = new Date();
+    const fmt = d => d.toISOString().slice(0, 10);
+    let check = fmt(today);
+    if (!dates.has(check)) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        check = fmt(yesterday);
+        if (!dates.has(check)) return 0;
+    }
+    let streak = 0;
+    let d = new Date(check + 'T00:00:00');
+    while (dates.has(fmt(d))) {
+        streak++;
+        d.setDate(d.getDate() - 1);
+    }
+    return streak;
+}
+
+function renderXtChart(runs) {
+    const withXt = runs.filter(r => r.expected_seconds != null);
+    const labels = withXt.map(r => r.date);
+    const actual = withXt.map(r => parseFloat(r.total_seconds));
+    const expected = withXt.map(r => r.expected_seconds);
+
+    if (xtChart) xtChart.destroy();
+    xtChart = new Chart(document.getElementById('xtChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Actual',
+                    data: actual,
+                    borderColor: '#7c3aed',
+                    backgroundColor: 'rgba(124,58,237,0.1)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    fill: false,
+                    tension: 0.3
+                },
+                {
+                    label: 'Expected (xT)',
+                    data: expected,
+                    borderColor: '#9ca3af',
+                    borderDash: [5, 5],
+                    borderWidth: 1.5,
+                    pointRadius: 2,
+                    fill: false,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { maxTicksLimit: 15, font: { size: 10 } } },
+                y: { title: { display: true, text: 'Seconds', font: { size: 11 } }, ticks: { font: { size: 10 } } }
+            }
+        }
+    });
+}
+
+function renderDeltaChart(runs) {
+    const withXt = runs.filter(r => r.expected_seconds != null);
+    const labels = withXt.map(r => r.date);
+    const deltas = withXt.map(r => +(r.expected_seconds - parseFloat(r.total_seconds)).toFixed(1));
+
+    // Rolling 7-game average
+    const rolling = deltas.map((_, i) => {
+        const window = deltas.slice(Math.max(0, i - 6), i + 1);
+        return +(window.reduce((a, b) => a + b, 0) / window.length).toFixed(1);
+    });
+
+    if (deltaChart) deltaChart.destroy();
+    deltaChart = new Chart(document.getElementById('deltaChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'xT Delta',
+                    data: deltas,
+                    backgroundColor: deltas.map(d => d >= 0 ? 'rgba(22,163,74,0.3)' : 'rgba(220,38,38,0.3)'),
+                    borderColor: deltas.map(d => d >= 0 ? '#16a34a' : '#dc2626'),
+                    borderWidth: 1,
+                    borderRadius: 3,
+                    order: 2
+                },
+                {
+                    label: '7-game avg',
+                    data: rolling,
+                    type: 'line',
+                    borderColor: '#7c3aed',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: false,
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { maxTicksLimit: 15, font: { size: 10 } } },
+                y: { title: { display: true, text: 'xT Delta (s)', font: { size: 11 } }, ticks: { font: { size: 10 } } }
+            }
+        }
+    });
+}
+
+function renderRunsTable(runs) {
+    const reversed = [...runs].reverse();
+    const container = document.getElementById('runsTable');
+
+    let html = '<h3>Recent Runs</h3><table><thead><tr>';
+    html += '<th>Date</th><th>Time</th><th>xT</th><th>Delta</th>';
+    html += '</tr></thead><tbody>';
+
+    reversed.slice(0, 50).forEach(r => {
+        const time = parseFloat(r.total_seconds).toFixed(1);
+        const xt = r.expected_seconds != null ? r.expected_seconds.toFixed(1) : '--';
+        let delta = '--';
+        let deltaClass = '';
+        if (r.expected_seconds != null) {
+            const d = r.expected_seconds - parseFloat(r.total_seconds);
+            delta = (d >= 0 ? '+' : '') + d.toFixed(1);
+            deltaClass = d >= 0 ? 'positive' : 'negative';
+        }
+
+        html += `<tr>
+            <td>${formatDate(r.date)}</td>
+            <td><strong>${time}s</strong></td>
+            <td>${xt}s</td>
+            <td class="${deltaClass}">${delta}s</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+</script>
+</body>
+</html>
