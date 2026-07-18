@@ -123,15 +123,18 @@ async function doSearch(q) {
         return;
     }
 
-    // Get game counts
+    // Get game counts from all modes
     const ids = profiles.map(p => p.id);
-    const { data: counts } = await sb.from('daily_runs')
-        .select('user_id')
-        .in('user_id', ids)
-        .not('total_seconds', 'is', null);
+    const [dc, hc, pc] = await Promise.all([
+        sb.from('daily_runs').select('user_id').in('user_id', ids).not('total_seconds', 'is', null),
+        sb.from('h2h_runs').select('user_id').in('user_id', ids).not('total_seconds', 'is', null),
+        sb.from('practice_runs').select('user_id').in('user_id', ids).not('total_seconds', 'is', null),
+    ]);
 
     const countMap = {};
-    (counts || []).forEach(r => { countMap[r.user_id] = (countMap[r.user_id] || 0) + 1; });
+    [...(dc.data || []), ...(hc.data || []), ...(pc.data || [])].forEach(r => {
+        countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
+    });
 
     searchResults.innerHTML = profiles.map(p => `
         <div class="search-result" onclick="loadPlayer('${p.id}')">
@@ -156,18 +159,55 @@ async function loadPlayer(userId) {
         .eq('id', userId)
         .single();
 
-    // Fetch all daily runs
-    const { data: runs } = await sb.from('daily_runs')
-        .select('date, total_seconds, expected_seconds')
-        .eq('user_id', userId)
-        .not('total_seconds', 'is', null)
-        .order('date', { ascending: true });
+    // Fetch runs from all three tables in parallel
+    const [dailyRes, h2hRes, practiceRes] = await Promise.all([
+        sb.from('daily_runs')
+            .select('date, total_seconds, expected_seconds, completed_at')
+            .eq('user_id', userId)
+            .not('total_seconds', 'is', null)
+            .order('date', { ascending: true }),
+        sb.from('h2h_runs')
+            .select('created_at, total_seconds, expected_seconds')
+            .eq('user_id', userId)
+            .not('total_seconds', 'is', null)
+            .order('created_at', { ascending: true }),
+        sb.from('practice_runs')
+            .select('created_at, total_seconds, expected_seconds')
+            .eq('user_id', userId)
+            .not('total_seconds', 'is', null)
+            .order('created_at', { ascending: true })
+    ]);
 
-    // Fetch overall stats
+    // Normalize all runs into a common shape
+    const allRuns = [];
+    (dailyRes.data || []).forEach(r => allRuns.push({
+        date: r.date,
+        sortKey: r.completed_at || r.date,
+        total_seconds: parseFloat(r.total_seconds),
+        expected_seconds: r.expected_seconds,
+        source: 'Daily'
+    }));
+    (h2hRes.data || []).forEach(r => allRuns.push({
+        date: r.created_at?.slice(0, 10) || '',
+        sortKey: r.created_at,
+        total_seconds: parseFloat(r.total_seconds),
+        expected_seconds: r.expected_seconds,
+        source: 'H2H'
+    }));
+    (practiceRes.data || []).forEach(r => allRuns.push({
+        date: r.created_at?.slice(0, 10) || '',
+        sortKey: r.created_at,
+        total_seconds: parseFloat(r.total_seconds),
+        expected_seconds: r.expected_seconds,
+        source: 'Practice'
+    }));
+    allRuns.sort((a, b) => a.sortKey < b.sortKey ? -1 : 1);
+
+    // Fetch overall stats (daily only)
     const { data: statsRows } = await sb.rpc('user_overall_stats', { p_user_id: userId });
     const stats = statsRows?.[0];
 
-    // Fetch streak
+    // Fetch streak (daily only)
     const { data: streakDates } = await sb.from('daily_runs')
         .select('date')
         .eq('user_id', userId)
@@ -178,13 +218,16 @@ async function loadPlayer(userId) {
     const streak = computeStreak(streakDates || []);
 
     // Render player card
-    const gamesPlayed = runs ? runs.length : 0;
-    const avgTime = gamesPlayed > 0 ? (runs.reduce((s, r) => s + parseFloat(r.total_seconds), 0) / gamesPlayed).toFixed(1) : '--';
+    const dailyCount = (dailyRes.data || []).length;
+    const h2hCount = (h2hRes.data || []).length;
+    const practiceCount = (practiceRes.data || []).length;
+    const totalGames = allRuns.length;
+    const avgTime = totalGames > 0 ? (allRuns.reduce((s, r) => s + r.total_seconds, 0) / totalGames).toFixed(1) : '--';
     const beatPct = stats?.ratio != null ? (stats.ratio * 100).toFixed(1) + '%' : '--';
     const overallRank = stats?.percentile_rank != null ? 'Top ' + Math.max(1, Math.round(100 - stats.percentile_rank)) + '%' : '--';
-    const runsWithXt = runs ? runs.filter(r => r.expected_seconds != null) : [];
+    const runsWithXt = allRuns.filter(r => r.expected_seconds != null);
     const avgXtDelta = runsWithXt.length > 0
-        ? (runsWithXt.reduce((s, r) => s + (r.expected_seconds - parseFloat(r.total_seconds)), 0) / runsWithXt.length).toFixed(1)
+        ? (runsWithXt.reduce((s, r) => s + (r.expected_seconds - r.total_seconds), 0) / runsWithXt.length).toFixed(1)
         : '--';
     const signupDate = profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
 
@@ -197,7 +240,10 @@ async function loadPlayer(userId) {
             </div>
         </div>
         <div class="stats-row">
-            <div class="mini-stat"><div class="label">Games</div><div class="val">${gamesPlayed}</div></div>
+            <div class="mini-stat"><div class="label">Total Runs</div><div class="val">${totalGames}</div></div>
+            <div class="mini-stat"><div class="label">Daily</div><div class="val">${dailyCount}</div></div>
+            <div class="mini-stat"><div class="label">H2H</div><div class="val">${h2hCount}</div></div>
+            <div class="mini-stat"><div class="label">Practice</div><div class="val">${practiceCount}</div></div>
             <div class="mini-stat"><div class="label">Avg Time</div><div class="val">${avgTime}s</div></div>
             <div class="mini-stat"><div class="label">Streak</div><div class="val">${streak}</div></div>
             <div class="mini-stat"><div class="label">Beat</div><div class="val">${beatPct}</div></div>
@@ -207,11 +253,11 @@ async function loadPlayer(userId) {
     `;
 
     // Render charts
-    renderXtChart(runs || []);
-    renderDeltaChart(runs || []);
+    renderXtChart(allRuns);
+    renderDeltaChart(allRuns);
 
     // Render runs table
-    renderRunsTable(runs || []);
+    renderRunsTable(allRuns);
 }
 
 function computeStreak(dateRows) {
@@ -238,7 +284,7 @@ function computeStreak(dateRows) {
 function renderXtChart(runs) {
     const withXt = runs.filter(r => r.expected_seconds != null);
     const labels = withXt.map(r => r.date);
-    const actual = withXt.map(r => parseFloat(r.total_seconds));
+    const actual = withXt.map(r => r.total_seconds);
     const expected = withXt.map(r => r.expected_seconds);
 
     if (xtChart) xtChart.destroy();
@@ -283,7 +329,7 @@ function renderXtChart(runs) {
 function renderDeltaChart(runs) {
     const withXt = runs.filter(r => r.expected_seconds != null);
     const labels = withXt.map(r => r.date);
-    const deltas = withXt.map(r => +(r.expected_seconds - parseFloat(r.total_seconds)).toFixed(1));
+    const deltas = withXt.map(r => +(r.expected_seconds - r.total_seconds).toFixed(1));
 
     // Rolling 7-game average
     const rolling = deltas.map((_, i) => {
@@ -334,23 +380,27 @@ function renderRunsTable(runs) {
     const reversed = [...runs].reverse();
     const container = document.getElementById('runsTable');
 
+    const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
+
     let html = '<h3>Recent Runs</h3><table><thead><tr>';
-    html += '<th>Date</th><th>Time</th><th>xT</th><th>Delta</th>';
+    html += '<th>Date</th><th>Mode</th><th>Time</th><th>xT</th><th>Delta</th>';
     html += '</tr></thead><tbody>';
 
-    reversed.slice(0, 50).forEach(r => {
-        const time = parseFloat(r.total_seconds).toFixed(1);
+    reversed.slice(0, 80).forEach(r => {
+        const time = r.total_seconds.toFixed(1);
         const xt = r.expected_seconds != null ? r.expected_seconds.toFixed(1) : '--';
         let delta = '--';
         let deltaClass = '';
         if (r.expected_seconds != null) {
-            const d = r.expected_seconds - parseFloat(r.total_seconds);
+            const d = r.expected_seconds - r.total_seconds;
             delta = (d >= 0 ? '+' : '') + d.toFixed(1);
             deltaClass = d >= 0 ? 'positive' : 'negative';
         }
+        const badgeColor = sourceColors[r.source] || '#6b7280';
 
         html += `<tr>
             <td>${formatDate(r.date)}</td>
+            <td><span style="background:${badgeColor};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${r.source}</span></td>
             <td><strong>${time}s</strong></td>
             <td>${xt}s</td>
             <td class="${deltaClass}">${delta}s</td>
