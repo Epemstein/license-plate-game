@@ -2070,8 +2070,9 @@
 
     let definitionsLoading = false;
     let definitionsLoadPromise = null;
+    let definitionsFullyLoaded = false;
     async function ensureDefinitionsLoaded() {
-        if (Object.keys(DEFINITIONS).length > 0) return;
+        if (definitionsFullyLoaded) return;
         if (definitionsLoadPromise) return definitionsLoadPromise;
         definitionsLoadPromise = (async () => {
             definitionsLoading = true;
@@ -2079,13 +2080,19 @@
                 console.log('[Defs] Downloading definitions.json...');
                 const res = await fetch(`${STORAGE_BASE}/definitions.json`);
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                DEFINITIONS = await res.json();
+                const fullDefs = await res.json();
+                Object.assign(DEFINITIONS, fullDefs);
+                definitionsFullyLoaded = true;
                 console.log(`[Defs] Loaded ${Object.keys(DEFINITIONS).length} definitions`);
             } catch (e) {
                 console.warn('[Defs] Remote failed:', e.message);
                 try {
                     const res = await fetch('definitions.json');
-                    if (res.ok) DEFINITIONS = await res.json();
+                    if (res.ok) {
+                        const fallbackDefs = await res.json();
+                        Object.assign(DEFINITIONS, fallbackDefs);
+                        definitionsFullyLoaded = true;
+                    }
                 } catch (e2) { console.warn('[Defs] Local fallback also failed'); }
             }
             definitionsLoading = false;
