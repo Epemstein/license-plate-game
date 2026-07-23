@@ -93,8 +93,8 @@
                 <button onclick="setModeFilter('h2h')" class="mode-btn" data-mode="h2h">H2H</button>
                 <button onclick="setModeFilter('practice')" class="mode-btn" data-mode="practice">Practice</button>
                 <span style="color:#d1d5db;">|</span>
-                <label style="font-size:12px;color:#6b7280;">Min xT:</label>
-                <input type="number" min="0" value="0" id="minXtInput" oninput="setMinXt(this.value)" style="width:50px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                <label style="font-size:12px;color:#6b7280;">Min Runs:</label>
+                <input type="number" min="0" value="0" id="minRunsInput" oninput="renderAllPlayersTable()" style="width:50px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
                 <button onclick="toggleAllXtOnly()" id="xtToggleBtn">xT Runs Only</button>
             </div>
         </div>
@@ -587,7 +587,6 @@ async function loadAllPlayers() {
     window._allSortCol = 'runs';
     window._allSortAsc = false;
     window._allXtOnly = false;
-    window._allMinXt = 0;
     window._allModeFilter = 'all'; // 'all', 'daily', 'h2h', 'practice'
 
     document.getElementById('allPlayersBreakdown').innerHTML = breakdownHtml;
@@ -646,11 +645,6 @@ function computePlayerStats(merged, xtOnly) {
     return { runs, xtCount, avgTime, avgXtVal, avgDeltaVal, medDeltaVal, beatPctVal };
 }
 
-function setMinXt(val) {
-    window._allMinXt = parseInt(val) || 0;
-    renderAllPlayersTable();
-}
-
 function setModeFilter(mode) {
     window._allModeFilter = mode;
     renderAllPlayersTable();
@@ -660,9 +654,8 @@ function renderAllPlayersTable() {
     if (!window._allPlayers) return;
     const players = [...window._allPlayers];
     const xtOnly = window._allXtOnly;
-    const minXtInput = document.getElementById('minXtInput');
-    const minXt = minXtInput ? (parseInt(minXtInput.value) || 0) : (window._allMinXt || 0);
-    window._allMinXt = minXt;
+    const minRunsInput = document.getElementById('minRunsInput');
+    const minRuns = minRunsInput ? (parseInt(minRunsInput.value) || 0) : 0;
     const modeFilter = window._allModeFilter;
     const col = window._allSortCol;
     const asc = window._allSortAsc;
@@ -674,8 +667,7 @@ function renderAllPlayersTable() {
     });
 
     // Filter
-    let filtered = withStats.filter(p => p._s.runs > 0);
-    if (minXt > 0) filtered = filtered.filter(p => p._m.xtRuns.length >= minXt);
+    let filtered = withStats.filter(p => p._s.runs >= Math.max(1, minRuns));
 
     // Sort
     const sortVal = (p) => {
