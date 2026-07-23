@@ -657,9 +657,12 @@ function setModeFilter(mode) {
 }
 
 function renderAllPlayersTable() {
+    if (!window._allPlayers) return;
     const players = [...window._allPlayers];
     const xtOnly = window._allXtOnly;
-    const minXt = window._allMinXt;
+    const minXtInput = document.getElementById('minXtInput');
+    const minXt = minXtInput ? (parseInt(minXtInput.value) || 0) : (window._allMinXt || 0);
+    window._allMinXt = minXt;
     const modeFilter = window._allModeFilter;
     const col = window._allSortCol;
     const asc = window._allSortAsc;
