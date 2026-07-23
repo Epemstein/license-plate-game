@@ -284,14 +284,15 @@ function renderXtBreakdown(runs) {
             return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
         })() : null;
         const avgDelta = xtCount > 0 ? withXt.reduce((s, r) => s + (r.expected_seconds - r.total_seconds), 0) / xtCount : null;
-        const beatXt = xtCount > 0 ? withXt.filter(r => r.total_seconds < r.expected_seconds).length : 0;
-        const beatPct = xtCount > 0 ? Math.round(beatXt / xtCount * 100) : null;
-        return { total, avgTime, avgXt, medianXt, avgDelta, beatPct, xtCount };
+        const beatYes = xtCount > 0 ? withXt.filter(r => r.total_seconds < r.expected_seconds).length : 0;
+        const beatNo = xtCount - beatYes;
+        return { total, avgTime, avgXt, medianXt, avgDelta, beatYes, beatNo, xtCount };
     }
 
-    let html = '<h3>xT Breakdown by Mode</h3><table><thead><tr>';
-    html += '<th>Mode</th><th>Runs</th><th>Avg Time</th><th>Avg xT</th><th>Median xT</th><th>Avg xT+</th><th>Beat xT</th>';
-    html += '</tr></thead><tbody>';
+    let html = '<h3>xT Breakdown by Mode</h3><table><thead>';
+    html += '<tr><th rowspan="2">Mode</th><th rowspan="2">Runs</th><th rowspan="2">Avg Time</th><th rowspan="2">Avg xT</th><th rowspan="2">Median xT</th><th rowspan="2">Avg xT+</th><th colspan="2" style="text-align:center;">Beat xT</th></tr>';
+    html += '<tr><th>Yes</th><th>No</th></tr>';
+    html += '</thead><tbody>';
 
     modes.forEach(mode => {
         const modeRuns = runs.filter(r => r.source === mode);
@@ -299,15 +300,12 @@ function renderXtBreakdown(runs) {
         if (!s) {
             html += `<tr>
                 <td><span style="background:${sourceColors[mode]};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${mode}</span></td>
-                <td>0</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td>
+                <td>0</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td>
             </tr>`;
             return;
         }
         const deltaStr = s.avgDelta != null ? (s.avgDelta >= 0 ? '+' : '') + s.avgDelta.toFixed(1) + 's' : '--';
         const deltaClass = s.avgDelta != null ? (s.avgDelta >= 0 ? 'positive' : 'negative') : '';
-        const beatStr = s.beatPct != null
-            ? `<span class="${s.beatPct >= 50 ? 'positive' : 'negative'}">${s.beatPct >= 50 ? 'Yes' : 'No'} (${s.beatPct}%)</span>`
-            : '--';
         html += `<tr>
             <td><span style="background:${sourceColors[mode]};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${mode}</span></td>
             <td><strong>${s.total}</strong></td>
@@ -315,7 +313,8 @@ function renderXtBreakdown(runs) {
             <td>${s.avgXt != null ? s.avgXt.toFixed(1) + 's' : '--'}</td>
             <td>${s.medianXt != null ? s.medianXt.toFixed(1) + 's' : '--'}</td>
             <td class="${deltaClass}">${deltaStr}</td>
-            <td>${beatStr}</td>
+            <td class="positive">${s.beatYes}</td>
+            <td class="negative">${s.beatNo}</td>
         </tr>`;
     });
 
@@ -324,9 +323,6 @@ function renderXtBreakdown(runs) {
     if (all) {
         const deltaStr = all.avgDelta != null ? (all.avgDelta >= 0 ? '+' : '') + all.avgDelta.toFixed(1) + 's' : '--';
         const deltaClass = all.avgDelta != null ? (all.avgDelta >= 0 ? 'positive' : 'negative') : '';
-        const beatStr = all.beatPct != null
-            ? `<span class="${all.beatPct >= 50 ? 'positive' : 'negative'}">${all.beatPct >= 50 ? 'Yes' : 'No'} (${all.beatPct}%)</span>`
-            : '--';
         html += `<tr style="border-top:2px solid #e5e7eb;font-weight:600;">
             <td>All</td>
             <td><strong>${all.total}</strong></td>
@@ -334,7 +330,8 @@ function renderXtBreakdown(runs) {
             <td>${all.avgXt != null ? all.avgXt.toFixed(1) + 's' : '--'}</td>
             <td>${all.medianXt != null ? all.medianXt.toFixed(1) + 's' : '--'}</td>
             <td class="${deltaClass}">${deltaStr}</td>
-            <td>${beatStr}</td>
+            <td class="positive">${all.beatYes}</td>
+            <td class="negative">${all.beatNo}</td>
         </tr>`;
     }
 
