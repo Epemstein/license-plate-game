@@ -594,10 +594,12 @@ function sortAllPlayers(col) {
     renderAllPlayersTable();
 }
 
-function mergePlayerModes(p, modeFilter) {
+function mergePlayerModes(p, modeFilter, xtOnly) {
     const modes = modeFilter === 'all' ? ['daily', 'h2h', 'practice'] : [modeFilter];
     const merged = { runs: 0, totalTime: 0, xtRuns: [], xtTimes: [], xtTotalTime: 0, beatYes: 0, beatNo: 0,
-        dailyRuns: p.daily.runs, h2hRuns: p.h2h.runs, practiceRuns: p.practice.runs };
+        dailyRuns: xtOnly ? p.daily.xtRuns.length : p.daily.runs,
+        h2hRuns: xtOnly ? p.h2h.xtRuns.length : p.h2h.runs,
+        practiceRuns: xtOnly ? p.practice.xtRuns.length : p.practice.runs };
     modes.forEach(mode => {
         const m = p[mode];
         merged.runs += m.runs;
@@ -648,7 +650,7 @@ function renderAllPlayersTable() {
 
     // Merge modes and compute stats
     const withStats = players.map(p => {
-        const merged = mergePlayerModes(p, modeFilter);
+        const merged = mergePlayerModes(p, modeFilter, xtOnly);
         return { ...p, _m: merged, _s: computePlayerStats(merged, xtOnly) };
     });
 
