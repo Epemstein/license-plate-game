@@ -567,7 +567,7 @@ async function loadAllPlayers() {
     breakdownHtml += '</tbody></table>';
 
     // Store players globally for sorting/filtering
-    window._allPlayers = Object.values(playerMap).filter(p => p.runs > 0);
+    window._allPlayers = Object.values(playerMap).filter(p => p.daily.runs + p.h2h.runs + p.practice.runs > 0);
     window._allSortCol = 'runs';
     window._allSortAsc = false;
     window._allXtOnly = false;
