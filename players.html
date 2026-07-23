@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Players v1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; }
@@ -35,10 +34,9 @@
         .mini-stat .label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
         .mini-stat .val { font-size: 1.1rem; font-weight: 700; margin-top: 2px; }
 
-        /* Charts */
-        .charts-row { display: flex; gap: 20px; margin-bottom: 20px; }
-        .chart-box { flex: 1; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; min-width: 0; }
-        .chart-box h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+        /* xT breakdown table */
+        .xt-breakdown { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+        .xt-breakdown h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; padding: 14px 16px 8px; }
 
         /* Runs table */
         .runs-table { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
@@ -52,7 +50,6 @@
 
         .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
 
-        @media (max-width: 768px) { .charts-row { flex-direction: column; } }
     </style>
 </head>
 <body>
@@ -67,18 +64,7 @@
     <div id="playerView" style="display:none;">
         <div id="playerCard" class="player-card"></div>
 
-        <div class="charts-row">
-            <div class="chart-box">
-                <h3>xT Performance (Actual vs Expected)</h3>
-                <canvas id="xtChart" height="200"></canvas>
-            </div>
-        </div>
-        <div class="charts-row">
-            <div class="chart-box">
-                <h3>xT Delta Over Time (higher = outperforming)</h3>
-                <canvas id="deltaChart" height="160"></canvas>
-            </div>
-        </div>
+        <div id="xtBreakdown" class="xt-breakdown"></div>
 
         <div id="runsTable" class="runs-table"></div>
     </div>
@@ -95,8 +81,6 @@ const sb = window.supabase.createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
 });
 
-let xtChart = null;
-let deltaChart = null;
 
 // Search
 const searchInput = document.getElementById('searchInput');
@@ -252,9 +236,8 @@ async function loadPlayer(userId) {
         </div>
     `;
 
-    // Render charts
-    renderXtChart(allRuns);
-    renderDeltaChart(allRuns);
+    // Render xT breakdown by mode
+    renderXtBreakdown(allRuns);
 
     // Render runs table
     renderRunsTable(allRuns);
@@ -281,99 +264,68 @@ function computeStreak(dateRows) {
     return streak;
 }
 
-function renderXtChart(runs) {
-    const withXt = runs.filter(r => r.expected_seconds != null);
-    const labels = withXt.map(r => r.date);
-    const actual = withXt.map(r => r.total_seconds);
-    const expected = withXt.map(r => r.expected_seconds);
+function renderXtBreakdown(runs) {
+    const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
+    const modes = ['Daily', 'H2H', 'Practice'];
 
-    if (xtChart) xtChart.destroy();
-    xtChart = new Chart(document.getElementById('xtChart'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: 'Actual',
-                    data: actual,
-                    borderColor: '#7c3aed',
-                    backgroundColor: 'rgba(124,58,237,0.1)',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    fill: false,
-                    tension: 0.3
-                },
-                {
-                    label: 'Expected (xT)',
-                    data: expected,
-                    borderColor: '#9ca3af',
-                    borderDash: [5, 5],
-                    borderWidth: 1.5,
-                    pointRadius: 2,
-                    fill: false,
-                    tension: 0.3
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
-            scales: {
-                x: { ticks: { maxTicksLimit: 15, font: { size: 10 } } },
-                y: { title: { display: true, text: 'Seconds', font: { size: 11 } }, ticks: { font: { size: 10 } } }
-            }
+    function calcStats(modeRuns) {
+        const total = modeRuns.length;
+        if (total === 0) return null;
+        const avgTime = modeRuns.reduce((s, r) => s + r.total_seconds, 0) / total;
+        const withXt = modeRuns.filter(r => r.expected_seconds != null);
+        const xtCount = withXt.length;
+        const avgXt = xtCount > 0 ? withXt.reduce((s, r) => s + r.expected_seconds, 0) / xtCount : null;
+        const avgDelta = xtCount > 0 ? withXt.reduce((s, r) => s + (r.expected_seconds - r.total_seconds), 0) / xtCount : null;
+        const beatXt = xtCount > 0 ? withXt.filter(r => r.total_seconds < r.expected_seconds).length : 0;
+        const beatPct = xtCount > 0 ? Math.round(beatXt / xtCount * 100) : null;
+        return { total, avgTime, avgXt, avgDelta, beatPct, xtCount };
+    }
+
+    let html = '<h3>xT Breakdown by Mode</h3><table><thead><tr>';
+    html += '<th>Mode</th><th>Runs</th><th>Avg Time</th><th>Avg xT</th><th>Avg xT+</th><th>Beat xT</th>';
+    html += '</tr></thead><tbody>';
+
+    modes.forEach(mode => {
+        const modeRuns = runs.filter(r => r.source === mode);
+        const s = calcStats(modeRuns);
+        if (!s) {
+            html += `<tr>
+                <td><span style="background:${sourceColors[mode]};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${mode}</span></td>
+                <td>0</td><td>--</td><td>--</td><td>--</td><td>--</td>
+            </tr>`;
+            return;
         }
+        const deltaStr = s.avgDelta != null ? (s.avgDelta >= 0 ? '+' : '') + s.avgDelta.toFixed(1) + 's' : '--';
+        const deltaClass = s.avgDelta != null ? (s.avgDelta >= 0 ? 'positive' : 'negative') : '';
+        const beatStr = s.beatPct != null ? s.beatPct + '%' : '--';
+        html += `<tr>
+            <td><span style="background:${sourceColors[mode]};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${mode}</span></td>
+            <td><strong>${s.total}</strong></td>
+            <td>${s.avgTime.toFixed(1)}s</td>
+            <td>${s.avgXt != null ? s.avgXt.toFixed(1) + 's' : '--'}</td>
+            <td class="${deltaClass}">${deltaStr}</td>
+            <td>${beatStr}</td>
+        </tr>`;
     });
-}
 
-function renderDeltaChart(runs) {
-    const withXt = runs.filter(r => r.expected_seconds != null);
-    const labels = withXt.map(r => r.date);
-    const deltas = withXt.map(r => +(r.expected_seconds - r.total_seconds).toFixed(1));
+    // Totals row
+    const all = calcStats(runs);
+    if (all) {
+        const deltaStr = all.avgDelta != null ? (all.avgDelta >= 0 ? '+' : '') + all.avgDelta.toFixed(1) + 's' : '--';
+        const deltaClass = all.avgDelta != null ? (all.avgDelta >= 0 ? 'positive' : 'negative') : '';
+        const beatStr = all.beatPct != null ? all.beatPct + '%' : '--';
+        html += `<tr style="border-top:2px solid #e5e7eb;font-weight:600;">
+            <td>All</td>
+            <td><strong>${all.total}</strong></td>
+            <td>${all.avgTime.toFixed(1)}s</td>
+            <td>${all.avgXt != null ? all.avgXt.toFixed(1) + 's' : '--'}</td>
+            <td class="${deltaClass}">${deltaStr}</td>
+            <td>${beatStr}</td>
+        </tr>`;
+    }
 
-    // Rolling 7-game average
-    const rolling = deltas.map((_, i) => {
-        const window = deltas.slice(Math.max(0, i - 6), i + 1);
-        return +(window.reduce((a, b) => a + b, 0) / window.length).toFixed(1);
-    });
-
-    if (deltaChart) deltaChart.destroy();
-    deltaChart = new Chart(document.getElementById('deltaChart'), {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: 'xT Delta',
-                    data: deltas,
-                    backgroundColor: deltas.map(d => d >= 0 ? 'rgba(22,163,74,0.3)' : 'rgba(220,38,38,0.3)'),
-                    borderColor: deltas.map(d => d >= 0 ? '#16a34a' : '#dc2626'),
-                    borderWidth: 1,
-                    borderRadius: 3,
-                    order: 2
-                },
-                {
-                    label: '7-game avg',
-                    data: rolling,
-                    type: 'line',
-                    borderColor: '#7c3aed',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.4,
-                    fill: false,
-                    order: 1
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
-            scales: {
-                x: { ticks: { maxTicksLimit: 15, font: { size: 10 } } },
-                y: { title: { display: true, text: 'xT Delta (s)', font: { size: 11 } }, ticks: { font: { size: 10 } } }
-            }
-        }
-    });
+    html += '</tbody></table>';
+    document.getElementById('xtBreakdown').innerHTML = html;
 }
 
 function renderRunsTable(runs) {
