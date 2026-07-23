@@ -201,17 +201,17 @@ async function loadPlayer(userId) {
 
     const streak = computeStreak(streakDates || []);
 
-    // Render player card (use only runs with xT data for stats)
-    const xtAllRuns = allRuns.filter(r => r.expected_seconds != null);
-    const dailyCount = xtAllRuns.filter(r => r.source === 'Daily').length;
-    const h2hCount = xtAllRuns.filter(r => r.source === 'H2H').length;
-    const practiceCount = xtAllRuns.filter(r => r.source === 'Practice').length;
-    const totalGames = xtAllRuns.length;
-    const avgTime = totalGames > 0 ? (xtAllRuns.reduce((s, r) => s + r.total_seconds, 0) / totalGames).toFixed(1) : '--';
+    // Render player card (use all runs for counts/time, xT runs for xT stats)
+    const dailyCount = allRuns.filter(r => r.source === 'Daily').length;
+    const h2hCount = allRuns.filter(r => r.source === 'H2H').length;
+    const practiceCount = allRuns.filter(r => r.source === 'Practice').length;
+    const totalGames = allRuns.length;
+    const avgTime = totalGames > 0 ? (allRuns.reduce((s, r) => s + r.total_seconds, 0) / totalGames).toFixed(1) : '--';
     const beatPct = stats?.ratio != null ? (stats.ratio * 100).toFixed(1) + '%' : '--';
     const overallRank = stats?.percentile_rank != null ? 'Top ' + Math.max(1, Math.round(100 - stats.percentile_rank)) + '%' : '--';
-    const avgXtDelta = totalGames > 0
-        ? (xtAllRuns.reduce((s, r) => s + (r.expected_seconds - r.total_seconds), 0) / totalGames).toFixed(1)
+    const xtAllRuns = allRuns.filter(r => r.expected_seconds != null);
+    const avgXtDelta = xtAllRuns.length > 0
+        ? (xtAllRuns.reduce((s, r) => s + (r.expected_seconds - r.total_seconds), 0) / xtAllRuns.length).toFixed(1)
         : '--';
     const signupDate = profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
 
@@ -236,14 +236,13 @@ async function loadPlayer(userId) {
         </div>
     `;
 
-    // Filter to only runs with xT data
-    const xtRuns = allRuns.filter(r => r.expected_seconds != null);
+    // Store runs globally for toggle
+    window._playerAllRuns = allRuns;
+    window._xtOnlyMode = false;
 
-    // Render xT breakdown by mode
-    renderXtBreakdown(xtRuns);
-
-    // Render runs table
-    renderRunsTable(xtRuns);
+    // Render breakdown and table (all runs by default)
+    renderXtBreakdown(allRuns);
+    renderRunsTable(allRuns);
 }
 
 function computeStreak(dateRows) {
@@ -267,9 +266,19 @@ function computeStreak(dateRows) {
     return streak;
 }
 
+function toggleXtOnly() {
+    window._xtOnlyMode = !window._xtOnlyMode;
+    const runs = window._xtOnlyMode
+        ? window._playerAllRuns.filter(r => r.expected_seconds != null)
+        : window._playerAllRuns;
+    renderXtBreakdown(runs);
+    renderRunsTable(runs);
+}
+
 function renderXtBreakdown(runs) {
     const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
     const modes = ['Daily', 'H2H', 'Practice'];
+    const xtOnly = window._xtOnlyMode;
 
     function calcStats(modeRuns) {
         const total = modeRuns.length;
@@ -289,7 +298,12 @@ function renderXtBreakdown(runs) {
         return { total, avgTime, avgXt, medianXt, avgDelta, beatYes, beatNo, xtCount };
     }
 
-    let html = '<h3>xT Breakdown by Mode</h3><table><thead>';
+    const toggleLabel = xtOnly ? 'Show All Runs' : 'xT Runs Only';
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;">
+        <h3 style="margin:0;">xT Breakdown by Mode</h3>
+        <button onclick="toggleXtOnly()" style="padding:4px 12px;border:1px solid #d1d5db;border-radius:6px;background:${xtOnly ? '#7c3aed' : '#f9fafb'};color:${xtOnly ? 'white' : '#374151'};font-size:12px;font-weight:600;cursor:pointer;">${toggleLabel}</button>
+    </div>`;
+    html += '<table><thead>';
     html += '<tr><th rowspan="2">Mode</th><th rowspan="2">Runs</th><th rowspan="2">Avg Time</th><th rowspan="2">Avg xT</th><th rowspan="2">Median xT</th><th rowspan="2">Avg xT+</th><th colspan="2" style="text-align:center;">Beat xT</th></tr>';
     html += '<tr><th>Yes</th><th>No</th></tr>';
     html += '</thead><tbody>';
