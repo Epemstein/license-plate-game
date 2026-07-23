@@ -470,7 +470,7 @@ async function loadAllPlayers() {
     // Aggregate per player
     const playerMap = {};
     profiles.forEach(p => {
-        playerMap[p.id] = { name: p.display_name || 'Unknown', handle: p.handle, runs: 0, totalTime: 0, xtRuns: [], xtTimes: [], beatYes: 0, beatNo: 0 };
+        playerMap[p.id] = { name: p.display_name || 'Unknown', handle: p.handle, runs: 0, totalTime: 0, xtRuns: [], xtTimes: [], xtTotalTime: 0, beatYes: 0, beatNo: 0 };
     });
 
     function addRuns(rows) {
@@ -480,9 +480,11 @@ async function loadAllPlayers() {
             p.runs++;
             p.totalTime += parseFloat(r.total_seconds);
             if (r.expected_seconds != null) {
-                const delta = r.expected_seconds - parseFloat(r.total_seconds);
+                const ts = parseFloat(r.total_seconds);
+                const delta = r.expected_seconds - ts;
                 p.xtRuns.push(delta);
                 p.xtTimes.push(r.expected_seconds);
+                p.xtTotalTime += ts;
                 if (delta > 0) p.beatYes++; else p.beatNo++;
             }
         });
@@ -567,6 +569,7 @@ async function loadAllPlayers() {
     window._allSortCol = 'runs';
     window._allSortAsc = false;
     window._allXtOnly = false;
+    window._allMinXt = 0;
 
     document.getElementById('allPlayersBreakdown').innerHTML = breakdownHtml;
     renderAllPlayersTable();
@@ -588,9 +591,11 @@ function sortAllPlayers(col) {
     renderAllPlayersTable();
 }
 
-function computePlayerStats(p) {
+function computePlayerStats(p, xtOnly) {
     const xtCount = p.xtRuns.length;
-    const avgTime = p.runs > 0 ? p.totalTime / p.runs : 0;
+    const runs = xtOnly ? xtCount : p.runs;
+    const totalTime = xtOnly ? p.xtTotalTime : p.totalTime;
+    const avgTime = runs > 0 ? totalTime / runs : 0;
     const avgXtVal = xtCount > 0 ? p.xtTimes.reduce((s, t) => s + t, 0) / xtCount : null;
     const avgDeltaVal = xtCount > 0 ? p.xtRuns.reduce((s, d) => s + d, 0) / xtCount : null;
     let medDeltaVal = null;
@@ -600,27 +605,35 @@ function computePlayerStats(p) {
         medDeltaVal = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
     }
     const beatPctVal = xtCount > 0 ? p.beatYes / xtCount * 100 : null;
-    return { xtCount, avgTime, avgXtVal, avgDeltaVal, medDeltaVal, beatPctVal };
+    return { runs, xtCount, avgTime, avgXtVal, avgDeltaVal, medDeltaVal, beatPctVal };
+}
+
+function setMinXt(val) {
+    window._allMinXt = parseInt(val) || 0;
+    renderAllPlayersTable();
 }
 
 function renderAllPlayersTable() {
     const players = [...window._allPlayers];
     const xtOnly = window._allXtOnly;
+    const minXt = window._allMinXt;
     const col = window._allSortCol;
     const asc = window._allSortAsc;
 
     // Filter
-    const filtered = xtOnly ? players.filter(p => p.xtRuns.length > 0) : players;
+    let filtered = players;
+    if (xtOnly) filtered = filtered.filter(p => p.xtRuns.length > 0);
+    if (minXt > 0) filtered = filtered.filter(p => p.xtRuns.length >= minXt);
 
     // Compute stats for sorting
-    const withStats = filtered.map(p => ({ ...p, _s: computePlayerStats(p) }));
+    const withStats = filtered.map(p => ({ ...p, _s: computePlayerStats(p, xtOnly) }));
 
     // Sort
     const sortVal = (p) => {
         const s = p._s;
         switch(col) {
             case 'name': return p.name.toLowerCase();
-            case 'runs': return p.runs;
+            case 'runs': return s.runs;
             case 'avgTime': return s.avgTime;
             case 'xtRuns': return s.xtCount;
             case 'avgXt': return s.avgXtVal ?? (asc ? Infinity : -Infinity);
@@ -629,7 +642,7 @@ function renderAllPlayersTable() {
             case 'beatYes': return p.beatYes;
             case 'beatNo': return p.beatNo;
             case 'beatPct': return s.beatPctVal ?? (asc ? Infinity : -Infinity);
-            default: return p.runs;
+            default: return s.runs;
         }
     };
     withStats.sort((a, b) => {
@@ -642,9 +655,13 @@ function renderAllPlayersTable() {
     const th = (label, c, rowspan) => `<th rowspan="${rowspan || 1}" style="cursor:pointer;user-select:none;" onclick="sortAllPlayers('${c}')">${label}${arrow(c)}</th>`;
     const toggleLabel = xtOnly ? 'Show All Runs' : 'xT Runs Only';
 
-    let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;">
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;">All Players</h3>
-        <button onclick="toggleAllXtOnly()" style="padding:4px 12px;border:1px solid #d1d5db;border-radius:6px;background:${xtOnly ? '#7c3aed' : '#f9fafb'};color:${xtOnly ? 'white' : '#374151'};font-size:12px;font-weight:600;cursor:pointer;">${toggleLabel}</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <label style="font-size:12px;color:#6b7280;">Min xT Runs:</label>
+            <input type="number" min="0" value="${minXt}" onchange="setMinXt(this.value)" style="width:60px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+            <button onclick="toggleAllXtOnly()" style="padding:4px 12px;border:1px solid #d1d5db;border-radius:6px;background:${xtOnly ? '#7c3aed' : '#f9fafb'};color:${xtOnly ? 'white' : '#374151'};font-size:12px;font-weight:600;cursor:pointer;">${toggleLabel}</button>
+        </div>
     </div>`;
     html += '<table><thead>';
     html += `<tr>${th('Player','name',2)}${th('Runs','runs',2)}${th('Avg Time','avgTime',2)}${th('xT Runs','xtRuns',2)}${th('Avg xT','avgXt',2)}${th('Avg xT+','avgDelta',2)}${th('Median xT+','medDelta',2)}<th colspan="2" style="text-align:center;">Beat xT</th>${th('Beat %','beatPct',2)}</tr>`;
@@ -664,7 +681,7 @@ function renderAllPlayersTable() {
 
         html += `<tr>
             <td>${nameDisplay}</td>
-            <td><strong>${p.runs}</strong></td>
+            <td><strong>${s.runs}</strong></td>
             <td>${avgTimeStr}</td>
             <td>${s.xtCount}</td>
             <td>${avgXtStr}</td>
@@ -677,8 +694,8 @@ function renderAllPlayersTable() {
     });
 
     // Totals row
-    const totRuns = withStats.reduce((s, p) => s + p.runs, 0);
-    const totTime = withStats.reduce((s, p) => s + p.totalTime, 0);
+    const totRuns = withStats.reduce((s, p) => s + p._s.runs, 0);
+    const totTime = withStats.reduce((s, p) => s + (xtOnly ? p.xtTotalTime : p.totalTime), 0);
     const allXtDeltas = withStats.flatMap(p => p.xtRuns);
     const allXtTimes = withStats.flatMap(p => p.xtTimes);
     const totXt = allXtDeltas.length;
