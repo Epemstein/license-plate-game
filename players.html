@@ -56,6 +56,12 @@
 <div class="container">
     <h1>Players</h1>
 
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+        <button id="btnSearch" onclick="showView('search')" style="padding:6px 16px;border:1px solid #d1d5db;border-radius:6px;background:#7c3aed;color:white;font-size:13px;font-weight:600;cursor:pointer;">Search</button>
+        <button id="btnAll" onclick="showView('all')" style="padding:6px 16px;border:1px solid #d1d5db;border-radius:6px;background:#f9fafb;color:#374151;font-size:13px;font-weight:600;cursor:pointer;">All Players</button>
+    </div>
+
+    <div id="searchView">
     <div class="search-row">
         <input type="text" id="searchInput" placeholder="Search by name or @handle..." autocomplete="off">
     </div>
@@ -71,6 +77,11 @@
 
     <div id="emptyState" class="empty-state">
         Search for a player to view their stats and xT trends.
+    </div>
+    </div>
+
+    <div id="allPlayersView" style="display:none;">
+        <div id="allPlayersTable" class="runs-table"></div>
     </div>
 </div>
 
@@ -398,6 +409,115 @@ function renderRunsTable(runs) {
 function formatDate(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// View toggle
+function showView(view) {
+    const btnSearch = document.getElementById('btnSearch');
+    const btnAll = document.getElementById('btnAll');
+    const searchView = document.getElementById('searchView');
+    const allView = document.getElementById('allPlayersView');
+
+    if (view === 'search') {
+        searchView.style.display = '';
+        allView.style.display = 'none';
+        btnSearch.style.background = '#7c3aed'; btnSearch.style.color = 'white';
+        btnAll.style.background = '#f9fafb'; btnAll.style.color = '#374151';
+    } else {
+        searchView.style.display = 'none';
+        allView.style.display = '';
+        btnAll.style.background = '#7c3aed'; btnAll.style.color = 'white';
+        btnSearch.style.background = '#f9fafb'; btnSearch.style.color = '#374151';
+        loadAllPlayers();
+    }
+}
+
+let allPlayersLoaded = false;
+async function loadAllPlayers() {
+    if (allPlayersLoaded) return;
+    document.getElementById('allPlayersTable').innerHTML = '<div class="empty-state">Loading all players...</div>';
+
+    // Get all profiles
+    const { data: profiles } = await sb.from('profiles')
+        .select('id, display_name, handle')
+        .order('display_name');
+
+    // Get all runs from all three tables
+    const [dailyRes, h2hRes, practiceRes] = await Promise.all([
+        sb.from('daily_runs').select('user_id, total_seconds, expected_seconds').not('total_seconds', 'is', null),
+        sb.from('h2h_runs').select('user_id, total_seconds, expected_seconds').not('total_seconds', 'is', null),
+        sb.from('practice_runs').select('user_id, total_seconds, expected_seconds').not('total_seconds', 'is', null),
+    ]);
+
+    // Aggregate per player
+    const playerMap = {};
+    profiles.forEach(p => {
+        playerMap[p.id] = { name: p.display_name || 'Unknown', handle: p.handle, runs: 0, totalTime: 0, xtRuns: [], beatYes: 0, beatNo: 0 };
+    });
+
+    function addRuns(rows) {
+        (rows || []).forEach(r => {
+            const p = playerMap[r.user_id];
+            if (!p) return;
+            p.runs++;
+            p.totalTime += parseFloat(r.total_seconds);
+            if (r.expected_seconds != null) {
+                const delta = r.expected_seconds - parseFloat(r.total_seconds);
+                p.xtRuns.push(delta);
+                if (delta > 0) p.beatYes++; else p.beatNo++;
+            }
+        });
+    }
+    addRuns(dailyRes.data);
+    addRuns(h2hRes.data);
+    addRuns(practiceRes.data);
+
+    // Build table sorted by total runs desc
+    const players = Object.values(playerMap).filter(p => p.runs > 0).sort((a, b) => b.runs - a.runs);
+
+    let html = '<h3>All Players</h3><table><thead>';
+    html += '<tr><th rowspan="2">Player</th><th rowspan="2">Runs</th><th rowspan="2">Avg Time</th><th rowspan="2">xT Runs</th><th rowspan="2">Avg xT+</th><th rowspan="2">Median xT+</th><th colspan="2" style="text-align:center;">Beat xT</th><th rowspan="2">Beat %</th></tr>';
+    html += '<tr><th>Yes</th><th>No</th></tr>';
+    html += '</thead><tbody>';
+
+    players.forEach(p => {
+        const avgTime = (p.totalTime / p.runs).toFixed(1);
+        const xtCount = p.xtRuns.length;
+        let avgDelta = '--', medDelta = '--', beatPct = '--';
+        let avgDeltaClass = '', medDeltaClass = '';
+
+        if (xtCount > 0) {
+            const avg = p.xtRuns.reduce((s, d) => s + d, 0) / xtCount;
+            avgDelta = (avg >= 0 ? '+' : '') + avg.toFixed(1) + 's';
+            avgDeltaClass = avg >= 0 ? 'positive' : 'negative';
+
+            const sorted = [...p.xtRuns].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            const med = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+            medDelta = (med >= 0 ? '+' : '') + med.toFixed(1) + 's';
+            medDeltaClass = med >= 0 ? 'positive' : 'negative';
+
+            beatPct = Math.round(p.beatYes / xtCount * 100) + '%';
+        }
+
+        const nameDisplay = p.handle ? `${p.name} <span style="color:#6b7280;font-size:12px;">@${p.handle}</span>` : p.name;
+
+        html += `<tr>
+            <td>${nameDisplay}</td>
+            <td><strong>${p.runs}</strong></td>
+            <td>${avgTime}s</td>
+            <td>${xtCount}</td>
+            <td class="${avgDeltaClass}">${avgDelta}</td>
+            <td class="${medDeltaClass}">${medDelta}</td>
+            <td class="positive">${p.beatYes}</td>
+            <td class="negative">${p.beatNo}</td>
+            <td>${beatPct}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('allPlayersTable').innerHTML = html;
+    allPlayersLoaded = true;
 }
 </script>
 </body>
