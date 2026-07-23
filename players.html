@@ -467,31 +467,33 @@ async function loadAllPlayers() {
         fetchAll('practice_runs'),
     ]);
 
-    // Aggregate per player
+    // Aggregate per player, per mode
+    const emptyMode = () => ({ runs: 0, totalTime: 0, xtRuns: [], xtTimes: [], xtTotalTime: 0, beatYes: 0, beatNo: 0 });
     const playerMap = {};
     profiles.forEach(p => {
-        playerMap[p.id] = { name: p.display_name || 'Unknown', handle: p.handle, runs: 0, totalTime: 0, xtRuns: [], xtTimes: [], xtTotalTime: 0, beatYes: 0, beatNo: 0 };
+        playerMap[p.id] = { name: p.display_name || 'Unknown', handle: p.handle, daily: emptyMode(), h2h: emptyMode(), practice: emptyMode() };
     });
 
-    function addRuns(rows) {
+    function addRuns(rows, mode) {
         (rows || []).forEach(r => {
             const p = playerMap[r.user_id];
             if (!p) return;
-            p.runs++;
-            p.totalTime += parseFloat(r.total_seconds);
+            const m = p[mode];
+            m.runs++;
+            m.totalTime += parseFloat(r.total_seconds);
             if (r.expected_seconds != null) {
                 const ts = parseFloat(r.total_seconds);
                 const delta = r.expected_seconds - ts;
-                p.xtRuns.push(delta);
-                p.xtTimes.push(r.expected_seconds);
-                p.xtTotalTime += ts;
-                if (delta > 0) p.beatYes++; else p.beatNo++;
+                m.xtRuns.push(delta);
+                m.xtTimes.push(r.expected_seconds);
+                m.xtTotalTime += ts;
+                if (delta > 0) m.beatYes++; else m.beatNo++;
             }
         });
     }
-    addRuns(dailyRows);
-    addRuns(h2hRows);
-    addRuns(practiceRows);
+    addRuns(dailyRows, 'daily');
+    addRuns(h2hRows, 'h2h');
+    addRuns(practiceRows, 'practice');
 
     // Build universe xT breakdown by mode
     function modeStats(rows) {
@@ -570,6 +572,7 @@ async function loadAllPlayers() {
     window._allSortAsc = false;
     window._allXtOnly = false;
     window._allMinXt = 0;
+    window._allModeFilter = 'all'; // 'all', 'daily', 'h2h', 'practice'
 
     document.getElementById('allPlayersBreakdown').innerHTML = breakdownHtml;
     renderAllPlayersTable();
@@ -591,20 +594,37 @@ function sortAllPlayers(col) {
     renderAllPlayersTable();
 }
 
-function computePlayerStats(p, xtOnly) {
-    const xtCount = p.xtRuns.length;
-    const runs = xtOnly ? xtCount : p.runs;
-    const totalTime = xtOnly ? p.xtTotalTime : p.totalTime;
+function mergePlayerModes(p, modeFilter) {
+    const modes = modeFilter === 'all' ? ['daily', 'h2h', 'practice'] : [modeFilter];
+    const merged = { runs: 0, totalTime: 0, xtRuns: [], xtTimes: [], xtTotalTime: 0, beatYes: 0, beatNo: 0,
+        dailyRuns: p.daily.runs, h2hRuns: p.h2h.runs, practiceRuns: p.practice.runs };
+    modes.forEach(mode => {
+        const m = p[mode];
+        merged.runs += m.runs;
+        merged.totalTime += m.totalTime;
+        merged.xtRuns.push(...m.xtRuns);
+        merged.xtTimes.push(...m.xtTimes);
+        merged.xtTotalTime += m.xtTotalTime;
+        merged.beatYes += m.beatYes;
+        merged.beatNo += m.beatNo;
+    });
+    return merged;
+}
+
+function computePlayerStats(merged, xtOnly) {
+    const xtCount = merged.xtRuns.length;
+    const runs = xtOnly ? xtCount : merged.runs;
+    const totalTime = xtOnly ? merged.xtTotalTime : merged.totalTime;
     const avgTime = runs > 0 ? totalTime / runs : 0;
-    const avgXtVal = xtCount > 0 ? p.xtTimes.reduce((s, t) => s + t, 0) / xtCount : null;
-    const avgDeltaVal = xtCount > 0 ? p.xtRuns.reduce((s, d) => s + d, 0) / xtCount : null;
+    const avgXtVal = xtCount > 0 ? merged.xtTimes.reduce((s, t) => s + t, 0) / xtCount : null;
+    const avgDeltaVal = xtCount > 0 ? merged.xtRuns.reduce((s, d) => s + d, 0) / xtCount : null;
     let medDeltaVal = null;
     if (xtCount > 0) {
-        const sorted = [...p.xtRuns].sort((a, b) => a - b);
+        const sorted = [...merged.xtRuns].sort((a, b) => a - b);
         const mid = Math.floor(sorted.length / 2);
         medDeltaVal = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
     }
-    const beatPctVal = xtCount > 0 ? p.beatYes / xtCount * 100 : null;
+    const beatPctVal = xtCount > 0 ? merged.beatYes / xtCount * 100 : null;
     return { runs, xtCount, avgTime, avgXtVal, avgDeltaVal, medDeltaVal, beatPctVal };
 }
 
@@ -613,34 +633,45 @@ function setMinXt(val) {
     renderAllPlayersTable();
 }
 
+function setModeFilter(mode) {
+    window._allModeFilter = mode;
+    renderAllPlayersTable();
+}
+
 function renderAllPlayersTable() {
     const players = [...window._allPlayers];
     const xtOnly = window._allXtOnly;
     const minXt = window._allMinXt;
+    const modeFilter = window._allModeFilter;
     const col = window._allSortCol;
     const asc = window._allSortAsc;
 
-    // Filter
-    let filtered = players;
-    if (xtOnly) filtered = filtered.filter(p => p.xtRuns.length > 0);
-    if (minXt > 0) filtered = filtered.filter(p => p.xtRuns.length >= minXt);
+    // Merge modes and compute stats
+    const withStats = players.map(p => {
+        const merged = mergePlayerModes(p, modeFilter);
+        return { ...p, _m: merged, _s: computePlayerStats(merged, xtOnly) };
+    });
 
-    // Compute stats for sorting
-    const withStats = filtered.map(p => ({ ...p, _s: computePlayerStats(p, xtOnly) }));
+    // Filter
+    let filtered = withStats.filter(p => p._s.runs > 0);
+    if (minXt > 0) filtered = filtered.filter(p => p._m.xtRuns.length >= minXt);
 
     // Sort
     const sortVal = (p) => {
         const s = p._s;
         switch(col) {
             case 'name': return p.name.toLowerCase();
+            case 'dailyRuns': return p._m.dailyRuns;
+            case 'h2hRuns': return p._m.h2hRuns;
+            case 'practiceRuns': return p._m.practiceRuns;
             case 'runs': return s.runs;
             case 'avgTime': return s.avgTime;
             case 'xtRuns': return s.xtCount;
             case 'avgXt': return s.avgXtVal ?? (asc ? Infinity : -Infinity);
             case 'avgDelta': return s.avgDeltaVal ?? (asc ? Infinity : -Infinity);
             case 'medDelta': return s.medDeltaVal ?? (asc ? Infinity : -Infinity);
-            case 'beatYes': return p.beatYes;
-            case 'beatNo': return p.beatNo;
+            case 'beatYes': return p._m.beatYes;
+            case 'beatNo': return p._m.beatNo;
             case 'beatPct': return s.beatPctVal ?? (asc ? Infinity : -Infinity);
             default: return s.runs;
         }
@@ -655,16 +686,23 @@ function renderAllPlayersTable() {
     const th = (label, c, rowspan) => `<th rowspan="${rowspan || 1}" style="cursor:pointer;user-select:none;" onclick="sortAllPlayers('${c}')">${label}${arrow(c)}</th>`;
     const toggleLabel = xtOnly ? 'Show All Runs' : 'xT Runs Only';
 
+    const modeBtn = (label, val, color) => {
+        const active = modeFilter === val;
+        return `<button onclick="setModeFilter('${val}')" style="padding:3px 10px;border:1px solid ${active ? color : '#d1d5db'};border-radius:6px;background:${active ? color : '#f9fafb'};color:${active ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">${label}</button>`;
+    };
+
     let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;">All Players</h3>
-        <div style="display:flex;gap:8px;align-items:center;">
-            <label style="font-size:12px;color:#6b7280;">Min xT Runs:</label>
-            <input type="number" min="0" value="${minXt}" onchange="setMinXt(this.value)" style="width:60px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
-            <button onclick="toggleAllXtOnly()" style="padding:4px 12px;border:1px solid #d1d5db;border-radius:6px;background:${xtOnly ? '#7c3aed' : '#f9fafb'};color:${xtOnly ? 'white' : '#374151'};font-size:12px;font-weight:600;cursor:pointer;">${toggleLabel}</button>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            ${modeBtn('All','all','#7c3aed')}${modeBtn('Daily','daily','#7c3aed')}${modeBtn('H2H','h2h','#f59e0b')}${modeBtn('Practice','practice','#3b82f6')}
+            <span style="color:#d1d5db;">|</span>
+            <label style="font-size:12px;color:#6b7280;">Min xT:</label>
+            <input type="number" min="0" value="${minXt}" onchange="setMinXt(this.value)" style="width:50px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+            <button onclick="toggleAllXtOnly()" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${xtOnly ? '#7c3aed' : '#f9fafb'};color:${xtOnly ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">${toggleLabel}</button>
         </div>
     </div>`;
     html += '<table><thead>';
-    html += `<tr>${th('Player','name',2)}${th('Runs','runs',2)}${th('Avg Time','avgTime',2)}${th('xT Runs','xtRuns',2)}${th('Avg xT','avgXt',2)}${th('Avg xT+','avgDelta',2)}${th('Median xT+','medDelta',2)}<th colspan="2" style="text-align:center;">Beat xT</th>${th('Beat %','beatPct',2)}</tr>`;
+    html += `<tr>${th('Player','name',2)}${th('Daily','dailyRuns',2)}${th('H2H','h2hRuns',2)}${th('Practice','practiceRuns',2)}${th('Runs','runs',2)}${th('Avg Time','avgTime',2)}${th('xT Runs','xtRuns',2)}${th('Avg xT','avgXt',2)}${th('Avg xT+','avgDelta',2)}${th('Median xT+','medDelta',2)}<th colspan="2" style="text-align:center;">Beat xT</th>${th('Beat %','beatPct',2)}</tr>`;
     html += `<tr>${th('Yes','beatYes')}${th('No','beatNo')}</tr>`;
     html += '</thead><tbody>';
 
@@ -681,26 +719,32 @@ function renderAllPlayersTable() {
 
         html += `<tr>
             <td>${nameDisplay}</td>
+            <td>${p._m.dailyRuns}</td>
+            <td>${p._m.h2hRuns}</td>
+            <td>${p._m.practiceRuns}</td>
             <td><strong>${s.runs}</strong></td>
             <td>${avgTimeStr}</td>
             <td>${s.xtCount}</td>
             <td>${avgXtStr}</td>
             <td class="${avgDeltaClass}">${avgDeltaStr}</td>
             <td class="${medDeltaClass}">${medDeltaStr}</td>
-            <td class="positive">${p.beatYes}</td>
-            <td class="negative">${p.beatNo}</td>
+            <td class="positive">${p._m.beatYes}</td>
+            <td class="negative">${p._m.beatNo}</td>
             <td>${beatPctStr}</td>
         </tr>`;
     });
 
     // Totals row
-    const totRuns = withStats.reduce((s, p) => s + p._s.runs, 0);
-    const totTime = withStats.reduce((s, p) => s + (xtOnly ? p.xtTotalTime : p.totalTime), 0);
-    const allXtDeltas = withStats.flatMap(p => p.xtRuns);
-    const allXtTimes = withStats.flatMap(p => p.xtTimes);
+    const totRuns = filtered.reduce((s, p) => s + p._s.runs, 0);
+    const totTime = filtered.reduce((s, p) => s + (xtOnly ? p._m.xtTotalTime : p._m.totalTime), 0);
+    const totDaily = filtered.reduce((s, p) => s + p._m.dailyRuns, 0);
+    const totH2h = filtered.reduce((s, p) => s + p._m.h2hRuns, 0);
+    const totPractice = filtered.reduce((s, p) => s + p._m.practiceRuns, 0);
+    const allXtDeltas = filtered.flatMap(p => p._m.xtRuns);
+    const allXtTimes = filtered.flatMap(p => p._m.xtTimes);
     const totXt = allXtDeltas.length;
-    const totBeatYes = withStats.reduce((s, p) => s + p.beatYes, 0);
-    const totBeatNo = withStats.reduce((s, p) => s + p.beatNo, 0);
+    const totBeatYes = filtered.reduce((s, p) => s + p._m.beatYes, 0);
+    const totBeatNo = filtered.reduce((s, p) => s + p._m.beatNo, 0);
     let totAvgXt = '--', totAvgDelta = '--', totMedDelta = '--', totBeatPct = '--';
     let totAvgDeltaClass = '', totMedDeltaClass = '';
     if (totXt > 0) {
@@ -717,6 +761,9 @@ function renderAllPlayersTable() {
     }
     html += `<tr style="border-top:2px solid #e5e7eb;font-weight:600;">
         <td>All Players</td>
+        <td>${totDaily}</td>
+        <td>${totH2h}</td>
+        <td>${totPractice}</td>
         <td><strong>${totRuns}</strong></td>
         <td>${totRuns > 0 ? (totTime / totRuns).toFixed(1) + 's' : '--'}</td>
         <td>${totXt}</td>
