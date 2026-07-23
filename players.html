@@ -201,17 +201,17 @@ async function loadPlayer(userId) {
 
     const streak = computeStreak(streakDates || []);
 
-    // Render player card
-    const dailyCount = (dailyRes.data || []).length;
-    const h2hCount = (h2hRes.data || []).length;
-    const practiceCount = (practiceRes.data || []).length;
-    const totalGames = allRuns.length;
-    const avgTime = totalGames > 0 ? (allRuns.reduce((s, r) => s + r.total_seconds, 0) / totalGames).toFixed(1) : '--';
+    // Render player card (use only runs with xT data for stats)
+    const xtAllRuns = allRuns.filter(r => r.expected_seconds != null);
+    const dailyCount = xtAllRuns.filter(r => r.source === 'Daily').length;
+    const h2hCount = xtAllRuns.filter(r => r.source === 'H2H').length;
+    const practiceCount = xtAllRuns.filter(r => r.source === 'Practice').length;
+    const totalGames = xtAllRuns.length;
+    const avgTime = totalGames > 0 ? (xtAllRuns.reduce((s, r) => s + r.total_seconds, 0) / totalGames).toFixed(1) : '--';
     const beatPct = stats?.ratio != null ? (stats.ratio * 100).toFixed(1) + '%' : '--';
     const overallRank = stats?.percentile_rank != null ? 'Top ' + Math.max(1, Math.round(100 - stats.percentile_rank)) + '%' : '--';
-    const runsWithXt = allRuns.filter(r => r.expected_seconds != null);
-    const avgXtDelta = runsWithXt.length > 0
-        ? (runsWithXt.reduce((s, r) => s + (r.expected_seconds - r.total_seconds), 0) / runsWithXt.length).toFixed(1)
+    const avgXtDelta = totalGames > 0
+        ? (xtAllRuns.reduce((s, r) => s + (r.expected_seconds - r.total_seconds), 0) / totalGames).toFixed(1)
         : '--';
     const signupDate = profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
 
@@ -236,11 +236,14 @@ async function loadPlayer(userId) {
         </div>
     `;
 
+    // Filter to only runs with xT data
+    const xtRuns = allRuns.filter(r => r.expected_seconds != null);
+
     // Render xT breakdown by mode
-    renderXtBreakdown(allRuns);
+    renderXtBreakdown(xtRuns);
 
     // Render runs table
-    renderRunsTable(allRuns);
+    renderRunsTable(xtRuns);
 }
 
 function computeStreak(dateRows) {
@@ -275,14 +278,19 @@ function renderXtBreakdown(runs) {
         const withXt = modeRuns.filter(r => r.expected_seconds != null);
         const xtCount = withXt.length;
         const avgXt = xtCount > 0 ? withXt.reduce((s, r) => s + r.expected_seconds, 0) / xtCount : null;
+        const medianXt = xtCount > 0 ? (() => {
+            const sorted = withXt.map(r => r.expected_seconds).sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        })() : null;
         const avgDelta = xtCount > 0 ? withXt.reduce((s, r) => s + (r.expected_seconds - r.total_seconds), 0) / xtCount : null;
         const beatXt = xtCount > 0 ? withXt.filter(r => r.total_seconds < r.expected_seconds).length : 0;
         const beatPct = xtCount > 0 ? Math.round(beatXt / xtCount * 100) : null;
-        return { total, avgTime, avgXt, avgDelta, beatPct, xtCount };
+        return { total, avgTime, avgXt, medianXt, avgDelta, beatPct, xtCount };
     }
 
     let html = '<h3>xT Breakdown by Mode</h3><table><thead><tr>';
-    html += '<th>Mode</th><th>Runs</th><th>Avg Time</th><th>Avg xT</th><th>Avg xT+</th><th>Beat xT</th>';
+    html += '<th>Mode</th><th>Runs</th><th>Avg Time</th><th>Avg xT</th><th>Median xT</th><th>Avg xT+</th><th>Beat xT</th>';
     html += '</tr></thead><tbody>';
 
     modes.forEach(mode => {
@@ -291,18 +299,21 @@ function renderXtBreakdown(runs) {
         if (!s) {
             html += `<tr>
                 <td><span style="background:${sourceColors[mode]};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${mode}</span></td>
-                <td>0</td><td>--</td><td>--</td><td>--</td><td>--</td>
+                <td>0</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td>
             </tr>`;
             return;
         }
         const deltaStr = s.avgDelta != null ? (s.avgDelta >= 0 ? '+' : '') + s.avgDelta.toFixed(1) + 's' : '--';
         const deltaClass = s.avgDelta != null ? (s.avgDelta >= 0 ? 'positive' : 'negative') : '';
-        const beatStr = s.beatPct != null ? s.beatPct + '%' : '--';
+        const beatStr = s.beatPct != null
+            ? `<span class="${s.beatPct >= 50 ? 'positive' : 'negative'}">${s.beatPct >= 50 ? 'Yes' : 'No'} (${s.beatPct}%)</span>`
+            : '--';
         html += `<tr>
             <td><span style="background:${sourceColors[mode]};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${mode}</span></td>
             <td><strong>${s.total}</strong></td>
             <td>${s.avgTime.toFixed(1)}s</td>
             <td>${s.avgXt != null ? s.avgXt.toFixed(1) + 's' : '--'}</td>
+            <td>${s.medianXt != null ? s.medianXt.toFixed(1) + 's' : '--'}</td>
             <td class="${deltaClass}">${deltaStr}</td>
             <td>${beatStr}</td>
         </tr>`;
@@ -313,12 +324,15 @@ function renderXtBreakdown(runs) {
     if (all) {
         const deltaStr = all.avgDelta != null ? (all.avgDelta >= 0 ? '+' : '') + all.avgDelta.toFixed(1) + 's' : '--';
         const deltaClass = all.avgDelta != null ? (all.avgDelta >= 0 ? 'positive' : 'negative') : '';
-        const beatStr = all.beatPct != null ? all.beatPct + '%' : '--';
+        const beatStr = all.beatPct != null
+            ? `<span class="${all.beatPct >= 50 ? 'positive' : 'negative'}">${all.beatPct >= 50 ? 'Yes' : 'No'} (${all.beatPct}%)</span>`
+            : '--';
         html += `<tr style="border-top:2px solid #e5e7eb;font-weight:600;">
             <td>All</td>
             <td><strong>${all.total}</strong></td>
             <td>${all.avgTime.toFixed(1)}s</td>
             <td>${all.avgXt != null ? all.avgXt.toFixed(1) + 's' : '--'}</td>
+            <td>${all.medianXt != null ? all.medianXt.toFixed(1) + 's' : '--'}</td>
             <td class="${deltaClass}">${deltaStr}</td>
             <td>${beatStr}</td>
         </tr>`;
