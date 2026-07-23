@@ -49,6 +49,9 @@
         .negative { color: #dc2626; font-weight: 600; }
 
         .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+        .mode-btn, #xtToggleBtn { padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:#f9fafb;color:#374151;font-size:11px;font-weight:600;cursor:pointer; }
+        .mode-btn.active { background:#7c3aed;color:white;border-color:#7c3aed; }
+        #xtToggleBtn.active { background:#7c3aed;color:white;border-color:#7c3aed; }
 
     </style>
 </head>
@@ -82,7 +85,20 @@
 
     <div id="allPlayersView" style="display:none;">
         <div id="allPlayersBreakdown" class="xt-breakdown" style="margin-bottom:20px;"></div>
-        <div id="allPlayersTable" class="runs-table"></div>
+        <div id="allPlayersControls" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px 12px 0 0;flex-wrap:wrap;gap:8px;">
+            <h3 style="margin:0;font-size:0.85rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">All Players</h3>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <button onclick="setModeFilter('all')" class="mode-btn" data-mode="all">All</button>
+                <button onclick="setModeFilter('daily')" class="mode-btn" data-mode="daily">Daily</button>
+                <button onclick="setModeFilter('h2h')" class="mode-btn" data-mode="h2h">H2H</button>
+                <button onclick="setModeFilter('practice')" class="mode-btn" data-mode="practice">Practice</button>
+                <span style="color:#d1d5db;">|</span>
+                <label style="font-size:12px;color:#6b7280;">Min xT:</label>
+                <input type="number" min="0" value="0" id="minXtInput" oninput="setMinXt(this.value)" style="width:50px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                <button onclick="toggleAllXtOnly()" id="xtToggleBtn">xT Runs Only</button>
+            </div>
+        </div>
+        <div id="allPlayersTable" class="runs-table" style="border-radius:0 0 12px 12px;border-top:none;"></div>
     </div>
 </div>
 
@@ -688,21 +704,13 @@ function renderAllPlayersTable() {
     const th = (label, c, rowspan) => `<th rowspan="${rowspan || 1}" style="cursor:pointer;user-select:none;" onclick="sortAllPlayers('${c}')">${label}${arrow(c)}</th>`;
     const toggleLabel = xtOnly ? 'Show All Runs' : 'xT Runs Only';
 
-    const modeBtn = (label, val, color) => {
-        const active = modeFilter === val;
-        return `<button onclick="setModeFilter('${val}')" style="padding:3px 10px;border:1px solid ${active ? color : '#d1d5db'};border-radius:6px;background:${active ? color : '#f9fafb'};color:${active ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">${label}</button>`;
-    };
+    // Update external controls
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === modeFilter));
+    const xtBtn = document.getElementById('xtToggleBtn');
+    xtBtn.classList.toggle('active', xtOnly);
+    xtBtn.textContent = xtOnly ? 'Show All Runs' : 'xT Runs Only';
 
-    let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;flex-wrap:wrap;gap:8px;">
-        <h3 style="margin:0;">All Players</h3>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-            ${modeBtn('All','all','#7c3aed')}${modeBtn('Daily','daily','#7c3aed')}${modeBtn('H2H','h2h','#f59e0b')}${modeBtn('Practice','practice','#3b82f6')}
-            <span style="color:#d1d5db;">|</span>
-            <label style="font-size:12px;color:#6b7280;">Min xT:</label>
-            <input type="number" min="0" value="${minXt}" onchange="setMinXt(this.value)" style="width:50px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
-            <button onclick="toggleAllXtOnly()" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${xtOnly ? '#7c3aed' : '#f9fafb'};color:${xtOnly ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">${toggleLabel}</button>
-        </div>
-    </div>`;
+    let html = '';
     html += '<table><thead>';
     html += `<tr>${th('Player','name',2)}${th('Daily','dailyRuns',2)}${th('H2H','h2hRuns',2)}${th('Practice','practiceRuns',2)}${th('Runs','runs',2)}${th('Avg Time','avgTime',2)}${th('xT Runs','xtRuns',2)}${th('Avg xT','avgXt',2)}${th('Avg xT+','avgDelta',2)}${th('Median xT+','medDelta',2)}<th colspan="2" style="text-align:center;">Beat xT</th>${th('Beat %','beatPct',2)}</tr>`;
     html += `<tr>${th('Yes','beatYes')}${th('No','beatNo')}</tr>`;
