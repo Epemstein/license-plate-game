@@ -562,80 +562,142 @@ async function loadAllPlayers() {
     </tr>`;
     breakdownHtml += '</tbody></table>';
 
-    // Build table sorted by total runs desc
-    const players = Object.values(playerMap).filter(p => p.runs > 0).sort((a, b) => b.runs - a.runs);
+    // Store players globally for sorting/filtering
+    window._allPlayers = Object.values(playerMap).filter(p => p.runs > 0);
+    window._allSortCol = 'runs';
+    window._allSortAsc = false;
+    window._allXtOnly = false;
 
-    let html = '<h3>All Players</h3><table><thead>';
-    html += '<tr><th rowspan="2">Player</th><th rowspan="2">Runs</th><th rowspan="2">Avg Time</th><th rowspan="2">xT Runs</th><th rowspan="2">Avg xT</th><th rowspan="2">Avg xT+</th><th rowspan="2">Median xT+</th><th colspan="2" style="text-align:center;">Beat xT</th><th rowspan="2">Beat %</th></tr>';
-    html += '<tr><th>Yes</th><th>No</th></tr>';
+    document.getElementById('allPlayersBreakdown').innerHTML = breakdownHtml;
+    renderAllPlayersTable();
+    allPlayersLoaded = true;
+}
+
+function toggleAllXtOnly() {
+    window._allXtOnly = !window._allXtOnly;
+    renderAllPlayersTable();
+}
+
+function sortAllPlayers(col) {
+    if (window._allSortCol === col) {
+        window._allSortAsc = !window._allSortAsc;
+    } else {
+        window._allSortCol = col;
+        window._allSortAsc = col === 'name'; // name ascending by default, numbers descending
+    }
+    renderAllPlayersTable();
+}
+
+function computePlayerStats(p) {
+    const xtCount = p.xtRuns.length;
+    const avgTime = p.runs > 0 ? p.totalTime / p.runs : 0;
+    const avgXtVal = xtCount > 0 ? p.xtTimes.reduce((s, t) => s + t, 0) / xtCount : null;
+    const avgDeltaVal = xtCount > 0 ? p.xtRuns.reduce((s, d) => s + d, 0) / xtCount : null;
+    let medDeltaVal = null;
+    if (xtCount > 0) {
+        const sorted = [...p.xtRuns].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        medDeltaVal = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    const beatPctVal = xtCount > 0 ? p.beatYes / xtCount * 100 : null;
+    return { xtCount, avgTime, avgXtVal, avgDeltaVal, medDeltaVal, beatPctVal };
+}
+
+function renderAllPlayersTable() {
+    const players = [...window._allPlayers];
+    const xtOnly = window._allXtOnly;
+    const col = window._allSortCol;
+    const asc = window._allSortAsc;
+
+    // Filter
+    const filtered = xtOnly ? players.filter(p => p.xtRuns.length > 0) : players;
+
+    // Compute stats for sorting
+    const withStats = filtered.map(p => ({ ...p, _s: computePlayerStats(p) }));
+
+    // Sort
+    const sortVal = (p) => {
+        const s = p._s;
+        switch(col) {
+            case 'name': return p.name.toLowerCase();
+            case 'runs': return p.runs;
+            case 'avgTime': return s.avgTime;
+            case 'xtRuns': return s.xtCount;
+            case 'avgXt': return s.avgXtVal ?? (asc ? Infinity : -Infinity);
+            case 'avgDelta': return s.avgDeltaVal ?? (asc ? Infinity : -Infinity);
+            case 'medDelta': return s.medDeltaVal ?? (asc ? Infinity : -Infinity);
+            case 'beatYes': return p.beatYes;
+            case 'beatNo': return p.beatNo;
+            case 'beatPct': return s.beatPctVal ?? (asc ? Infinity : -Infinity);
+            default: return p.runs;
+        }
+    };
+    withStats.sort((a, b) => {
+        const av = sortVal(a), bv = sortVal(b);
+        if (typeof av === 'string') return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+        return asc ? av - bv : bv - av;
+    });
+
+    const arrow = (c) => col === c ? (asc ? ' ▲' : ' ▼') : '';
+    const th = (label, c, rowspan) => `<th rowspan="${rowspan || 1}" style="cursor:pointer;user-select:none;" onclick="sortAllPlayers('${c}')">${label}${arrow(c)}</th>`;
+    const toggleLabel = xtOnly ? 'Show All Runs' : 'xT Runs Only';
+
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;">
+        <h3 style="margin:0;">All Players</h3>
+        <button onclick="toggleAllXtOnly()" style="padding:4px 12px;border:1px solid #d1d5db;border-radius:6px;background:${xtOnly ? '#7c3aed' : '#f9fafb'};color:${xtOnly ? 'white' : '#374151'};font-size:12px;font-weight:600;cursor:pointer;">${toggleLabel}</button>
+    </div>`;
+    html += '<table><thead>';
+    html += `<tr>${th('Player','name',2)}${th('Runs','runs',2)}${th('Avg Time','avgTime',2)}${th('xT Runs','xtRuns',2)}${th('Avg xT','avgXt',2)}${th('Avg xT+','avgDelta',2)}${th('Median xT+','medDelta',2)}<th colspan="2" style="text-align:center;">Beat xT</th>${th('Beat %','beatPct',2)}</tr>`;
+    html += `<tr>${th('Yes','beatYes')}${th('No','beatNo')}</tr>`;
     html += '</thead><tbody>';
 
-    players.forEach(p => {
-        const avgTime = (p.totalTime / p.runs).toFixed(1);
-        const xtCount = p.xtRuns.length;
-        let avgXt = '--', avgDelta = '--', medDelta = '--', beatPct = '--';
-        let avgDeltaClass = '', medDeltaClass = '';
-
-        if (xtCount > 0) {
-            avgXt = (p.xtTimes.reduce((s, t) => s + t, 0) / xtCount).toFixed(1) + 's';
-
-            const avg = p.xtRuns.reduce((s, d) => s + d, 0) / xtCount;
-            avgDelta = (avg >= 0 ? '+' : '') + avg.toFixed(1) + 's';
-            avgDeltaClass = avg >= 0 ? 'positive' : 'negative';
-
-            const sorted = [...p.xtRuns].sort((a, b) => a - b);
-            const mid = Math.floor(sorted.length / 2);
-            const med = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-            medDelta = (med >= 0 ? '+' : '') + med.toFixed(1) + 's';
-            medDeltaClass = med >= 0 ? 'positive' : 'negative';
-
-            beatPct = Math.round(p.beatYes / xtCount * 100) + '%';
-        }
-
+    withStats.forEach(p => {
+        const s = p._s;
+        const avgTimeStr = s.avgTime.toFixed(1) + 's';
+        const avgXtStr = s.avgXtVal != null ? s.avgXtVal.toFixed(1) + 's' : '--';
+        const avgDeltaStr = s.avgDeltaVal != null ? (s.avgDeltaVal >= 0 ? '+' : '') + s.avgDeltaVal.toFixed(1) + 's' : '--';
+        const avgDeltaClass = s.avgDeltaVal != null ? (s.avgDeltaVal >= 0 ? 'positive' : 'negative') : '';
+        const medDeltaStr = s.medDeltaVal != null ? (s.medDeltaVal >= 0 ? '+' : '') + s.medDeltaVal.toFixed(1) + 's' : '--';
+        const medDeltaClass = s.medDeltaVal != null ? (s.medDeltaVal >= 0 ? 'positive' : 'negative') : '';
+        const beatPctStr = s.beatPctVal != null ? Math.round(s.beatPctVal) + '%' : '--';
         const nameDisplay = p.handle ? `${p.name} <span style="color:#6b7280;font-size:12px;">@${p.handle}</span>` : p.name;
 
         html += `<tr>
             <td>${nameDisplay}</td>
             <td><strong>${p.runs}</strong></td>
-            <td>${avgTime}s</td>
-            <td>${xtCount}</td>
-            <td>${avgXt}</td>
-            <td class="${avgDeltaClass}">${avgDelta}</td>
-            <td class="${medDeltaClass}">${medDelta}</td>
+            <td>${avgTimeStr}</td>
+            <td>${s.xtCount}</td>
+            <td>${avgXtStr}</td>
+            <td class="${avgDeltaClass}">${avgDeltaStr}</td>
+            <td class="${medDeltaClass}">${medDeltaStr}</td>
             <td class="positive">${p.beatYes}</td>
             <td class="negative">${p.beatNo}</td>
-            <td>${beatPct}</td>
+            <td>${beatPctStr}</td>
         </tr>`;
     });
 
-    // All Players totals row
-    const totRuns = players.reduce((s, p) => s + p.runs, 0);
-    const totTime = players.reduce((s, p) => s + p.totalTime, 0);
-    const allXtDeltas = players.flatMap(p => p.xtRuns);
-    const allXtTimes = players.flatMap(p => p.xtTimes);
+    // Totals row
+    const totRuns = withStats.reduce((s, p) => s + p.runs, 0);
+    const totTime = withStats.reduce((s, p) => s + p.totalTime, 0);
+    const allXtDeltas = withStats.flatMap(p => p.xtRuns);
+    const allXtTimes = withStats.flatMap(p => p.xtTimes);
     const totXt = allXtDeltas.length;
-    const totBeatYes = players.reduce((s, p) => s + p.beatYes, 0);
-    const totBeatNo = players.reduce((s, p) => s + p.beatNo, 0);
-
+    const totBeatYes = withStats.reduce((s, p) => s + p.beatYes, 0);
+    const totBeatNo = withStats.reduce((s, p) => s + p.beatNo, 0);
     let totAvgXt = '--', totAvgDelta = '--', totMedDelta = '--', totBeatPct = '--';
     let totAvgDeltaClass = '', totMedDeltaClass = '';
-
     if (totXt > 0) {
         totAvgXt = (allXtTimes.reduce((s, t) => s + t, 0) / totXt).toFixed(1) + 's';
-
         const avgD = allXtDeltas.reduce((s, d) => s + d, 0) / totXt;
         totAvgDelta = (avgD >= 0 ? '+' : '') + avgD.toFixed(1) + 's';
         totAvgDeltaClass = avgD >= 0 ? 'positive' : 'negative';
-
         const sorted = [...allXtDeltas].sort((a, b) => a - b);
         const mid = Math.floor(sorted.length / 2);
         const medD = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
         totMedDelta = (medD >= 0 ? '+' : '') + medD.toFixed(1) + 's';
         totMedDeltaClass = medD >= 0 ? 'positive' : 'negative';
-
         totBeatPct = Math.round(totBeatYes / totXt * 100) + '%';
     }
-
     html += `<tr style="border-top:2px solid #e5e7eb;font-weight:600;">
         <td>All Players</td>
         <td><strong>${totRuns}</strong></td>
@@ -650,9 +712,7 @@ async function loadAllPlayers() {
     </tr>`;
 
     html += '</tbody></table>';
-    document.getElementById('allPlayersBreakdown').innerHTML = breakdownHtml;
     document.getElementById('allPlayersTable').innerHTML = html;
-    allPlayersLoaded = true;
 }
 </script>
 </body>
