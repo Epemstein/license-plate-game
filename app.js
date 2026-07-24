@@ -5549,6 +5549,7 @@
             console.error('Error submitting H2H run:', e);
         }
 
+        const completedChallengeId = currentChallengeId;
         currentChallengeId = null;
         currentH2HRunId = null;
         challengeStartTime = null;
@@ -5570,6 +5571,11 @@
         document.getElementById('dailyChallengeBtn').disabled = false;
         document.getElementById('dailyChallengeBtn').style.opacity = '1';
         updateDailyBtnState();
+
+        // Auto-show scorecard after a brief delay for data to settle
+        if (completedChallengeId) {
+            setTimeout(() => viewH2HScorecard(completedChallengeId), 500);
+        }
     }
 
     async function markChallengeDNF() {
