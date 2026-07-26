@@ -2764,6 +2764,7 @@
         wordInputEl.readOnly = true;
 
         if (gameMode !== 'h2h_challenge') openEndModal(computedSec);
+        if (gameMode === 'h2h_challenge') computeExpectedTime(computedSec);
         if (gameMode !== 'daily' && gameMode !== 'h2h_challenge') {
             showRestartGameButton();
         }
