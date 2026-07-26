@@ -5746,14 +5746,22 @@
             const p1Time = p1Data ? p1Data.totalSeconds : null;
             const p2Time = p2Data ? p2Data.totalSeconds : null;
 
+            // Forfeit detection: solved fewer than 10 plates
+            const p1Solved = p1Data ? p1Data.entries.filter(e => !e.skipped).length : 0;
+            const p2Solved = p2Data ? p2Data.entries.filter(e => !e.skipped).length : 0;
+            const p1Forfeit = p1Data && p1Time !== null && p1Solved < 10;
+            const p2Forfeit = p2Data && p2Time !== null && p2Solved < 10;
+
             // Header
             let p1Icon = '', p2Icon = '';
             let p1TimeClass = '', p2TimeClass = '';
             if (p1Time !== null && p2Time !== null) {
-                if (p1Time < p2Time) {
+                const p1Wins = p2Forfeit && !p1Forfeit ? true : (!p1Forfeit && !p2Forfeit && p1Time < p2Time);
+                const p2Wins = p1Forfeit && !p2Forfeit ? true : (!p1Forfeit && !p2Forfeit && p2Time < p1Time);
+                if (p1Wins) {
                     p1Icon = ' &#10003;'; p1TimeClass = 'ch-win';
                     p2Icon = ' &#10007;'; p2TimeClass = 'ch-loss';
-                } else if (p2Time < p1Time) {
+                } else if (p2Wins) {
                     p2Icon = ' &#10003;'; p2TimeClass = 'ch-win';
                     p1Icon = ' &#10007;'; p1TimeClass = 'ch-loss';
                 } else {
@@ -5775,12 +5783,15 @@
                 }
             }
 
+            const p1TimeDisplay = p1Forfeit ? '🏳️ Forfeit' : (p1Time !== null ? p1Time.toFixed(2) : '--');
+            const p2TimeDisplay = p2Forfeit ? '🏳️ Forfeit' : (p2Time !== null ? p2Time.toFixed(2) : '--');
+
             let html = '<div class="scorecard-header">';
             html += `<div class="scorecard-player"><div class="scorecard-player-name">${p1Name}${p1Icon}</div>${p1Elo}`;
-            html += `<div class="scorecard-player-time ${p1TimeClass}">${p1Time !== null ? p1Time.toFixed(2) : '--'}</div></div>`;
+            html += `<div class="scorecard-player-time ${p1TimeClass}">${p1TimeDisplay}</div></div>`;
             html += '<div class="scorecard-vs">VS</div>';
             html += `<div class="scorecard-player"><div class="scorecard-player-name">${p2Name}${p2Icon}</div>${p2Elo}`;
-            html += `<div class="scorecard-player-time ${p2TimeClass}">${p2Time !== null ? p2Time.toFixed(2) : '--'}</div></div>`;
+            html += `<div class="scorecard-player-time ${p2TimeClass}">${p2TimeDisplay}</div></div>`;
             html += '</div>';
 
             // Table
