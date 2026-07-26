@@ -2763,7 +2763,7 @@
         wordInputEl.disabled = true;
         wordInputEl.readOnly = true;
 
-        openEndModal(computedSec);
+        if (gameMode !== 'h2h_challenge') openEndModal(computedSec);
         if (gameMode !== 'daily' && gameMode !== 'h2h_challenge') {
             showRestartGameButton();
         }
