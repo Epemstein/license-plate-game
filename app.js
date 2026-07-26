@@ -5856,7 +5856,7 @@
 
                 html += `<tr>`;
                 html += `<td${p1CellClass}>${p1Cell}</td>`;
-                html += `<td class="sc-plate" onclick="showViableWordsForPlate('${plate}')">${plate}</td>`;
+                html += `<td class="sc-plate" onclick="showViableWordsForPlate('${plate}', false, 'practice')">${plate}</td>`;
                 html += `<td${p2CellClass}>${p2Cell}</td>`;
                 html += `</tr>`;
             }
