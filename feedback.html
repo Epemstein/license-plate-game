@@ -101,6 +101,15 @@
             adminLogin();
         }
 
+        function updateUnreadBadge() {
+            const badges = document.querySelectorAll('.user-item .unread');
+            const count = badges.length;
+            // Post message to parent (admin.html) with unread count
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'feedbackUnread', count }, '*');
+            }
+        }
+
         async function loadConversations() {
             const { data: messages, error } = await sb
                 .from('feedback_messages')
@@ -145,7 +154,9 @@
                 const msgs = conversations[uid];
                 const last = msgs[msgs.length - 1];
                 const name = profileMap[uid] || uid.slice(0, 8);
-                const hasUnread = !last.from_admin;
+                const lastReadKey = `feedback_read_${uid}`;
+                const lastRead = localStorage.getItem(lastReadKey) || '';
+                const hasUnread = !last.from_admin && last.created_at > lastRead;
                 const ago = timeAgo(last.created_at);
                 html += `<div class="user-item ${selectedUserId === uid ? 'active' : ''}" onclick="selectUser('${uid}')">`;
                 html += `<div class="name">${name}${hasUnread ? '<span class="unread">new</span>' : ''}</div>`;
@@ -154,6 +165,7 @@
                 html += `</div>`;
             }
             document.getElementById('userList').innerHTML = html;
+            updateUnreadBadge();
 
             // Refresh current chat
             if (selectedUserId && conversations[selectedUserId]) {
@@ -166,6 +178,14 @@
             const items = document.querySelectorAll('.user-item');
             items.forEach(el => el.classList.remove('active'));
             event.currentTarget.classList.add('active');
+
+            // Mark as read
+            localStorage.setItem(`feedback_read_${uid}`, new Date().toISOString());
+            // Remove "new" badge from this item
+            const badge = event.currentTarget.querySelector('.unread');
+            if (badge) badge.remove();
+            // Notify parent to update tab badge
+            updateUnreadBadge();
 
             const name = event.currentTarget.querySelector('.name').textContent.replace(/new$/, '').trim();
             renderChat(uid, name);
