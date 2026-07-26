@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Match Queue</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        h1 { font-size: 1.3rem; margin-bottom: 16px; }
+        .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 18px; min-width: 120px; text-align: center; }
+        .stat-card .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .val { font-size: 1.3rem; font-weight: 700; margin-top: 4px; }
+        .queue-table { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+        .queue-table h3 { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; padding: 14px 16px 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #e5e7eb; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; }
+        tr:hover { background: #f9fafb; }
+        .status-waiting { color: #f59e0b; font-weight: 600; }
+        .status-matched { color: #16a34a; font-weight: 600; }
+        .status-expired { color: #9ca3af; font-weight: 600; }
+        .empty { text-align: center; padding: 40px; color: #9ca3af; }
+        .refresh-btn { background: #7c3aed; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; margin-bottom: 16px; }
+        .refresh-btn:hover { background: #6d28d9; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Quick Match Queue</h1>
+    <button class="refresh-btn" onclick="loadQueue()">Refresh</button>
+
+    <div id="stats" class="stats-row"></div>
+    <div id="queueTable" class="queue-table">
+        <div class="empty">Loading...</div>
+    </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTkxOTA1NSwiZXhwIjoyMDkxNDk1MDU1fQ.b_qDqjP-Nadk_M_kACc5mJB_OR_-Cx80vOgOfLYsDLQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false }
+});
+
+async function loadQueue() {
+    // Fetch queue entries
+    const { data: queue } = await sb
+        .from('h2h_queue')
+        .select('id, challenge_id, user_id, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+    // Fetch matching challenges
+    const challengeIds = (queue || []).map(q => q.challenge_id);
+    let challenges = {};
+    if (challengeIds.length > 0) {
+        const { data: cRows } = await sb
+            .from('h2h_challenges')
+            .select('id, challenger_id, opponent_id, status, difficulty, created_at, completed_at')
+            .in('id', challengeIds);
+        (cRows || []).forEach(c => { challenges[c.id] = c; });
+    }
+
+    // Fetch profiles for all user IDs
+    const userIds = new Set();
+    (queue || []).forEach(q => userIds.add(q.user_id));
+    Object.values(challenges).forEach(c => {
+        if (c.challenger_id) userIds.add(c.challenger_id);
+        if (c.opponent_id) userIds.add(c.opponent_id);
+    });
+
+    let profiles = {};
+    if (userIds.size > 0) {
+        const { data: pRows } = await sb
+            .from('profiles')
+            .select('id, display_name, handle')
+            .in('id', [...userIds]);
+        (pRows || []).forEach(p => { profiles[p.id] = p; });
+    }
+
+    // Fetch runs for these challenges
+    let runs = {};
+    if (challengeIds.length > 0) {
+        const { data: rRows } = await sb
+            .from('h2h_runs')
+            .select('challenge_id, user_id, total_seconds')
+            .in('challenge_id', challengeIds);
+        (rRows || []).forEach(r => {
+            if (!runs[r.challenge_id]) runs[r.challenge_id] = [];
+            runs[r.challenge_id].push(r);
+        });
+    }
+
+    // Stats
+    const waiting = (queue || []).filter(q => q.status === 'waiting').length;
+    const matched = (queue || []).filter(q => q.status === 'matched').length;
+    const expired = (queue || []).filter(q => q.status === 'expired').length;
+    const total = (queue || []).length;
+
+    document.getElementById('stats').innerHTML = `
+        <div class="stat-card"><div class="label">Total</div><div class="val">${total}</div></div>
+        <div class="stat-card"><div class="label">Waiting</div><div class="val" style="color:#f59e0b;">${waiting}</div></div>
+        <div class="stat-card"><div class="label">Matched</div><div class="val" style="color:#16a34a;">${matched}</div></div>
+        <div class="stat-card"><div class="label">Expired</div><div class="val" style="color:#9ca3af;">${expired}</div></div>
+    `;
+
+    // Table
+    if (!queue || queue.length === 0) {
+        document.getElementById('queueTable').innerHTML = '<div class="empty">No queue entries yet</div>';
+        return;
+    }
+
+    const getName = (id) => {
+        const p = profiles[id];
+        return p ? (p.display_name || p.handle || id.slice(0, 8)) : id.slice(0, 8);
+    };
+
+    const timeAgo = (dateStr) => {
+        const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.round(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.round(diff / 3600) + 'h ago';
+        return Math.round(diff / 86400) + 'd ago';
+    };
+
+    let html = '<h3>Queue Entries</h3><table><thead><tr>';
+    html += '<th>Player</th><th>Status</th><th>Opponent</th><th>Challenger Score</th><th>Opponent Score</th><th>Created</th>';
+    html += '</tr></thead><tbody>';
+
+    (queue || []).forEach(q => {
+        const c = challenges[q.challenge_id] || {};
+        const statusClass = `status-${q.status}`;
+        const opponentId = c.opponent_id && c.opponent_id !== q.user_id ? c.opponent_id : null;
+        const opponentName = opponentId ? getName(opponentId) : '--';
+        const challengeRuns = runs[q.challenge_id] || [];
+        const myRun = challengeRuns.find(r => r.user_id === q.user_id);
+        const oppRun = opponentId ? challengeRuns.find(r => r.user_id === opponentId) : null;
+        const myScore = myRun?.total_seconds != null ? myRun.total_seconds.toFixed(1) + 's' : 'TBD';
+        const oppScore = oppRun?.total_seconds != null ? oppRun.total_seconds.toFixed(1) + 's' : opponentId ? 'TBD' : '--';
+
+        html += `<tr>
+            <td><strong>${getName(q.user_id)}</strong></td>
+            <td class="${statusClass}">${q.status}</td>
+            <td>${opponentName}</td>
+            <td>${myScore}</td>
+            <td>${oppScore}</td>
+            <td>${timeAgo(q.created_at)}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('queueTable').innerHTML = html;
+}
+
+loadQueue();
+</script>
+</body>
+</html>
