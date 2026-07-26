@@ -5730,9 +5730,15 @@
                 };
             }
 
-            // Determine players
+            // Determine players — fetch names if not cached
             const p1Id = challenge.challenger_id;
             const p2Id = challenge.opponent_id;
+            for (const uid of [p1Id, p2Id]) {
+                if (uid && uid !== currentUser.id && !h2hProfilesCache[uid]) {
+                    const { data: prof } = await sb.from('profiles').select('display_name, handle').eq('id', uid).single();
+                    if (prof) h2hProfilesCache[uid] = prof.display_name || (prof.handle ? '@' + prof.handle : null);
+                }
+            }
             const p1Name = p1Id === currentUser.id ? 'You' : (h2hProfilesCache[p1Id] || 'Player 1');
             const p2Name = p2Id === currentUser.id ? 'You' : (h2hProfilesCache[p2Id] || 'Player 2');
             const p1Data = runEntries[p1Id];
