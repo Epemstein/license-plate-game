@@ -5783,8 +5783,8 @@
                 }
             }
 
-            const p1TimeDisplay = p1Forfeit ? '🏳️ Forfeit' : (p1Time !== null ? p1Time.toFixed(2) : '--');
-            const p2TimeDisplay = p2Forfeit ? '🏳️ Forfeit' : (p2Time !== null ? p2Time.toFixed(2) : '--');
+            const p1TimeDisplay = p1Forfeit ? '🏳️' : (p1Time !== null ? p1Time.toFixed(2) : '--');
+            const p2TimeDisplay = p2Forfeit ? '🏳️' : (p2Time !== null ? p2Time.toFixed(2) : '--');
 
             let html = '<div class="scorecard-header">';
             html += `<div class="scorecard-player"><div class="scorecard-player-name">${p1Name}${p1Icon}</div>${p1Elo}`;
