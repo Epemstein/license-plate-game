@@ -127,8 +127,20 @@ async function loadQueue() {
         return Math.round(diff / 86400) + 'd ago';
     };
 
+    // Fetch message counts for all challenges
+    let msgCounts = {};
+    if (challengeIds.length > 0) {
+        const { data: msgs } = await sb
+            .from('h2h_messages')
+            .select('challenge_id')
+            .in('challenge_id', challengeIds);
+        (msgs || []).forEach(m => {
+            msgCounts[m.challenge_id] = (msgCounts[m.challenge_id] || 0) + 1;
+        });
+    }
+
     let html = '<h3>Queue Entries</h3><table><thead><tr>';
-    html += '<th>Player</th><th>Status</th><th>Opponent</th><th>Challenger Score</th><th>Opponent Score</th><th>Created</th>';
+    html += '<th>Player</th><th>Status</th><th>Opponent</th><th>Challenger Score</th><th>Opponent Score</th><th>Created</th><th>Chat</th>';
     html += '</tr></thead><tbody>';
 
     (queue || []).forEach(q => {
@@ -141,6 +153,10 @@ async function loadQueue() {
         const oppRun = opponentId ? challengeRuns.find(r => r.user_id === opponentId) : null;
         const myScore = myRun?.total_seconds != null ? myRun.total_seconds.toFixed(1) + 's' : 'TBD';
         const oppScore = oppRun?.total_seconds != null ? oppRun.total_seconds.toFixed(1) + 's' : opponentId ? 'TBD' : '--';
+        const count = msgCounts[q.challenge_id] || 0;
+        const chatBtn = count > 0
+            ? `<button onclick="showChat('${q.challenge_id}')" style="background:#7c3aed;color:white;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">${count} msg${count > 1 ? 's' : ''}</button>`
+            : '<span style="color:#d1d5db;">--</span>';
 
         html += `<tr>
             <td><strong>${getName(q.user_id)}</strong></td>
@@ -149,11 +165,51 @@ async function loadQueue() {
             <td>${myScore}</td>
             <td>${oppScore}</td>
             <td>${timeAgo(q.created_at)}</td>
+            <td>${chatBtn}</td>
         </tr>`;
     });
 
     html += '</tbody></table>';
     document.getElementById('queueTable').innerHTML = html;
+}
+
+async function showChat(challengeId) {
+    const { data: msgs } = await sb
+        .from('h2h_messages')
+        .select('user_id, text, created_at')
+        .eq('challenge_id', challengeId)
+        .order('created_at');
+
+    // Get profile names
+    const userIds = [...new Set((msgs || []).map(m => m.user_id))];
+    let names = {};
+    if (userIds.length > 0) {
+        const { data: profs } = await sb
+            .from('profiles')
+            .select('id, display_name, handle')
+            .in('id', userIds);
+        (profs || []).forEach(p => { names[p.id] = p.display_name || (p.handle ? '@' + p.handle : p.id.slice(0, 8)); });
+    }
+
+    let html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)this.remove()">';
+    html += '<div style="background:white;border-radius:16px;padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3 style="margin:0;">Chat History</h3><button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button></div>';
+
+    if (!msgs || msgs.length === 0) {
+        html += '<p style="color:#9ca3af;text-align:center;">No messages</p>';
+    } else {
+        msgs.forEach(m => {
+            const name = names[m.user_id] || m.user_id.slice(0, 8);
+            const time = new Date(m.created_at).toLocaleString();
+            html += `<div style="margin-bottom:10px;padding:8px 12px;background:#f9fafb;border-radius:10px;">`;
+            html += `<div style="font-size:12px;color:#6b7280;margin-bottom:2px;"><strong>${name}</strong> · ${time}</div>`;
+            html += `<div style="font-size:14px;">${m.text}</div>`;
+            html += `</div>`;
+        });
+    }
+
+    html += '</div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
 }
 
 loadQueue();
