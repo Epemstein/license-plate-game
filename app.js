@@ -4457,6 +4457,74 @@
             }
         });
 
+        document.getElementById('quickMatchBtn').addEventListener('click', async () => {
+            if (!currentUser) {
+                alert('Please sign in to play Quick Match');
+                return;
+            }
+
+            // Generate 200 plates at difficulty 50
+            const plates = generateChallengeSequence(50);
+            if (!plates.length) {
+                alert('Game data not ready yet. Please wait.');
+                return;
+            }
+
+            try {
+                const { data, error } = await sb.rpc('quick_match', {
+                    p_user_id: currentUser.id,
+                    p_plates: plates
+                });
+
+                if (error) throw error;
+                const result = Array.isArray(data) ? data[0] : data;
+                if (!result) throw new Error('No result from quick_match');
+
+                console.log('[QuickMatch] challenge=' + result.challenge_id + ' run=' + result.run_id + ' matched=' + result.matched);
+
+                // Reset game state
+                if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+                resetGameState();
+                gameOver = false;
+                gameStarted = false;
+
+                currentChallengeId = result.challenge_id;
+                currentH2HRunId = result.run_id;
+                gameMode = 'h2h_challenge';
+                dailyPlateSequence = result.plates;
+                currentH2HDifficulty = 50;
+
+                // Switch to game tab
+                switchTab('game');
+
+                document.getElementById('practiceBtn').disabled = true;
+                document.getElementById('practiceBtn').style.opacity = '0.5';
+                document.getElementById('dailyChallengeBtn').disabled = true;
+                document.getElementById('dailyChallengeBtn').style.opacity = '0.5';
+                document.getElementById('quickMatchBtn').disabled = true;
+                document.getElementById('quickMatchBtn').style.opacity = '0.5';
+
+                const mi = document.getElementById('modeIndicator');
+                mi.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <span>Quick Match | Difficulty 50</span>
+                        <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
+                    </div>
+                `;
+                mi.style.background = '#fef3c7';
+                mi.style.color = '#92400e';
+                mi.style.border = '2px solid #fbbf24';
+
+                const startBtn = document.getElementById('startButton');
+                startBtn.style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                await beginNewRun();
+            } catch (e) {
+                console.error('[QuickMatch] Error:', e);
+                alert('Quick Match error: ' + e.message);
+            }
+        });
+
         document.getElementById('choosePracticeBtn').addEventListener('click', () => {
             document.getElementById('practiceModeBackdrop').classList.remove('show');
             const btn = document.getElementById('practiceBtn');
@@ -5570,6 +5638,8 @@
         document.getElementById('practiceBtn').style.opacity = '1';
         document.getElementById('dailyChallengeBtn').disabled = false;
         document.getElementById('dailyChallengeBtn').style.opacity = '1';
+        document.getElementById('quickMatchBtn').disabled = false;
+        document.getElementById('quickMatchBtn').style.opacity = '1';
         updateDailyBtnState();
 
         // Auto-show scorecard after a brief delay for data to settle
