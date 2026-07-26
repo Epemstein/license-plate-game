@@ -4457,13 +4457,40 @@
             }
         });
 
-        document.getElementById('quickMatchBtn').addEventListener('click', async () => {
+        document.getElementById('quickMatchBtn').addEventListener('click', () => {
             if (!currentUser) {
                 alert('Please sign in to play Quick Match');
                 return;
             }
+            // Show confirmation modal
+            const backdrop = document.getElementById('wordsModalBackdrop') || document.createElement('div');
+            let modal = document.getElementById('quickMatchConfirm');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'quickMatchConfirm';
+                modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);';
+                modal.innerHTML = `
+                    <div style="background:white;border-radius:16px;padding:24px;max-width:340px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.2);text-align:center;">
+                        <div style="font-size:1.2rem;font-weight:700;margin-bottom:8px;">Quick Match</div>
+                        <div style="color:#6b7280;font-size:0.9rem;margin-bottom:20px;">Play 10 plates at Difficulty 50. You'll be matched against a random opponent.</div>
+                        <div style="display:flex;gap:10px;">
+                            <button id="qmCancel" style="flex:1;padding:10px;border:1px solid #d1d5db;border-radius:10px;background:white;font-weight:600;cursor:pointer;font-size:0.9rem;">Cancel</button>
+                            <button id="qmStart" style="flex:1;padding:10px;border:none;border-radius:10px;background:#f59e0b;color:white;font-weight:600;cursor:pointer;font-size:0.9rem;">Play</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                document.getElementById('qmCancel').addEventListener('click', () => { modal.style.display = 'none'; });
+                document.getElementById('qmStart').addEventListener('click', async () => {
+                    modal.style.display = 'none';
+                    await startQuickMatch();
+                });
+            } else {
+                modal.style.display = 'flex';
+            }
+        });
 
-            // Generate 200 plates at difficulty 50
+        async function startQuickMatch() {
             const plates = generateChallengeSequence(50);
             if (!plates.length) {
                 alert('Game data not ready yet. Please wait.');
@@ -4482,7 +4509,6 @@
 
                 console.log('[QuickMatch] challenge=' + result.challenge_id + ' run=' + result.run_id + ' matched=' + result.matched);
 
-                // Reset game state
                 if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
                 resetGameState();
                 gameOver = false;
@@ -4494,7 +4520,6 @@
                 dailyPlateSequence = result.plates;
                 currentH2HDifficulty = 50;
 
-                // Switch to game tab
                 switchTab('game');
 
                 document.getElementById('practiceBtn').disabled = true;
@@ -4523,7 +4548,7 @@
                 console.error('[QuickMatch] Error:', e);
                 alert('Quick Match error: ' + e.message);
             }
-        });
+        }
 
         document.getElementById('choosePracticeBtn').addEventListener('click', () => {
             document.getElementById('practiceModeBackdrop').classList.remove('show');
@@ -4904,9 +4929,10 @@
             const userIds = new Set();
             h2hChallengesCache.forEach(c => {
                 userIds.add(c.challenger_id);
-                userIds.add(c.opponent_id);
+                if (c.opponent_id) userIds.add(c.opponent_id);
             });
             userIds.delete(currentUser.id);
+            userIds.delete(null);
 
             if (userIds.size > 0) {
                 const { data: profiles } = await sb
@@ -5005,7 +5031,7 @@
         } else if (h2hActiveSubTab === 'pending') {
             filtered = h2hChallengesCache.filter(c => {
                 const isChallenger = c.challenger_id === currentUser.id;
-                return (isChallenger && c.status === 'pending') || c.status === 'accepted';
+                return (isChallenger && c.status === 'pending') || c.status === 'accepted' || c.status === 'quick_match_waiting';
             });
         } else if (h2hActiveSubTab === 'results') {
             filtered = h2hChallengesCache.filter(c => c.status === 'completed');
@@ -5039,18 +5065,22 @@
                 html += `</div>`;
                 html += `</div>`;
             } else if (h2hActiveSubTab === 'pending') {
+                const isQuickMatch = ch.status === 'quick_match_waiting';
                 const myRun = ch._runs && ch._runs[currentUser.id];
-                const oppId = isChallenger ? ch.opponent_id : ch.challenger_id;
-                const oppRun = ch._runs && ch._runs[oppId];
+                const oppId = isQuickMatch ? null : (isChallenger ? ch.opponent_id : ch.challenger_id);
+                const oppRun = oppId ? (ch._runs && ch._runs[oppId]) : null;
                 const myScore = myRun && myRun.forfeited ? 'Forfeit' : (myRun && myRun.totalSeconds != null ? myRun.totalSeconds.toFixed(1) : (myRun ? 'In progress' : 'Not played'));
-                const oppScore = oppRun && oppRun.forfeited ? 'Forfeit' : (oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(1) : '—');
+                const oppScore = isQuickMatch ? '—' : (oppRun && oppRun.forfeited ? 'Forfeit' : (oppRun && oppRun.totalSeconds != null ? oppRun.totalSeconds.toFixed(1) : '—'));
 
-                const canPlay = (!myRun || (myRun && myRun.totalSeconds == null)) && ch.status === 'accepted';
-                const statusLabel = ch.status === 'pending' ? 'Waiting for response' : (canPlay ? 'Tap to play' : 'Waiting for opponent');
+                const canPlay = !isQuickMatch && (!myRun || (myRun && myRun.totalSeconds == null)) && ch.status === 'accepted';
+                const statusLabel = isQuickMatch ? 'Waiting for opponent' : (ch.status === 'pending' ? 'Waiting for response' : (canPlay ? 'Tap to play' : 'Waiting for opponent'));
                 const statusColor = canPlay ? '#16a34a' : '#9ca3af';
-                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:#fffbeb;border:1px solid #fde68a;cursor:pointer;" onclick="${canPlay ? `playH2HChallenge('${ch.id}')` : `viewH2HScorecard('${ch.id}')`}">`;
+                const displayName = isQuickMatch ? 'Quick Match' : `vs ${oppName}`;
+                const bgColor = isQuickMatch ? '#fff7ed' : '#fffbeb';
+                const borderColor = isQuickMatch ? '#fdba74' : '#fde68a';
+                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${bgColor};border:1px solid ${borderColor};cursor:pointer;" onclick="${canPlay ? `playH2HChallenge('${ch.id}')` : `viewH2HScorecard('${ch.id}')`}">`;
                 html += `<div style="flex:1;min-width:0;">`;
-                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">vs ${oppName}</div>`;
+                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">${displayName}</div>`;
                 html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${diffLabel} · ${dateStr}</div>`;
                 html += `<div style="font-size:0.75rem;color:${statusColor};font-weight:600;margin-top:2px;">${statusLabel}</div>`;
                 html += `</div>`;
