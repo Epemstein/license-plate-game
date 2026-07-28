@@ -52,7 +52,7 @@ async function loadQueue() {
         .from('h2h_queue')
         .select('id, challenge_id, user_id, status, created_at')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200);
 
     // Fetch matching challenges
     const challengeIds = (queue || []).map(q => q.challenge_id);
