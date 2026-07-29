@@ -4499,10 +4499,13 @@
             }
 
             try {
-                const { data, error } = await sb.rpc('quick_match', {
+                const rpcParams = {
                     p_user_id: currentUser.id,
                     p_plates: plates
-                });
+                };
+                if (lastQuickMatchOpponentId) rpcParams.p_last_opponent_id = lastQuickMatchOpponentId;
+
+                const { data, error } = await sb.rpc('quick_match', rpcParams);
 
                 if (error) throw error;
                 const result = Array.isArray(data) ? data[0] : data;
@@ -4856,6 +4859,7 @@
     let currentChallengeId = null;
     let currentH2HRunId = null;
     let currentH2HDifficulty = 50;
+    let lastQuickMatchOpponentId = null;
     let challengeStartTime = null;
     let pendingOpponent = null;
     let h2hChallengesCache = [];
@@ -5673,8 +5677,16 @@
         document.getElementById('quickMatchBtn').style.opacity = '1';
         updateDailyBtnState();
 
-        // Auto-show scorecard after a brief delay for data to settle
+        // Track last quick match opponent for B2B prevention
         if (completedChallengeId) {
+            sb.from('h2h_challenges').select('challenger_id, opponent_id').eq('id', completedChallengeId).single()
+                .then(({ data }) => {
+                    if (data) {
+                        const oppId = data.challenger_id === currentUser.id ? data.opponent_id : data.challenger_id;
+                        if (oppId) lastQuickMatchOpponentId = oppId;
+                    }
+                });
+            // Auto-show scorecard after a brief delay for data to settle
             setTimeout(() => viewH2HScorecard(completedChallengeId), 500);
         }
     }
