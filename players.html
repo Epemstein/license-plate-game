@@ -538,8 +538,10 @@ function renderRunsChart(runs) {
         if (y != null) allYValues.push(y);
     });
     allYValues.sort((a, b) => a - b);
-    const p95Idx = Math.floor(allYValues.length * 0.975);
-    const yCeiling = allYValues.length > 0 ? allYValues[Math.min(p95Idx, allYValues.length - 1)] * 1.05 : null;
+    const pTopIdx = Math.floor(allYValues.length * 0.975);
+    const pBotIdx = Math.floor(allYValues.length * 0.025);
+    const yCeiling = allYValues.length > 0 ? allYValues[Math.min(pTopIdx, allYValues.length - 1)] * 1.05 : null;
+    const yFloor = allYValues.length > 0 ? allYValues[pBotIdx] * (allYValues[pBotIdx] >= 0 ? 0.95 : 1.05) : null;
 
     const datasets = ['Daily', 'H2H', 'Practice'].map(source => {
         const modeRuns = runs.filter(r => r.source === source);
@@ -552,22 +554,26 @@ function renderRunsChart(runs) {
                 actualY = r.expected_seconds != null ? +(r.expected_seconds - r.total_seconds).toFixed(1) : null;
             }
             if (actualY == null) return null;
-            // Clamp to ceiling but store actual value for tooltip
-            y = yCeiling != null && actualY > yCeiling ? yCeiling : actualY;
-            return { x: runIdx, y, actualY, date: r.date, source: r.source, diff: r.difficulty, clamped: actualY > yCeiling, time: r.total_seconds, xt: r.expected_seconds };
+            // Clamp to ceiling/floor but store actual value for tooltip
+            const clampedHigh = yCeiling != null && actualY > yCeiling;
+            const clampedLow = yFloor != null && actualY < yFloor;
+            y = clampedHigh ? yCeiling : (clampedLow ? yFloor : actualY);
+            return { x: runIdx, y, actualY, date: r.date, source: r.source, diff: r.difficulty, clamped: clampedHigh || clampedLow, time: r.total_seconds, xt: r.expected_seconds };
         }).filter(Boolean);
 
         return {
             label: source,
             data,
-            backgroundColor: sourceColors[source] + '99',
+            backgroundColor: runsGraphMode === 'delta'
+                ? data.map(d => d.actualY >= 0 ? sourceColors[source] + '99' : sourceColors[source] + '40')
+                : sourceColors[source] + '99',
             borderColor: runsGraphMode === 'delta'
                 ? data.map(d => d.actualY >= 0 ? '#16a34a' : '#dc2626')
                 : sourceColors[source],
-            borderWidth: runsGraphMode === 'delta' ? 2.5 : 1,
-            pointRadius: data.map(d => d.clamped ? 6 : 4),
+            borderWidth: runsGraphMode === 'delta' ? 3 : 1,
+            pointRadius: data.map(d => d.clamped ? 7 : 5),
             pointStyle: data.map(d => d.clamped ? 'triangle' : 'circle'),
-            pointHoverRadius: 6
+            pointHoverRadius: 7
         };
     }).filter(ds => ds.data.length > 0);
 
@@ -589,7 +595,7 @@ function renderRunsChart(runs) {
                 }
             },
             plugins: {
-                legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
+                legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, font: { size: 11 } } },
                 annotation: runsGraphMode === 'delta' ? {
                     annotations: {
                         zeroLine: {
@@ -618,7 +624,8 @@ function renderRunsChart(runs) {
                 y: {
                     title: { display: true, text: runsGraphMode === 'time' ? 'Seconds' : 'xT Delta (s)', font: { size: 11 } },
                     ticks: { font: { size: 10 } },
-                    max: yCeiling != null ? Math.ceil(yCeiling) : undefined
+                    max: yCeiling != null ? Math.ceil(yCeiling) : undefined,
+                    min: yFloor != null ? Math.floor(yFloor) : undefined
                 }
             }
         }
