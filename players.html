@@ -560,13 +560,11 @@ function renderRunsChart(runs) {
         return {
             label: source,
             data,
-            backgroundColor: runsGraphMode === 'delta'
-                ? data.map(d => d.actualY >= 0 ? 'rgba(22,163,74,0.7)' : 'rgba(220,38,38,0.7)')
-                : sourceColors[source] + '99',
+            backgroundColor: sourceColors[source] + '99',
             borderColor: runsGraphMode === 'delta'
                 ? data.map(d => d.actualY >= 0 ? '#16a34a' : '#dc2626')
                 : sourceColors[source],
-            borderWidth: runsGraphMode === 'delta' ? 2 : 1,
+            borderWidth: runsGraphMode === 'delta' ? 2.5 : 1,
             pointRadius: data.map(d => d.clamped ? 6 : 4),
             pointStyle: data.map(d => d.clamped ? 'triangle' : 'circle'),
             pointHoverRadius: 6
