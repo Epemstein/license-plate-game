@@ -433,12 +433,21 @@ function renderRunsView() {
     html += `<button onclick="toggleRunsView('graph')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsViewMode === 'graph' ? '#7c3aed' : '#f9fafb'};color:${runsViewMode === 'graph' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">Graph</button>`;
     html += `</div></div>`;
 
-    // Difficulty filter
-    html += `<div style="padding:4px 16px 8px;display:flex;gap:10px;align-items:center;font-size:12px;color:#6b7280;">
-        <label>Difficulty:</label>
-        <input type="number" min="0" max="100" value="${runsDiffMin}" oninput="setRunsDiffMin(this.value)" style="width:45px;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;">
-        <span>to</span>
-        <input type="number" min="0" max="100" value="${runsDiffMax}" oninput="setRunsDiffMax(this.value)" style="width:45px;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;">
+    // Difficulty range slider
+    html += `<div style="padding:4px 16px 12px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;margin-bottom:4px;">
+            <label>Difficulty: <strong>${runsDiffMin}</strong> – <strong>${runsDiffMax}</strong></label>
+        </div>
+        <div style="position:relative;height:20px;margin:0 4px;">
+            <div style="position:absolute;top:8px;left:0;right:0;height:4px;background:#e5e7eb;border-radius:2px;"></div>
+            <div id="diffTrackFill" style="position:absolute;top:8px;height:4px;background:#7c3aed;border-radius:2px;left:${runsDiffMin}%;right:${100-runsDiffMax}%;"></div>
+            <input type="range" min="0" max="100" value="${runsDiffMin}" oninput="setRunsDiffMin(this.value)" style="position:absolute;top:0;left:0;width:100%;pointer-events:none;-webkit-appearance:none;appearance:none;background:transparent;height:20px;margin:0;">
+            <input type="range" min="0" max="100" value="${runsDiffMax}" oninput="setRunsDiffMax(this.value)" style="position:absolute;top:0;left:0;width:100%;pointer-events:none;-webkit-appearance:none;appearance:none;background:transparent;height:20px;margin:0;">
+        </div>
+        <style>
+            input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; pointer-events:auto; width:16px; height:16px; border-radius:50%; background:#7c3aed; border:2px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.3); cursor:pointer; }
+            input[type=range]::-moz-range-thumb { pointer-events:auto; width:14px; height:14px; border-radius:50%; background:#7c3aed; border:2px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.3); cursor:pointer; }
+        </style>
     </div>`;
 
     if (runsViewMode === 'list') {
@@ -512,7 +521,7 @@ function renderRunsChart(runs) {
             if (actualY == null) return null;
             // Clamp to ceiling but store actual value for tooltip
             y = yCeiling != null && actualY > yCeiling ? yCeiling : actualY;
-            return { x: runIdx, y, actualY, date: r.date, source: r.source, diff: r.difficulty, clamped: actualY > yCeiling };
+            return { x: runIdx, y, actualY, date: r.date, source: r.source, diff: r.difficulty, clamped: actualY > yCeiling, time: r.total_seconds, xt: r.expected_seconds };
         }).filter(Boolean);
 
         return {
@@ -532,6 +541,17 @@ function renderRunsChart(runs) {
         data: { datasets },
         options: {
             responsive: true,
+            onClick: (evt, elements) => {
+                if (elements.length > 0) {
+                    const el = elements[0];
+                    const pt = runsChart.data.datasets[el.datasetIndex].data[el.index];
+                    if (pt) {
+                        const delta = pt.xt != null ? (pt.xt - pt.time) : null;
+                        const deltaStr = delta != null ? `xT+: ${delta >= 0 ? '+' : ''}${delta.toFixed(1)}s` : 'No xT';
+                        alert(`${pt.source} · ${pt.date}\nDifficulty: ${pt.diff}\nTime: ${pt.time.toFixed(2)}s\n${deltaStr}`);
+                    }
+                }
+            },
             plugins: {
                 legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
                 tooltip: {
