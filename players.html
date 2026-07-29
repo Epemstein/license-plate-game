@@ -312,7 +312,7 @@ function toggleXtOnly() {
 }
 
 function renderXtBreakdown(runs) {
-    const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
+    const sourceColors = { Daily: '#f59e0b', H2H: '#1f2937', Practice: '#6d28d9' };
     const modes = ['Daily', 'H2H', 'Practice'];
     const xtOnly = window._xtOnlyMode;
 
@@ -417,7 +417,7 @@ function getFilteredRuns() {
 function renderRunsView() {
     const runs = getFilteredRuns();
     const container = document.getElementById('runsTable');
-    const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
+    const sourceColors = { Daily: '#f59e0b', H2H: '#1f2937', Practice: '#6d28d9' };
 
     let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;font-size:0.85rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">All Runs (${runs.length})</h3>
@@ -482,7 +482,7 @@ function renderRunsView() {
 }
 
 function renderRunsChart(runs) {
-    const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
+    const sourceColors = { Daily: '#f59e0b', H2H: '#1f2937', Practice: '#6d28d9' };
 
     const datasets = ['Daily', 'H2H', 'Practice'].map(source => {
         const modeRuns = runs.filter(r => r.source === source);
@@ -650,7 +650,7 @@ async function loadAllPlayers() {
         All: modeStats([...dailyRows, ...h2hRows, ...practiceRows])
     };
 
-    const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
+    const sourceColors = { Daily: '#f59e0b', H2H: '#1f2937', Practice: '#6d28d9' };
     let breakdownHtml = '<h3>xT Breakdown by Mode (All Players)</h3><table><thead>';
     breakdownHtml += '<tr><th rowspan="2">Mode</th><th rowspan="2">Runs</th><th rowspan="2">Avg Time</th><th rowspan="2">Avg xT</th><th rowspan="2">Avg xT+</th><th rowspan="2">Median xT+</th><th colspan="2" style="text-align:center;">Beat xT</th><th rowspan="2">Beat %</th></tr>';
     breakdownHtml += '<tr><th>Yes</th><th>No</th></tr>';
