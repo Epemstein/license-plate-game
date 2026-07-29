@@ -2680,7 +2680,7 @@
             return;
         }
         // Submit practice stats from previous run before restarting
-        if (gameMode === 'practice' && gameHistory.length > 0) {
+        if (gameMode === 'practice' && gameHistory.length > 0 && !practiceStatsSubmitted) {
             submitPracticePlateStats();
         }
         practiceStatsSubmitted = false;
