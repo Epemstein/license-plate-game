@@ -76,7 +76,8 @@
 
         <div id="xtBreakdown" class="xt-breakdown"></div>
 
-        <div id="runsTable" class="runs-table"></div>
+        <div id="runsControls" class="runs-table" style="display:none;margin-bottom:0;border-radius:12px 12px 0 0;border-bottom:none;"></div>
+        <div id="runsTable" class="runs-table" style="border-radius:0 0 12px 12px;"></div>
     </div>
 
     <div id="emptyState" class="empty-state">
@@ -403,40 +404,44 @@ let runsDiffMin = 0;
 let runsDiffMax = 100;
 let currentRunsData = [];
 
-function toggleRunsView(mode) { runsViewMode = mode; renderRunsView(); }
-function toggleGraphMode(mode) { runsGraphMode = mode; renderRunsView(); }
-function setRunsDiffMin(val) { runsDiffMin = parseInt(val) || 0; renderRunsView(); }
-function setRunsDiffMax(val) { runsDiffMax = parseInt(val) || 100; renderRunsView(); }
+function toggleRunsView(mode) { runsViewMode = mode; renderRunsContent(); updateRunsToggleButtons(); }
+function toggleGraphMode(mode) { runsGraphMode = mode; renderRunsContent(); updateRunsToggleButtons(); }
+function setRunsDiffMin(val) {
+    runsDiffMin = parseInt(val) || 0;
+    document.getElementById('diffLabel').innerHTML = `Difficulty: <strong>${runsDiffMin}</strong> – <strong>${runsDiffMax}</strong>`;
+    document.getElementById('diffTrackFill').style.left = runsDiffMin + '%';
+    renderRunsContent();
+}
+function setRunsDiffMax(val) {
+    runsDiffMax = parseInt(val) || 100;
+    document.getElementById('diffLabel').innerHTML = `Difficulty: <strong>${runsDiffMin}</strong> – <strong>${runsDiffMax}</strong>`;
+    document.getElementById('diffTrackFill').style.right = (100 - runsDiffMax) + '%';
+    renderRunsContent();
+}
 
-function renderRunsTable(runs) { currentRunsData = runs; renderRunsView(); }
+function renderRunsTable(runs) {
+    currentRunsData = runs;
+    renderRunsControls();
+    renderRunsContent();
+}
 
 function getFilteredRuns() {
     return currentRunsData.filter(r => (r.difficulty || 50) >= runsDiffMin && (r.difficulty || 50) <= runsDiffMax);
 }
 
-function renderRunsView() {
-    const runs = getFilteredRuns();
-    const container = document.getElementById('runsTable');
-    const sourceColors = { Daily: '#f59e0b', H2H: '#1f2937', Practice: '#6d28d9' };
+function renderRunsControls() {
+    const ctrl = document.getElementById('runsControls');
+    ctrl.style.display = '';
 
     let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;flex-wrap:wrap;gap:8px;">
-        <h3 style="margin:0;font-size:0.85rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">All Runs (${runs.length})</h3>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">`;
-
-    if (runsViewMode === 'graph') {
-        html += `<button onclick="toggleGraphMode('time')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsGraphMode === 'time' ? '#7c3aed' : '#f9fafb'};color:${runsGraphMode === 'time' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">Time</button>`;
-        html += `<button onclick="toggleGraphMode('delta')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsGraphMode === 'delta' ? '#7c3aed' : '#f9fafb'};color:${runsGraphMode === 'delta' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">xT Delta</button>`;
-        html += `<span style="color:#d1d5db;">|</span>`;
-    }
-
-    html += `<button onclick="toggleRunsView('list')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsViewMode === 'list' ? '#7c3aed' : '#f9fafb'};color:${runsViewMode === 'list' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">List</button>`;
-    html += `<button onclick="toggleRunsView('graph')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsViewMode === 'graph' ? '#7c3aed' : '#f9fafb'};color:${runsViewMode === 'graph' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">Graph</button>`;
-    html += `</div></div>`;
+        <h3 id="runsCountLabel" style="margin:0;font-size:0.85rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">All Runs</h3>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;" id="runsToggleButtons"></div>
+    </div>`;
 
     // Difficulty range slider
     html += `<div style="padding:4px 16px 12px;">
         <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;margin-bottom:4px;">
-            <label>Difficulty: <strong>${runsDiffMin}</strong> – <strong>${runsDiffMax}</strong></label>
+            <label id="diffLabel">Difficulty: <strong>${runsDiffMin}</strong> – <strong>${runsDiffMax}</strong></label>
         </div>
         <div style="position:relative;height:20px;margin:0 4px;">
             <div style="position:absolute;top:8px;left:0;right:0;height:4px;background:#e5e7eb;border-radius:2px;"></div>
@@ -449,6 +454,33 @@ function renderRunsView() {
             input[type=range]::-moz-range-thumb { pointer-events:auto; width:14px; height:14px; border-radius:50%; background:#7c3aed; border:2px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.3); cursor:pointer; }
         </style>
     </div>`;
+
+    ctrl.innerHTML = html;
+    updateRunsToggleButtons();
+}
+
+function updateRunsToggleButtons() {
+    const runs = getFilteredRuns();
+    document.getElementById('runsCountLabel').textContent = `All Runs (${runs.length})`;
+    let btns = '';
+    if (runsViewMode === 'graph') {
+        btns += `<button onclick="toggleGraphMode('time')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsGraphMode === 'time' ? '#7c3aed' : '#f9fafb'};color:${runsGraphMode === 'time' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">Time</button>`;
+        btns += `<button onclick="toggleGraphMode('delta')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsGraphMode === 'delta' ? '#7c3aed' : '#f9fafb'};color:${runsGraphMode === 'delta' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">xT Delta</button>`;
+        btns += `<span style="color:#d1d5db;">|</span>`;
+    }
+    btns += `<button onclick="toggleRunsView('list')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsViewMode === 'list' ? '#7c3aed' : '#f9fafb'};color:${runsViewMode === 'list' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">List</button>`;
+    btns += `<button onclick="toggleRunsView('graph')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsViewMode === 'graph' ? '#7c3aed' : '#f9fafb'};color:${runsViewMode === 'graph' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">Graph</button>`;
+    document.getElementById('runsToggleButtons').innerHTML = btns;
+}
+
+function renderRunsContent() {
+    const runs = getFilteredRuns();
+    const container = document.getElementById('runsTable');
+    const sourceColors = { Daily: '#f59e0b', H2H: '#1f2937', Practice: '#6d28d9' };
+
+    updateRunsToggleButtons();
+
+    let html = '';
 
     if (runsViewMode === 'list') {
         const reversed = [...runs].reverse();
