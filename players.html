@@ -496,7 +496,7 @@ function renderRunsChart(runs) {
         if (y != null) allYValues.push(y);
     });
     allYValues.sort((a, b) => a - b);
-    const p95Idx = Math.floor(allYValues.length * 0.95);
+    const p95Idx = Math.floor(allYValues.length * 0.975);
     const yCeiling = allYValues.length > 0 ? allYValues[Math.min(p95Idx, allYValues.length - 1)] * 1.05 : null;
 
     const datasets = ['Daily', 'H2H', 'Practice'].map(source => {
