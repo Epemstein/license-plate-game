@@ -185,9 +185,10 @@ async function loadPlayer(userId) {
             .not('total_seconds', 'is', null)
             .order('created_at', { ascending: true }),
         sb.from('practice_runs')
-            .select('created_at, total_seconds, expected_seconds')
+            .select('created_at, total_seconds, expected_seconds, plates_solved, difficulty')
             .eq('user_id', userId)
             .not('total_seconds', 'is', null)
+            .gte('plates_solved', 10)
             .order('created_at', { ascending: true })
     ]);
 
@@ -198,6 +199,7 @@ async function loadPlayer(userId) {
         sortKey: r.completed_at || r.date,
         total_seconds: parseFloat(r.total_seconds),
         expected_seconds: r.expected_seconds,
+        difficulty: 50,
         source: 'Daily'
     }));
     (h2hRes.data || []).filter(r => {
@@ -208,6 +210,7 @@ async function loadPlayer(userId) {
         sortKey: r.created_at,
         total_seconds: parseFloat(r.total_seconds),
         expected_seconds: r.expected_seconds,
+        difficulty: 50,
         source: 'H2H'
     }));
     (practiceRes.data || []).forEach(r => allRuns.push({
@@ -215,6 +218,7 @@ async function loadPlayer(userId) {
         sortKey: r.created_at,
         total_seconds: parseFloat(r.total_seconds),
         expected_seconds: r.expected_seconds,
+        difficulty: r.difficulty ?? 50,
         source: 'Practice'
     }));
     allRuns.sort((a, b) => a.sortKey < b.sortKey ? -1 : 1);
@@ -393,32 +397,31 @@ function renderXtBreakdown(runs) {
 }
 
 let runsChart = null;
-let runsViewMode = 'list'; // 'list' or 'graph'
-let runsGraphMode = 'time'; // 'time' or 'delta'
+let runsViewMode = 'list';
+let runsGraphMode = 'time';
+let runsDiffMin = 0;
+let runsDiffMax = 100;
 let currentRunsData = [];
 
-function toggleRunsView(mode) {
-    runsViewMode = mode;
-    renderRunsView();
-}
-function toggleGraphMode(mode) {
-    runsGraphMode = mode;
-    renderRunsView();
-}
+function toggleRunsView(mode) { runsViewMode = mode; renderRunsView(); }
+function toggleGraphMode(mode) { runsGraphMode = mode; renderRunsView(); }
+function setRunsDiffMin(val) { runsDiffMin = parseInt(val) || 0; renderRunsView(); }
+function setRunsDiffMax(val) { runsDiffMax = parseInt(val) || 100; renderRunsView(); }
 
-function renderRunsTable(runs) {
-    currentRunsData = runs;
-    renderRunsView();
+function renderRunsTable(runs) { currentRunsData = runs; renderRunsView(); }
+
+function getFilteredRuns() {
+    return currentRunsData.filter(r => (r.difficulty || 50) >= runsDiffMin && (r.difficulty || 50) <= runsDiffMax);
 }
 
 function renderRunsView() {
-    const runs = currentRunsData;
+    const runs = getFilteredRuns();
     const container = document.getElementById('runsTable');
     const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
 
-    let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;">
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;font-size:0.85rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">All Runs (${runs.length})</h3>
-        <div style="display:flex;gap:6px;align-items:center;">`;
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">`;
 
     if (runsViewMode === 'graph') {
         html += `<button onclick="toggleGraphMode('time')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsGraphMode === 'time' ? '#7c3aed' : '#f9fafb'};color:${runsGraphMode === 'time' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">Time</button>`;
@@ -430,10 +433,18 @@ function renderRunsView() {
     html += `<button onclick="toggleRunsView('graph')" style="padding:3px 10px;border:1px solid #d1d5db;border-radius:6px;background:${runsViewMode === 'graph' ? '#7c3aed' : '#f9fafb'};color:${runsViewMode === 'graph' ? 'white' : '#374151'};font-size:11px;font-weight:600;cursor:pointer;">Graph</button>`;
     html += `</div></div>`;
 
+    // Difficulty filter
+    html += `<div style="padding:4px 16px 8px;display:flex;gap:10px;align-items:center;font-size:12px;color:#6b7280;">
+        <label>Difficulty:</label>
+        <input type="number" min="0" max="100" value="${runsDiffMin}" oninput="setRunsDiffMin(this.value)" style="width:45px;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;">
+        <span>to</span>
+        <input type="number" min="0" max="100" value="${runsDiffMax}" oninput="setRunsDiffMax(this.value)" style="width:45px;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;">
+    </div>`;
+
     if (runsViewMode === 'list') {
         const reversed = [...runs].reverse();
         html += '<table><thead><tr>';
-        html += '<th>Date</th><th>Mode</th><th>Time</th><th>xT</th><th>Delta</th>';
+        html += '<th>Date</th><th>Mode</th><th>Diff</th><th>Time</th><th>xT</th><th>Delta</th>';
         html += '</tr></thead><tbody>';
 
         reversed.forEach(r => {
@@ -451,6 +462,7 @@ function renderRunsView() {
             html += `<tr>
                 <td>${formatDate(r.date)}</td>
                 <td><span style="background:${badgeColor};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${r.source}</span></td>
+                <td>${r.difficulty ?? '--'}</td>
                 <td><strong>${time}s</strong></td>
                 <td>${xt}s</td>
                 <td class="${deltaClass}">${delta}s</td>
@@ -471,61 +483,51 @@ function renderRunsView() {
 
 function renderRunsChart(runs) {
     const sourceColors = { Daily: '#7c3aed', H2H: '#f59e0b', Practice: '#3b82f6' };
-    const labels = runs.map((_, i) => i + 1);
 
-    let data, label, borderColor;
-    if (runsGraphMode === 'time') {
-        data = runs.map(r => r.total_seconds);
-        label = 'Time (s)';
-        borderColor = '#7c3aed';
-    } else {
-        data = runs.map(r => r.expected_seconds != null ? +(r.expected_seconds - r.total_seconds).toFixed(1) : null);
-        label = 'xT Delta (s)';
-        borderColor = '#16a34a';
-    }
+    const datasets = ['Daily', 'H2H', 'Practice'].map(source => {
+        const modeRuns = runs.filter(r => r.source === source);
+        const data = modeRuns.map((r, i) => {
+            const runIdx = runs.indexOf(r) + 1;
+            let y;
+            if (runsGraphMode === 'time') {
+                y = r.total_seconds;
+            } else {
+                y = r.expected_seconds != null ? +(r.expected_seconds - r.total_seconds).toFixed(1) : null;
+            }
+            return y != null ? { x: runIdx, y, date: r.date, source: r.source, diff: r.difficulty } : null;
+        }).filter(Boolean);
 
-    const pointColors = runs.map(r => sourceColors[r.source] || '#6b7280');
+        return {
+            label: source,
+            data,
+            backgroundColor: sourceColors[source] + '99',
+            borderColor: sourceColors[source],
+            pointRadius: 4,
+            pointHoverRadius: 6
+        };
+    }).filter(ds => ds.data.length > 0);
 
     if (runsChart) runsChart.destroy();
     runsChart = new Chart(document.getElementById('runsChart'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label,
-                data,
-                borderColor,
-                backgroundColor: borderColor + '20',
-                borderWidth: 2,
-                pointRadius: 3,
-                pointBackgroundColor: pointColors,
-                fill: runsGraphMode === 'delta',
-                tension: 0.3,
-                spanGaps: true
-            }]
-        },
+        type: 'scatter',
+        data: { datasets },
         options: {
             responsive: true,
             plugins: {
-                legend: { display: false },
+                legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
                 tooltip: {
                     callbacks: {
-                        title: (items) => {
-                            const idx = items[0].dataIndex;
-                            const r = runs[idx];
-                            return `${r.source} · ${formatDate(r.date)}`;
-                        },
                         label: (item) => {
-                            const val = item.raw;
-                            if (val == null) return 'No xT data';
-                            if (runsGraphMode === 'delta') return `xT+: ${val >= 0 ? '+' : ''}${val.toFixed(1)}s`;
-                            return `Time: ${val.toFixed(1)}s`;
+                            const pt = item.raw;
+                            const val = pt.y;
+                            const prefix = runsGraphMode === 'delta' ? `xT+: ${val >= 0 ? '+' : ''}` : 'Time: ';
+                            return `${pt.source} · ${formatDate(pt.date)} · D${pt.diff} · ${prefix}${val.toFixed(1)}s`;
                         }
                     }
                 }
             },
             scales: {
-                x: { title: { display: true, text: 'Run #', font: { size: 11 } }, ticks: { font: { size: 10 }, maxTicksLimit: 20 } },
+                x: { title: { display: true, text: 'Run #', font: { size: 11 } }, ticks: { font: { size: 10 } } },
                 y: { title: { display: true, text: runsGraphMode === 'time' ? 'Seconds' : 'xT Delta (s)', font: { size: 11 } }, ticks: { font: { size: 10 } } }
             }
         }
