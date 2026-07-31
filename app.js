@@ -4459,7 +4459,7 @@
         });
 
         document.getElementById('quickMatchBtn').addEventListener('click', () => {
-            if (!currentUser) {
+            if (!currentUser || currentUser.is_anonymous) {
                 alert('Please sign in to play Quick Match');
                 return;
             }
