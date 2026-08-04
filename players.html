@@ -779,6 +779,39 @@ async function loadAllPlayers() {
     addRuns(h2hRows, 'h2h');
     addRuns(practiceRows, 'practice');
 
+    // Fetch plate-level entry stats for all users
+    async function fetchAllEntries(table) {
+        const rows = [];
+        const pageSize = 1000;
+        let offset = 0;
+        while (true) {
+            const { data } = await sb.from(table)
+                .select('user_id, skipped, thinking_seconds')
+                .range(offset, offset + pageSize - 1);
+            if (!data || data.length === 0) break;
+            rows.push(...data);
+            if (data.length < pageSize) break;
+            offset += pageSize;
+        }
+        return rows;
+    }
+
+    const practiceEntryRows = await fetchAllEntries('practice_plate_stats');
+
+    // Aggregate entry stats per player
+    practiceEntryRows.forEach(e => {
+        const p = playerMap[e.user_id];
+        if (!p) return;
+        if (!p.entryStats) p.entryStats = { solved: 0, skipped: 0, thinkSolved: 0, thinkSkipped: 0 };
+        if (e.skipped) {
+            p.entryStats.skipped++;
+            p.entryStats.thinkSkipped += e.thinking_seconds || 0;
+        } else {
+            p.entryStats.solved++;
+            p.entryStats.thinkSolved += e.thinking_seconds || 0;
+        }
+    });
+
     // Build universe xT breakdown by mode
     function modeStats(rows) {
         const total = rows.length;
@@ -947,6 +980,9 @@ function renderAllPlayersTable() {
             case 'practiceRuns': return p._m.practiceRuns;
             case 'runs': return s.runs;
             case 'avgTime': return s.avgTime;
+            case 'skipRate': return p.entryStats ? (p.entryStats.skipped / (p.entryStats.solved + p.entryStats.skipped) * 100) : (asc ? Infinity : -Infinity);
+            case 'thinkSolved': return p.entryStats && p.entryStats.solved > 0 ? p.entryStats.thinkSolved / p.entryStats.solved : (asc ? Infinity : -Infinity);
+            case 'thinkSkipped': return p.entryStats && p.entryStats.skipped > 0 ? p.entryStats.thinkSkipped / p.entryStats.skipped : (asc ? Infinity : -Infinity);
             case 'xtRuns': return s.xtCount;
             case 'avgXt': return s.avgXtVal ?? (asc ? Infinity : -Infinity);
             case 'avgDelta': return s.avgDeltaVal ?? (asc ? Infinity : -Infinity);
@@ -975,7 +1011,7 @@ function renderAllPlayersTable() {
 
     let html = '';
     html += '<table><thead>';
-    html += `<tr>${th('Player','name',2)}${th('Daily','dailyRuns',2)}${th('H2H','h2hRuns',2)}${th('Practice','practiceRuns',2)}${th('Runs','runs',2)}${th('Avg Time','avgTime',2)}${th('xT Runs','xtRuns',2)}${th('Avg xT','avgXt',2)}${th('Avg xT+','avgDelta',2)}${th('Median xT+','medDelta',2)}<th colspan="2" style="text-align:center;">Beat xT</th>${th('Beat %','beatPct',2)}</tr>`;
+    html += `<tr>${th('Player','name',2)}${th('Daily','dailyRuns',2)}${th('H2H','h2hRuns',2)}${th('Practice','practiceRuns',2)}${th('Runs','runs',2)}${th('Avg Time','avgTime',2)}${th('Skip %','skipRate',2)}${th('Think<br>(Solved)','thinkSolved',2)}${th('Think<br>(Skip)','thinkSkipped',2)}${th('xT Runs','xtRuns',2)}${th('Avg xT','avgXt',2)}${th('Avg xT+','avgDelta',2)}${th('Median xT+','medDelta',2)}<th colspan="2" style="text-align:center;">Beat xT</th>${th('Beat %','beatPct',2)}</tr>`;
     html += `<tr>${th('Yes','beatYes')}${th('No','beatNo')}</tr>`;
     html += '</thead><tbody>';
 
@@ -990,6 +1026,12 @@ function renderAllPlayersTable() {
         const beatPctStr = s.beatPctVal != null ? Math.round(s.beatPctVal) + '%' : '--';
         const nameDisplay = p.handle ? `${p.name} <span style="color:#6b7280;font-size:12px;">@${p.handle}</span>` : p.name;
 
+        const es = p.entryStats;
+        const totalEntries = es ? es.solved + es.skipped : 0;
+        const skipRateStr = totalEntries > 0 ? Math.round(es.skipped / totalEntries * 100) + '%' : '--';
+        const thinkSolvedStr = es && es.solved > 0 ? (es.thinkSolved / es.solved).toFixed(1) + 's' : '--';
+        const thinkSkippedStr = es && es.skipped > 0 ? (es.thinkSkipped / es.skipped).toFixed(1) + 's' : '--';
+
         html += `<tr>
             <td>${nameDisplay}</td>
             <td>${p._m.dailyRuns}</td>
@@ -997,6 +1039,9 @@ function renderAllPlayersTable() {
             <td>${p._m.practiceRuns}</td>
             <td><strong>${s.runs}</strong></td>
             <td>${avgTimeStr}</td>
+            <td>${skipRateStr}</td>
+            <td>${thinkSolvedStr}</td>
+            <td>${thinkSkippedStr}</td>
             <td>${s.xtCount}</td>
             <td>${avgXtStr}</td>
             <td class="${avgDeltaClass}">${avgDeltaStr}</td>
@@ -1032,6 +1077,20 @@ function renderAllPlayersTable() {
         totMedDeltaClass = medD >= 0 ? 'positive' : 'negative';
         totBeatPct = Math.round(totBeatYes / totXt * 100) + '%';
     }
+    const totEs = { solved: 0, skipped: 0, thinkSolved: 0, thinkSkipped: 0 };
+    filtered.forEach(p => {
+        if (p.entryStats) {
+            totEs.solved += p.entryStats.solved;
+            totEs.skipped += p.entryStats.skipped;
+            totEs.thinkSolved += p.entryStats.thinkSolved;
+            totEs.thinkSkipped += p.entryStats.thinkSkipped;
+        }
+    });
+    const totEntries = totEs.solved + totEs.skipped;
+    const totSkipRate = totEntries > 0 ? Math.round(totEs.skipped / totEntries * 100) + '%' : '--';
+    const totThinkSolved = totEs.solved > 0 ? (totEs.thinkSolved / totEs.solved).toFixed(1) + 's' : '--';
+    const totThinkSkipped = totEs.skipped > 0 ? (totEs.thinkSkipped / totEs.skipped).toFixed(1) + 's' : '--';
+
     html += `<tr style="border-top:2px solid #e5e7eb;font-weight:600;">
         <td>All Players</td>
         <td>${totDaily}</td>
@@ -1039,6 +1098,9 @@ function renderAllPlayersTable() {
         <td>${totPractice}</td>
         <td><strong>${totRuns}</strong></td>
         <td>${totRuns > 0 ? (totTime / totRuns).toFixed(1) + 's' : '--'}</td>
+        <td>${totSkipRate}</td>
+        <td>${totThinkSolved}</td>
+        <td>${totThinkSkipped}</td>
         <td>${totXt}</td>
         <td>${totAvgXt}</td>
         <td class="${totAvgDeltaClass}">${totAvgDelta}</td>
