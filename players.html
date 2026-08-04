@@ -274,6 +274,21 @@ async function loadPlayer(userId) {
         </div>
     `;
 
+    // Fetch plate-level stats for skip rate and thinking times
+    const [dailyEntries, h2hEntries, practiceEntries] = await Promise.all([
+        sb.from('daily_run_entries').select('skipped, thinking_seconds').eq('user_id', userId),
+        sb.from('h2h_run_entries').select('skipped, thinking_seconds, run_id')
+            .in('run_id', (h2hRes.data || []).filter(r => (r.h2h_run_entries || []).filter(e => !e.skipped).length >= 10).map(r => r.id)),
+        sb.from('practice_plate_stats').select('skipped, thinking_seconds, source')
+            .eq('user_id', userId).eq('source', 'practice')
+    ]);
+
+    window._playerEntryStats = {
+        Daily: (dailyEntries.data || []),
+        H2H: (h2hEntries.data || []),
+        Practice: (practiceEntries.data || [])
+    };
+
     // Store runs globally for toggle
     window._playerAllRuns = allRuns;
     window._xtOnlyMode = false;
@@ -318,7 +333,7 @@ function renderXtBreakdown(runs) {
     const modes = ['Daily', 'H2H', 'Practice'];
     const xtOnly = window._xtOnlyMode;
 
-    function calcStats(modeRuns) {
+    function calcStats(modeRuns, mode) {
         const total = modeRuns.length;
         if (total === 0) return null;
         const avgTime = modeRuns.reduce((s, r) => s + r.total_seconds, 0) / total;
@@ -334,7 +349,16 @@ function renderXtBreakdown(runs) {
         const beatYes = xtCount > 0 ? withXt.filter(r => r.total_seconds < r.expected_seconds).length : 0;
         const beatNo = xtCount - beatYes;
         const beatPct = xtCount > 0 ? Math.round(beatYes / xtCount * 100) : null;
-        return { total, avgTime, avgXt, medianDelta, avgDelta, beatYes, beatNo, beatPct, xtCount };
+
+        // Per-plate stats from entries
+        const entries = (window._playerEntryStats && window._playerEntryStats[mode]) || [];
+        const solved = entries.filter(e => !e.skipped);
+        const skipped = entries.filter(e => e.skipped);
+        const skipRate = entries.length > 0 ? Math.round(skipped.length / entries.length * 100) : null;
+        const avgThinkSolved = solved.length > 0 ? solved.reduce((s, e) => s + e.thinking_seconds, 0) / solved.length : null;
+        const avgThinkSkipped = skipped.length > 0 ? skipped.reduce((s, e) => s + e.thinking_seconds, 0) / skipped.length : null;
+
+        return { total, avgTime, avgXt, medianDelta, avgDelta, beatYes, beatNo, beatPct, xtCount, skipRate, avgThinkSolved, avgThinkSkipped };
     }
 
     const toggleLabel = xtOnly ? 'Show All Runs' : 'xT Runs Only';
@@ -343,17 +367,17 @@ function renderXtBreakdown(runs) {
         <button onclick="toggleXtOnly()" style="padding:4px 12px;border:1px solid #d1d5db;border-radius:6px;background:${xtOnly ? '#7c3aed' : '#f9fafb'};color:${xtOnly ? 'white' : '#374151'};font-size:12px;font-weight:600;cursor:pointer;">${toggleLabel}</button>
     </div>`;
     html += '<table><thead>';
-    html += '<tr><th rowspan="2">Mode</th><th rowspan="2">Runs</th><th rowspan="2">Avg Time</th><th rowspan="2">Avg xT</th><th rowspan="2">Avg xT+</th><th rowspan="2">Median xT+</th><th colspan="2" style="text-align:center;">Beat xT</th><th rowspan="2">Beat %</th></tr>';
+    html += '<tr><th rowspan="2">Mode</th><th rowspan="2">Runs</th><th rowspan="2">Avg Time</th><th rowspan="2">Skip %</th><th rowspan="2">Avg Think<br>(Solved)</th><th rowspan="2">Avg Think<br>(Skip)</th><th rowspan="2">Avg xT</th><th rowspan="2">Avg xT+</th><th rowspan="2">Median xT+</th><th colspan="2" style="text-align:center;">Beat xT</th><th rowspan="2">Beat %</th></tr>';
     html += '<tr><th>Yes</th><th>No</th></tr>';
     html += '</thead><tbody>';
 
     modes.forEach(mode => {
         const modeRuns = runs.filter(r => r.source === mode);
-        const s = calcStats(modeRuns);
+        const s = calcStats(modeRuns, mode);
         if (!s) {
             html += `<tr>
                 <td><span style="background:${sourceColors[mode]};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${mode}</span></td>
-                <td>0</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td>
+                <td>0</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td><td>--</td>
             </tr>`;
             return;
         }
@@ -365,6 +389,9 @@ function renderXtBreakdown(runs) {
             <td><span style="background:${sourceColors[mode]};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${mode}</span></td>
             <td><strong>${s.total}</strong></td>
             <td>${s.avgTime.toFixed(1)}s</td>
+            <td>${s.skipRate != null ? s.skipRate + '%' : '--'}</td>
+            <td>${s.avgThinkSolved != null ? s.avgThinkSolved.toFixed(1) + 's' : '--'}</td>
+            <td>${s.avgThinkSkipped != null ? s.avgThinkSkipped.toFixed(1) + 's' : '--'}</td>
             <td>${s.avgXt != null ? s.avgXt.toFixed(1) + 's' : '--'}</td>
             <td class="${deltaClass}">${deltaStr}</td>
             <td class="${medDeltaClass}">${medDeltaStr}</td>
@@ -375,16 +402,31 @@ function renderXtBreakdown(runs) {
     });
 
     // Totals row
-    const all = calcStats(runs);
+    const all = calcStats(runs, 'All');
     if (all) {
         const deltaStr = all.avgDelta != null ? (all.avgDelta >= 0 ? '+' : '') + all.avgDelta.toFixed(1) + 's' : '--';
         const deltaClass = all.avgDelta != null ? (all.avgDelta >= 0 ? 'positive' : 'negative') : '';
         const medDeltaStr = all.medianDelta != null ? (all.medianDelta >= 0 ? '+' : '') + all.medianDelta.toFixed(1) + 's' : '--';
         const medDeltaClass = all.medianDelta != null ? (all.medianDelta >= 0 ? 'positive' : 'negative') : '';
+        // Combine all entries for the All row
+        const allEntries = [
+            ...(window._playerEntryStats?.Daily || []),
+            ...(window._playerEntryStats?.H2H || []),
+            ...(window._playerEntryStats?.Practice || [])
+        ];
+        const allSolved = allEntries.filter(e => !e.skipped);
+        const allSkipped = allEntries.filter(e => e.skipped);
+        const allSkipRate = allEntries.length > 0 ? Math.round(allSkipped.length / allEntries.length * 100) : null;
+        const allAvgThinkSolved = allSolved.length > 0 ? allSolved.reduce((s, e) => s + e.thinking_seconds, 0) / allSolved.length : null;
+        const allAvgThinkSkipped = allSkipped.length > 0 ? allSkipped.reduce((s, e) => s + e.thinking_seconds, 0) / allSkipped.length : null;
+
         html += `<tr style="border-top:2px solid #e5e7eb;font-weight:600;">
             <td>All</td>
             <td><strong>${all.total}</strong></td>
             <td>${all.avgTime.toFixed(1)}s</td>
+            <td>${allSkipRate != null ? allSkipRate + '%' : '--'}</td>
+            <td>${allAvgThinkSolved != null ? allAvgThinkSolved.toFixed(1) + 's' : '--'}</td>
+            <td>${allAvgThinkSkipped != null ? allAvgThinkSkipped.toFixed(1) + 's' : '--'}</td>
             <td>${all.avgXt != null ? all.avgXt.toFixed(1) + 's' : '--'}</td>
             <td class="${deltaClass}">${deltaStr}</td>
             <td class="${medDeltaClass}">${medDeltaStr}</td>
