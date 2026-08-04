@@ -177,7 +177,7 @@ async function loadPlayer(userId) {
     // Fetch runs from all three tables in parallel
     const [dailyRes, h2hRes, practiceRes] = await Promise.all([
         sb.from('daily_runs')
-            .select('date, total_seconds, expected_seconds, completed_at')
+            .select('id, date, total_seconds, expected_seconds, completed_at')
             .eq('user_id', userId)
             .not('total_seconds', 'is', null)
             .order('date', { ascending: true }),
@@ -275,18 +275,35 @@ async function loadPlayer(userId) {
     `;
 
     // Fetch plate-level stats for skip rate and thinking times
-    const [dailyEntries, h2hEntries, practiceEntries] = await Promise.all([
-        sb.from('daily_run_entries').select('skipped, thinking_seconds').eq('user_id', userId),
-        sb.from('h2h_run_entries').select('skipped, thinking_seconds, run_id')
-            .in('run_id', (h2hRes.data || []).filter(r => (r.h2h_run_entries || []).filter(e => !e.skipped).length >= 10).map(r => r.id)),
+    const dailyRunIds = (dailyRes.data || []).map(r => r.id || '').filter(Boolean);
+    const h2hRunIds = (h2hRes.data || []).filter(r => (r.h2h_run_entries || []).filter(e => !e.skipped).length >= 10).map(r => r.id);
+
+    // daily_run_entries needs run_id (no user_id column), so fetch via run IDs
+    // Paginate since there could be many
+    async function fetchEntriesByRunIds(table, runIds) {
+        if (!runIds.length) return [];
+        const all = [];
+        for (let i = 0; i < runIds.length; i += 100) {
+            const batch = runIds.slice(i, i + 100);
+            const { data } = await sb.from(table).select('skipped, thinking_seconds').in('run_id', batch);
+            if (data) all.push(...data);
+        }
+        return all;
+    }
+
+    const [dailyEntryData, h2hEntryData, practiceEntries] = await Promise.all([
+        fetchEntriesByRunIds('daily_run_entries', dailyRunIds),
+        fetchEntriesByRunIds('h2h_run_entries', h2hRunIds),
         sb.from('practice_plate_stats').select('skipped, thinking_seconds, source')
-            .eq('user_id', userId).eq('source', 'practice')
+            .eq('user_id', userId).eq('source', 'practice').then(r => r.data || [])
     ]);
+    const dailyEntries = { data: dailyEntryData };
+    const h2hEntries = { data: h2hEntryData };
 
     window._playerEntryStats = {
-        Daily: (dailyEntries.data || []),
-        H2H: (h2hEntries.data || []),
-        Practice: (practiceEntries.data || [])
+        Daily: dailyEntries.data || [],
+        H2H: h2hEntries.data || [],
+        Practice: Array.isArray(practiceEntries) ? practiceEntries : (practiceEntries.data || [])
     };
 
     // Store runs globally for toggle
