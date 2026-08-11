@@ -904,7 +904,6 @@
     let runs = [];
     let knownRunIds = new Set();
 
-    let runsLoaded = false;
     async function loadRecentRuns(force) {
         if (runsLoaded && !force) { renderRuns(); return; }
         const { data } = await sb.rpc('recent_completed_runs');
