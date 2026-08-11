@@ -904,12 +904,15 @@
     let runs = [];
     let knownRunIds = new Set();
 
-    async function loadRecentRuns() {
+    let runsLoaded = false;
+    async function loadRecentRuns(force) {
+        if (runsLoaded && !force) { renderRuns(); return; }
         const { data } = await sb.rpc('recent_completed_runs');
         const rows = data || [];
 
         runs = [];
         knownRunIds = new Set();
+        const missingUserIds = new Set();
         for (const r of rows) {
             knownRunIds.add(r.id);
             runs.push({
@@ -920,11 +923,21 @@
                 at: new Date(r.completed_at),
                 expected: r.expected_seconds
             });
+            if (r.user_id && !profileCache[r.user_id]) missingUserIds.add(r.user_id);
         }
-        // Resolve names
+        // Batch resolve missing profiles
+        if (missingUserIds.size > 0) {
+            const { data: profiles } = await sb.from('profiles')
+                .select('id, display_name, handle')
+                .in('id', [...missingUserIds]);
+            for (const p of (profiles || [])) {
+                profileCache[p.id] = p.display_name || (p.handle ? '@' + p.handle : null);
+            }
+        }
         for (const r of runs) {
-            if (r.userId) r.userName = await resolveUser(r.userId);
+            if (r.userId) r.userName = profileCache[r.userId] || null;
         }
+        runsLoaded = true;
         renderRuns();
     }
 
@@ -1050,6 +1063,7 @@
         if (e.userId) e.userName = await resolveUser(e.userId);
 
         entries.unshift(e);
+        runCountsDirty = true;
         if (entries.length > MAX_ENTRIES) entries.pop();
         todayCount++;
         if (e.mode in todaySplits) todaySplits[e.mode]++;
@@ -1215,7 +1229,9 @@
     };
 
     // Compute running solved/seen per run using run_id
+    let runCountsDirty = true;
     function computeRunningCounts() {
+        if (!runCountsDirty) return;
         const runState = {}; // run_id -> { solved, seen }
         // Process oldest first
         const chrono = [...entries].reverse();
@@ -1227,6 +1243,7 @@
             e._solved = runState[key].solved;
             e._seen = runState[key].seen;
         }
+        runCountsDirty = false;
     }
 
     function renderFeed() {
