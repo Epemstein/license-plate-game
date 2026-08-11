@@ -5583,10 +5583,12 @@
 
                 // Set group name if from saved group
                 if (selectedGroupName) {
-                    await sb.rpc('set_group_challenge_name', {
-                        p_challenge_id: result.challenge_id,
-                        p_name: selectedGroupName
-                    }).catch(() => {});
+                    try {
+                        await sb.rpc('set_group_challenge_name', {
+                            p_challenge_id: result.challenge_id,
+                            p_name: selectedGroupName
+                        });
+                    } catch (_) {}
                 }
 
                 closeNewChallengeModal();
@@ -5841,7 +5843,7 @@
 
             // Complete group challenge run (pairwise Elo)
             if (currentChallengeType === 'group' && currentChallengeId) {
-                await sb.rpc('complete_group_run', { p_challenge_id: currentChallengeId }).catch(() => {});
+                try { await sb.rpc('complete_group_run', { p_challenge_id: currentChallengeId }); } catch (_) {}
             }
         } catch (e) {
             console.error('Forfeit error:', e);
