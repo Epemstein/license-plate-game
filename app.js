@@ -5480,12 +5480,12 @@
                     html += `<span style="background:#7c3aed;color:white;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">${f.name} <span onclick="event.stopPropagation();deselectFriend('${fid}')" style="cursor:pointer;opacity:0.7;">✕</span></span>`;
                 }
             });
-            html += `<span style="color:#6b7280;font-size:11px;padding:3px 0;">${selectedFriendIds.size}/5</span>`;
+            html += `<span style="color:#6b7280;font-size:11px;padding:3px 0;">${selectedFriendIds.size}/9</span>`;
             html += '</div>';
         }
 
         // Friends list
-        if (selectedFriendIds.size < 5) {
+        if (selectedFriendIds.size < 9) {
             const filtered = friendsListData.filter(f =>
                 !selectedFriendIds.has(f.id) &&
                 (f.name.toLowerCase().includes(query) || f.handle.toLowerCase().includes(query))
