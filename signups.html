@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Ups</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { font-size: 1.3rem; margin-bottom: 16px; }
+        .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 18px; min-width: 100px; text-align: center; }
+        .stat-card .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .val { font-size: 1.3rem; font-weight: 700; margin-top: 4px; }
+        .signup-table { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #e5e7eb; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; }
+        th:hover { color: #374151; }
+        td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; }
+        tr:hover { background: #f9fafb; }
+        .empty { text-align: center; padding: 40px; color: #9ca3af; }
+        .active-recent { color: #16a34a; font-weight: 600; }
+        .active-old { color: #9ca3af; }
+        .refresh-btn { background: #7c3aed; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; margin-bottom: 16px; }
+        .refresh-btn:hover { background: #6d28d9; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Sign Ups</h1>
+    <button class="refresh-btn" onclick="loadSignups()">Refresh</button>
+    <div id="stats" class="stats-row"></div>
+    <div id="signupTable" class="signup-table">
+        <div class="empty">Loading...</div>
+    </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTkxOTA1NSwiZXhwIjoyMDkxNDk1MDU1fQ.b_qDqjP-Nadk_M_kACc5mJB_OR_-Cx80vOgOfLYsDLQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false }
+});
+
+let sortCol = 'signup';
+let sortAsc = false;
+let signupData = [];
+
+function timeAgo(dateStr) {
+    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.round(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.round(diff / 3600) + 'h ago';
+    return Math.round(diff / 86400) + 'd ago';
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '--';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+async function loadSignups() {
+    document.getElementById('signupTable').innerHTML = '<div class="empty">Loading...</div>';
+
+    // Fetch all non-anonymous users
+    let allUsers = [];
+    let page = 1;
+    while (true) {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=100`, {
+            headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` }
+        });
+        const data = await res.json();
+        const users = data.users || [];
+        allUsers.push(...users);
+        if (users.length < 100) break;
+        page++;
+    }
+
+    const nonAnon = allUsers.filter(u => !u.is_anonymous);
+
+    // Fetch all profiles
+    const { data: profiles } = await sb.from('profiles').select('id, display_name, handle');
+    const profileMap = {};
+    (profiles || []).forEach(p => { profileMap[p.id] = p; });
+
+    // Fetch plate counts per user from all entry tables
+    // Use live_plays for "last active" and total plates
+    const { data: playStats } = await sb.rpc('signup_plate_stats').catch(() => ({ data: null }));
+
+    // Fallback: fetch from live_plays grouped by user
+    let userPlayData = {};
+    if (!playStats) {
+        // Fetch all completed_runs for plate counts
+        const allRuns = [];
+        let offset = 0;
+        while (true) {
+            const { data } = await sb.from('completed_runs')
+                .select('user_id, plates_solved, completed_at')
+                .range(offset, offset + 999);
+            if (!data || data.length === 0) break;
+            allRuns.push(...data);
+            if (data.length < 1000) break;
+            offset += 1000;
+        }
+
+        allRuns.forEach(r => {
+            if (!userPlayData[r.user_id]) userPlayData[r.user_id] = { totalPlates: 0, lastActive: null };
+            userPlayData[r.user_id].totalPlates += r.plates_solved || 0;
+            if (!userPlayData[r.user_id].lastActive || r.completed_at > userPlayData[r.user_id].lastActive) {
+                userPlayData[r.user_id].lastActive = r.completed_at;
+            }
+        });
+
+        // Also check daily_runs, practice_runs, h2h_runs for last active
+        for (const table of ['daily_runs', 'practice_runs', 'h2h_runs']) {
+            let off = 0;
+            while (true) {
+                const { data } = await sb.from(table)
+                    .select('user_id, created_at')
+                    .not('total_seconds', 'is', null)
+                    .range(off, off + 999);
+                if (!data || data.length === 0) break;
+                data.forEach(r => {
+                    if (!userPlayData[r.user_id]) userPlayData[r.user_id] = { totalPlates: 0, lastActive: null };
+                    if (!userPlayData[r.user_id].lastActive || r.created_at > userPlayData[r.user_id].lastActive) {
+                        userPlayData[r.user_id].lastActive = r.created_at;
+                    }
+                });
+                if (data.length < 1000) break;
+                off += 1000;
+            }
+        }
+    }
+
+    // Fetch daily run counts per user
+    const dailyCounts = {};
+    let dOff = 0;
+    while (true) {
+        const { data } = await sb.from('daily_runs')
+            .select('user_id')
+            .not('total_seconds', 'is', null)
+            .range(dOff, dOff + 999);
+        if (!data || data.length === 0) break;
+        data.forEach(r => { dailyCounts[r.user_id] = (dailyCounts[r.user_id] || 0) + 1; });
+        if (data.length < 1000) break;
+        dOff += 1000;
+    }
+
+    // Build data
+    signupData = nonAnon.map(u => {
+        const p = profileMap[u.id] || {};
+        const pd = userPlayData[u.id] || {};
+        const signupDate = u.created_at;
+        const lastActive = pd.lastActive;
+        const daysSinceSignup = Math.max(1, Math.ceil((Date.now() - new Date(signupDate).getTime()) / 86400000));
+        const totalPlates = pd.totalPlates || 0;
+        const dailiesPlayed = dailyCounts[u.id] || 0;
+
+        return {
+            name: p.display_name || '--',
+            handle: p.handle || '--',
+            signup: signupDate,
+            signupAgo: timeAgo(signupDate),
+            signupFormatted: formatDate(signupDate),
+            lastActive: lastActive,
+            lastActiveAgo: lastActive ? timeAgo(lastActive) : '--',
+            lastActiveFormatted: lastActive ? formatDate(lastActive) : '--',
+            dailiesPlayed,
+            totalPlates,
+            platesPerDay: daysSinceSignup > 0 ? (totalPlates / daysSinceSignup).toFixed(1) : '0'
+        };
+    });
+
+    // Stats
+    const total = signupData.length;
+    const today = signupData.filter(u => {
+        const d = new Date(u.signup);
+        const now = new Date();
+        return d.toDateString() === now.toDateString();
+    }).length;
+    const thisWeek = signupData.filter(u => {
+        return (Date.now() - new Date(u.signup).getTime()) < 7 * 86400000;
+    }).length;
+    const activeThisWeek = signupData.filter(u => {
+        return u.lastActive && (Date.now() - new Date(u.lastActive).getTime()) < 7 * 86400000;
+    }).length;
+
+    document.getElementById('stats').innerHTML = `
+        <div class="stat-card"><div class="label">Total Users</div><div class="val">${total}</div></div>
+        <div class="stat-card"><div class="label">Today</div><div class="val" style="color:#16a34a;">${today}</div></div>
+        <div class="stat-card"><div class="label">This Week</div><div class="val" style="color:#2563eb;">${thisWeek}</div></div>
+        <div class="stat-card"><div class="label">Active This Week</div><div class="val" style="color:#7c3aed;">${activeThisWeek}</div></div>
+    `;
+
+    renderTable();
+}
+
+function sortBy(col) {
+    if (sortCol === col) { sortAsc = !sortAsc; }
+    else { sortCol = col; sortAsc = col === 'name' || col === 'handle'; }
+    renderTable();
+}
+
+function renderTable() {
+    const sorted = [...signupData].sort((a, b) => {
+        let av, bv;
+        switch (sortCol) {
+            case 'name': av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break;
+            case 'handle': av = a.handle.toLowerCase(); bv = b.handle.toLowerCase(); break;
+            case 'signup': av = a.signup; bv = b.signup; break;
+            case 'lastActive': av = a.lastActive || ''; bv = b.lastActive || ''; break;
+            case 'dailies': av = a.dailiesPlayed; bv = b.dailiesPlayed; break;
+            case 'plates': av = a.totalPlates; bv = b.totalPlates; break;
+            case 'ppd': av = parseFloat(a.platesPerDay); bv = parseFloat(b.platesPerDay); break;
+            default: av = a.signup; bv = b.signup;
+        }
+        if (typeof av === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+        return sortAsc ? av - bv : bv - av;
+    });
+
+    const arrow = (c) => sortCol === c ? (sortAsc ? ' ▲' : ' ▼') : '';
+
+    let html = '<table><thead><tr>';
+    html += `<th onclick="sortBy('name')">Name${arrow('name')}</th>`;
+    html += `<th onclick="sortBy('handle')">Handle${arrow('handle')}</th>`;
+    html += `<th onclick="sortBy('signup')">Signed Up${arrow('signup')}</th>`;
+    html += `<th onclick="sortBy('lastActive')">Last Active${arrow('lastActive')}</th>`;
+    html += `<th onclick="sortBy('dailies')">Dailies${arrow('dailies')}</th>`;
+    html += `<th onclick="sortBy('plates')">Total Plates${arrow('plates')}</th>`;
+    html += `<th onclick="sortBy('ppd')">Plates/Day${arrow('ppd')}</th>`;
+    html += '</tr></thead><tbody>';
+
+    sorted.forEach(u => {
+        const lastActiveClass = u.lastActive && (Date.now() - new Date(u.lastActive).getTime()) < 7 * 86400000 ? 'active-recent' : 'active-old';
+        html += `<tr>
+            <td><strong>${u.name}</strong></td>
+            <td style="color:#6b7280;">@${u.handle}</td>
+            <td>${u.signupAgo}<br><span style="color:#9ca3af;font-size:11px;">${u.signupFormatted}</span></td>
+            <td class="${lastActiveClass}">${u.lastActiveAgo}<br><span style="color:#9ca3af;font-size:11px;">${u.lastActiveFormatted}</span></td>
+            <td>${u.dailiesPlayed}</td>
+            <td>${u.totalPlates.toLocaleString()}</td>
+            <td>${u.platesPerDay}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('signupTable').innerHTML = html;
+}
+
+loadSignups();
+</script>
+</body>
+</html>
