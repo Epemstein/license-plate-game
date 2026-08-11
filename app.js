@@ -6231,10 +6231,15 @@
             const runs = runsRes.data || [];
             const eloData = eloRes.data || [];
 
-            // Build elo map
+            // Build elo map — sum changes for group challenges (multiple pairwise adjustments)
             const eloMap = {};
             for (const e of eloData) {
-                eloMap[e.user_id] = { oldElo: e.old_elo, newElo: e.new_elo, change: e.new_elo - e.old_elo };
+                if (eloMap[e.user_id]) {
+                    eloMap[e.user_id].change += (e.new_elo - e.old_elo);
+                    eloMap[e.user_id].newElo = e.new_elo;
+                } else {
+                    eloMap[e.user_id] = { oldElo: e.old_elo, newElo: e.new_elo, change: e.new_elo - e.old_elo };
+                }
             }
 
             // Fetch profiles for all participants
