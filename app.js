@@ -4520,6 +4520,7 @@
 
                 currentChallengeId = result.challenge_id;
                 currentH2HRunId = result.run_id;
+                currentChallengeType = null;
                 gameMode = 'h2h_challenge';
                 dailyPlateSequence = result.plates;
                 currentH2HDifficulty = 50;
@@ -4859,6 +4860,7 @@
     let currentChallengeId = null;
     let currentH2HRunId = null;
     let currentH2HDifficulty = 50;
+    let currentChallengeType = null; // 'group' or null
     let lastQuickMatchOpponentId = null;
     let challengeStartTime = null;
     let pendingOpponent = null;
@@ -4928,13 +4930,52 @@
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            h2hChallengesCache = data || [];
+
+            // Also fetch group challenges where user is a participant
+            const { data: groupParts } = await sb
+                .from('group_challenge_participants')
+                .select('challenge_id, user_id, status')
+                .eq('user_id', currentUser.id);
+
+            const groupChallengeIds = (groupParts || []).map(p => p.challenge_id);
+            let groupChallenges = [];
+            if (groupChallengeIds.length > 0) {
+                const existingIds = new Set((data || []).map(c => c.id));
+                const missingIds = groupChallengeIds.filter(id => !existingIds.has(id));
+                if (missingIds.length > 0) {
+                    const { data: gcData } = await sb
+                        .from('h2h_challenges')
+                        .select('*')
+                        .in('id', missingIds)
+                        .order('created_at', { ascending: false });
+                    groupChallenges = gcData || [];
+                }
+            }
+
+            // Store group participants for lookup
+            window._groupParticipants = {};
+            if (groupChallengeIds.length > 0) {
+                const { data: allParts } = await sb
+                    .from('group_challenge_participants')
+                    .select('challenge_id, user_id, status')
+                    .in('challenge_id', groupChallengeIds);
+                (allParts || []).forEach(p => {
+                    if (!window._groupParticipants[p.challenge_id]) window._groupParticipants[p.challenge_id] = [];
+                    window._groupParticipants[p.challenge_id].push(p);
+                });
+            }
+
+            h2hChallengesCache = [...(data || []), ...groupChallenges];
 
             // Collect unique user IDs for profile lookup
             const userIds = new Set();
             h2hChallengesCache.forEach(c => {
                 userIds.add(c.challenger_id);
                 if (c.opponent_id) userIds.add(c.opponent_id);
+            });
+            // Add group participant IDs
+            Object.values(window._groupParticipants || {}).forEach(parts => {
+                parts.forEach(p => userIds.add(p.user_id));
             });
             userIds.delete(currentUser.id);
             userIds.delete(null);
@@ -5030,17 +5071,40 @@
 
         let filtered = [];
         if (h2hActiveSubTab === 'incoming') {
-            filtered = h2hChallengesCache.filter(c =>
-                c.opponent_id === currentUser.id && c.status === 'pending'
-            );
+            filtered = h2hChallengesCache.filter(c => {
+                if (c.opponent_id === currentUser.id && c.status === 'pending') return true;
+                // Group challenge invites
+                if (c.challenge_type === 'group') {
+                    const parts = window._groupParticipants?.[c.id] || [];
+                    if (parts.some(p => p.user_id === currentUser.id && p.status === 'invited')) return true;
+                }
+                return false;
+            });
         } else if (h2hActiveSubTab === 'pending') {
             filtered = h2hChallengesCache.filter(c => {
                 const isChallenger = c.challenger_id === currentUser.id;
-                return (isChallenger && c.status === 'pending') || c.status === 'accepted' || c.status === 'quick_match_waiting';
+                if ((isChallenger && c.status === 'pending') || c.status === 'accepted' || c.status === 'quick_match_waiting') return true;
+                // Group challenges I created or accepted
+                if (c.challenge_type === 'group' && c.status === 'group_active') {
+                    if (isChallenger) return true;
+                    const parts = window._groupParticipants?.[c.id] || [];
+                    if (parts.some(p => p.user_id === currentUser.id && (p.status === 'accepted' || p.status === 'completed'))) return true;
+                }
+                return false;
             });
         } else if (h2hActiveSubTab === 'results') {
-            filtered = h2hChallengesCache.filter(c => c.status === 'completed');
-            filtered.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
+            filtered = h2hChallengesCache.filter(c => {
+                if (c.status === 'completed') return true;
+                // Group challenges where I completed and at least one other completed
+                if (c.challenge_type === 'group' && c.status === 'group_active') {
+                    const parts = window._groupParticipants?.[c.id] || [];
+                    const myPart = parts.find(p => p.user_id === currentUser.id);
+                    const othersCompleted = parts.some(p => p.user_id !== currentUser.id && p.status === 'completed');
+                    if (myPart?.status === 'completed' && othersCompleted) return true;
+                }
+                return false;
+            });
+            filtered.sort((a, b) => (b.completed_at || b.created_at || '').localeCompare(a.completed_at || a.created_at || ''));
         }
 
         if (filtered.length === 0) {
@@ -5059,17 +5123,35 @@
             const dateStr = formatRelativeDate(h2hActiveSubTab === 'results' && ch.completed_at ? ch.completed_at : ch.created_at);
 
             if (h2hActiveSubTab === 'incoming') {
-                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:#f0f0ff;border:1px solid #c7d2fe;">`;
+                const isGroup = ch.challenge_type === 'group';
+                const displayName = isGroup ? (ch.group_name || 'Group Challenge') : oppName;
+                const acceptFn = isGroup ? 'acceptGroupChallenge' : 'acceptChallenge';
+                const declineFn = isGroup ? 'declineGroupChallenge' : 'declineChallenge';
+                const bgColor = isGroup ? '#f3e8ff' : '#f0f0ff';
+                const borderColor = isGroup ? '#d8b4fe' : '#c7d2fe';
+                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${bgColor};border:1px solid ${borderColor};">`;
                 html += `<div style="flex:1;min-width:0;">`;
-                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">${oppName}</div>`;
+                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">${isGroup ? '👥 ' : ''}${displayName}</div>`;
                 html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${diffLabel} · ${dateStr}</div>`;
                 html += `</div>`;
                 html += `<div style="display:flex;gap:8px;">`;
-                html += `<button onclick="event.stopPropagation();acceptChallenge('${ch.id}')" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Accept</button>`;
-                html += `<button onclick="event.stopPropagation();declineChallenge('${ch.id}')" style="padding:6px 14px;background:#ef4444;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Decline</button>`;
+                html += `<button onclick="event.stopPropagation();${acceptFn}('${ch.id}')" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Accept</button>`;
+                html += `<button onclick="event.stopPropagation();${declineFn}('${ch.id}')" style="padding:6px 14px;background:#ef4444;color:white;border:none;border-radius:8px;font-weight:600;font-size:0.8rem;cursor:pointer;">Decline</button>`;
                 html += `</div>`;
                 html += `</div>`;
             } else if (h2hActiveSubTab === 'pending') {
+                if (ch.challenge_type === 'group') {
+                    const parts = window._groupParticipants?.[ch.id] || [];
+                    const completedCount = parts.filter(p => p.status === 'completed').length;
+                    const groupDisplayName = ch.group_name || 'Group Challenge';
+                    html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:#f3e8ff;border:1px solid #d8b4fe;cursor:pointer;" onclick="viewGroupScorecard('${ch.id}')">`;
+                    html += `<div style="flex:1;min-width:0;">`;
+                    html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">👥 ${groupDisplayName}</div>`;
+                    html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${completedCount}/${parts.length} played · ${diffLabel} · ${dateStr}</div>`;
+                    html += `</div>`;
+                    html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
+                    html += `</div>`;
+                } else {
                 const isQuickMatch = ch.status === 'quick_match_waiting';
                 const myRun = ch._runs && ch._runs[currentUser.id];
                 const oppId = isQuickMatch ? null : (isChallenger ? ch.opponent_id : ch.challenger_id);
@@ -5102,7 +5184,20 @@
                 html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
                 html += `</div>`;
                 html += `</div>`;
+                } // close else for non-group pending
             } else if (h2hActiveSubTab === 'results') {
+                if (ch.challenge_type === 'group') {
+                    const parts = window._groupParticipants?.[ch.id] || [];
+                    const completedCount = parts.filter(p => p.status === 'completed').length;
+                    const groupDisplayName = ch.group_name || 'Group Challenge';
+                    html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:#f3e8ff;border:1px solid #d8b4fe;cursor:pointer;" onclick="viewGroupScorecard('${ch.id}')">`;
+                    html += `<div style="flex:1;min-width:0;">`;
+                    html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">👥 ${groupDisplayName}</div>`;
+                    html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${completedCount}/${parts.length} played · ${diffLabel} · ${dateStr}</div>`;
+                    html += `</div>`;
+                    html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
+                    html += `</div>`;
+                } else {
                 const myRun = ch._runs && ch._runs[currentUser.id];
                 const oppId = isChallenger ? ch.opponent_id : ch.challenger_id;
                 const oppRun = ch._runs && ch._runs[oppId];
@@ -5147,6 +5242,7 @@
                 html += `<button onclick="event.stopPropagation();rematchChallenge('${oppId}','${oppName.replace(/'/g,"\\'")}',${ch.difficulty ?? 50})" style="padding:4px 8px;background:none;border:1px solid #d1d5db;border-radius:6px;font-size:0.7rem;color:#6b7280;cursor:pointer;white-space:nowrap;" title="Rematch">↻</button>`;
                 html += `<span style="color:#d1d5db;font-size:0.9rem;">›</span>`;
                 html += `</div>`;
+                } // close else for non-group results
             }
         });
 
@@ -5258,6 +5354,9 @@
     // === New Challenge Modal ===
     let preselectedChallengeUserId = null;
     let preselectedChallengeUserName = null;
+    let selectedFriendIds = new Set();
+    let savedGroupsList = [];
+    let selectedGroupName = null;
 
     function openNewChallengeModal() {
         if (!currentUser) {
@@ -5269,17 +5368,18 @@
         preselectedChallengeUserId = null;
         preselectedChallengeUserName = null;
 
-        if (!preId) {
-            selectedFriendId = null;
-            document.getElementById('sendChallengeBtn').disabled = true;
-            document.getElementById('sendChallengeBtn').style.opacity = '0.5';
-        }
+        selectedFriendIds = new Set();
+        selectedFriendId = null;
+        selectedGroupName = null;
+        document.getElementById('sendChallengeBtn').disabled = true;
+        document.getElementById('sendChallengeBtn').style.opacity = '0.5';
         document.getElementById('friendSearchInput').value = '';
         document.getElementById('challengeDiffSlider').value = 50;
         document.getElementById('challengeDiffValue').textContent = '50';
         document.getElementById('challengeDiffLabel').textContent = 'Normal plates';
         document.getElementById('newChallengeModalBackdrop').classList.add('show');
         loadFriendsList(preId, preName);
+        loadSavedGroups();
     }
     window.openNewChallengeModal = openNewChallengeModal;
 
@@ -5339,26 +5439,69 @@
         }
     }
 
+    async function loadSavedGroups() {
+        try {
+            const { data } = await sb.from('saved_groups')
+                .select('id, name, member_ids')
+                .order('updated_at', { ascending: false });
+            savedGroupsList = data || [];
+        } catch(e) { savedGroupsList = []; }
+        renderFriendsList();
+    }
+
     function renderFriendsList() {
         const listEl = document.getElementById('friendsList');
         const query = (document.getElementById('friendSearchInput').value || '').toLowerCase();
-        const filtered = friendsListData.filter(f =>
-            f.name.toLowerCase().includes(query) || f.handle.toLowerCase().includes(query)
-        );
-
-        if (filtered.length === 0) {
-            listEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:12px;">No friends found</p>';
-            return;
-        }
 
         let html = '';
-        filtered.forEach(f => {
-            const sel = f.id === selectedFriendId ? ' selected' : '';
-            html += `<div class="friend-item${sel}" onclick="selectFriend('${f.id}')">`;
-            html += `<div class="friend-name">${f.name}</div>`;
-            if (f.handle) html += `<div class="friend-handle">@${f.handle}</div>`;
-            html += `</div>`;
-        });
+
+        // Saved groups (show when no friends selected)
+        if (selectedFriendIds.size === 0 && savedGroupsList.length > 0) {
+            const filteredGroups = query ? savedGroupsList.filter(g => g.name.toLowerCase().includes(query)) : savedGroupsList;
+            if (filteredGroups.length > 0) {
+                html += '<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;padding:8px 12px 4px;">Saved Groups</div>';
+                filteredGroups.forEach(g => {
+                    html += `<div class="friend-item" onclick="selectSavedGroup('${g.id}')" style="background:#f3e8ff;">`;
+                    html += `<div class="friend-name" style="color:#7c3aed;">👥 ${g.name}</div>`;
+                    html += `<div class="friend-handle">${g.member_ids.length} players</div>`;
+                    html += `</div>`;
+                });
+                html += '<div style="border-bottom:1px solid #e5e7eb;margin:4px 0;"></div>';
+            }
+        }
+
+        // Selected friends chips
+        if (selectedFriendIds.size > 0) {
+            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;">';
+            selectedFriendIds.forEach(fid => {
+                const f = friendsListData.find(x => x.id === fid);
+                if (f) {
+                    html += `<span style="background:#7c3aed;color:white;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">${f.name} <span onclick="event.stopPropagation();deselectFriend('${fid}')" style="cursor:pointer;opacity:0.7;">✕</span></span>`;
+                }
+            });
+            html += `<span style="color:#6b7280;font-size:11px;padding:3px 0;">${selectedFriendIds.size}/5</span>`;
+            html += '</div>';
+        }
+
+        // Friends list
+        if (selectedFriendIds.size < 5) {
+            const filtered = friendsListData.filter(f =>
+                !selectedFriendIds.has(f.id) &&
+                (f.name.toLowerCase().includes(query) || f.handle.toLowerCase().includes(query))
+            );
+
+            if (filtered.length === 0 && selectedFriendIds.size === 0) {
+                html += '<p style="text-align:center;color:#6b7280;padding:12px;">No friends found</p>';
+            } else {
+                filtered.forEach(f => {
+                    html += `<div class="friend-item" onclick="selectFriend('${f.id}')">`;
+                    html += `<div class="friend-name">${f.name}</div>`;
+                    if (f.handle) html += `<div class="friend-handle">@${f.handle}</div>`;
+                    html += `</div>`;
+                });
+            }
+        }
+
         listEl.innerHTML = html;
     }
 
@@ -5368,7 +5511,10 @@
     window.filterFriendsList = filterFriendsList;
 
     function selectFriend(friendId) {
-        selectedFriendId = friendId;
+        selectedFriendIds.add(friendId);
+        selectedGroupName = null;
+        // Keep backward compat for 1v1
+        if (selectedFriendIds.size === 1) selectedFriendId = friendId;
         renderFriendsList();
         const btn = document.getElementById('sendChallengeBtn');
         btn.disabled = false;
@@ -5376,8 +5522,35 @@
     }
     window.selectFriend = selectFriend;
 
+    function deselectFriend(friendId) {
+        selectedFriendIds.delete(friendId);
+        selectedGroupName = null;
+        if (selectedFriendIds.size === 0) {
+            selectedFriendId = null;
+            document.getElementById('sendChallengeBtn').disabled = true;
+            document.getElementById('sendChallengeBtn').style.opacity = '0.5';
+        } else {
+            selectedFriendId = [...selectedFriendIds][0];
+        }
+        renderFriendsList();
+    }
+    window.deselectFriend = deselectFriend;
+
+    function selectSavedGroup(groupId) {
+        const group = savedGroupsList.find(g => g.id === groupId);
+        if (!group) return;
+        selectedFriendIds = new Set(group.member_ids.filter(id => id !== currentUser.id));
+        selectedFriendId = [...selectedFriendIds][0] || null;
+        selectedGroupName = group.name;
+        renderFriendsList();
+        const btn = document.getElementById('sendChallengeBtn');
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }
+    window.selectSavedGroup = selectSavedGroup;
+
     async function sendChallenge() {
-        if (!currentUser || !selectedFriendId) return;
+        if (!currentUser || selectedFriendIds.size === 0) return;
 
         const btn = document.getElementById('sendChallengeBtn');
         btn.disabled = true;
@@ -5394,19 +5567,80 @@
                 return;
             }
 
-            const { data, error } = await sb.rpc('create_h2h_challenge', {
-                p_opponent_id: selectedFriendId,
-                p_plates: plates,
-                p_difficulty: difficulty
-            });
+            const opponentIds = [...selectedFriendIds];
+            const isGroup = opponentIds.length > 1;
 
-            if (error) throw error;
-            const challengeId = data;
+            if (isGroup) {
+                // Group challenge
+                const { data, error } = await sb.rpc('create_group_challenge', {
+                    p_opponent_ids: opponentIds,
+                    p_plates: plates,
+                    p_difficulty: difficulty
+                });
+                if (error) throw error;
+                const result = Array.isArray(data) ? data[0] : data;
+                if (!result) throw new Error('Failed to create group challenge');
 
-            closeNewChallengeModal();
+                // Set group name if from saved group
+                if (selectedGroupName) {
+                    await sb.rpc('set_group_challenge_name', {
+                        p_challenge_id: result.challenge_id,
+                        p_name: selectedGroupName
+                    }).catch(() => {});
+                }
 
-            // Start playing immediately
-            await playH2HChallenge(challengeId);
+                closeNewChallengeModal();
+
+                const displayName = selectedGroupName || 'Group Challenge';
+                // Set up H2H game mode
+                if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+                resetGameState();
+                gameOver = false;
+                gameStarted = false;
+
+                currentChallengeId = result.challenge_id;
+                currentH2HRunId = result.run_id;
+                currentChallengeType = 'group';
+                gameMode = 'h2h_challenge';
+                dailyPlateSequence = plates;
+                currentH2HDifficulty = difficulty;
+
+                switchTab('game');
+
+                document.getElementById('practiceBtn').disabled = true;
+                document.getElementById('practiceBtn').style.opacity = '0.5';
+                document.getElementById('dailyChallengeBtn').disabled = true;
+                document.getElementById('dailyChallengeBtn').style.opacity = '0.5';
+                document.getElementById('quickMatchBtn').disabled = true;
+                document.getElementById('quickMatchBtn').style.opacity = '0.5';
+
+                const mi = document.getElementById('modeIndicator');
+                mi.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <span>${displayName.toUpperCase()} | Difficulty ${difficulty}</span>
+                        <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
+                    </div>
+                `;
+                mi.style.background = '#fef3c7';
+                mi.style.color = '#92400e';
+                mi.style.border = '2px solid #fbbf24';
+
+                const startBtn = document.getElementById('startButton');
+                startBtn.style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                await beginNewRun();
+            } else {
+                // 1v1 challenge
+                const { data, error } = await sb.rpc('create_h2h_challenge', {
+                    p_opponent_id: opponentIds[0],
+                    p_plates: plates,
+                    p_difficulty: difficulty
+                });
+                if (error) throw error;
+                const challengeId = data;
+                closeNewChallengeModal();
+                await playH2HChallenge(challengeId);
+            }
         } catch (e) {
             console.error('Error creating challenge:', e);
             alert('Error creating challenge: ' + e.message);
@@ -5451,6 +5685,36 @@
         }
     }
     window.declineChallenge = declineChallenge;
+
+    async function acceptGroupChallenge(challengeId) {
+        if (!currentUser) return;
+        try {
+            const { data, error } = await sb.rpc('accept_group_challenge', {
+                p_challenge_id: challengeId
+            });
+            if (error) throw error;
+            const result = Array.isArray(data) ? data[0] : data;
+            if (!result) throw new Error('Failed to accept');
+            await playH2HChallenge(challengeId);
+        } catch(e) {
+            console.error('Error accepting group challenge:', e);
+            alert('Error: ' + e.message);
+        }
+    }
+    window.acceptGroupChallenge = acceptGroupChallenge;
+
+    async function declineGroupChallenge(challengeId) {
+        if (!currentUser) return;
+        if (!confirm('Decline this group challenge?')) return;
+        try {
+            await sb.rpc('decline_group_challenge', { p_challenge_id: challengeId });
+            loadH2HChallenges();
+        } catch(e) {
+            console.error('Error declining group challenge:', e);
+            alert('Error: ' + e.message);
+        }
+    }
+    window.declineGroupChallenge = declineGroupChallenge;
 
     async function playH2HChallenge(challengeId) {
         if (!currentUser) {
@@ -5505,6 +5769,7 @@
 
             currentChallengeId = challengeId;
             currentH2HRunId = run.run_id;
+            currentChallengeType = challenge.challenge_type || null;
             gameMode = 'h2h_challenge';
             dailyPlateSequence = challenge.plates;
 
@@ -5573,12 +5838,18 @@
                 p_total_seconds: totalSeconds,
                 p_entries: entries
             });
+
+            // Complete group challenge run (pairwise Elo)
+            if (currentChallengeType === 'group' && currentChallengeId) {
+                await sb.rpc('complete_group_run', { p_challenge_id: currentChallengeId }).catch(() => {});
+            }
         } catch (e) {
             console.error('Forfeit error:', e);
         }
 
         currentChallengeId = null;
         currentH2HRunId = null;
+        currentChallengeType = null;
         gameMode = 'practice';
         gameHistory = [];
         localStorage.removeItem('pendingPracticeStats');
@@ -5595,6 +5866,7 @@
         pendingOpponent = null;
         currentChallengeId = null;
         currentH2HRunId = null;
+        currentChallengeType = null;
         gameMode = 'practice';
 
         const practiceBtn = document.getElementById('practiceBtn');
@@ -5647,14 +5919,25 @@
                 console.log('H2H run submitted successfully');
                 const solved = entries.filter(e => !e.skipped).length;
                 pushCompletedRun('h2h', totalSeconds, currentH2HDifficulty, solved, entries.length, currentH2HRunId);
+
+                // Complete group challenge run (pairwise Elo)
+                if (currentChallengeType === 'group' && currentChallengeId) {
+                    try {
+                        await sb.rpc('complete_group_run', { p_challenge_id: currentChallengeId });
+                    } catch (ge) {
+                        console.error('Error completing group run:', ge);
+                    }
+                }
             }
         } catch (e) {
             console.error('Error submitting H2H run:', e);
         }
 
         const completedChallengeId = currentChallengeId;
+        const completedChallengeType = currentChallengeType;
         currentChallengeId = null;
         currentH2HRunId = null;
+        currentChallengeType = null;
         challengeStartTime = null;
         gameMode = 'practice';
         // Mark as already submitted so practice stats don't re-submit H2H history
@@ -5687,7 +5970,13 @@
                     }
                 });
             // Auto-show scorecard after a brief delay for data to settle
-            setTimeout(() => viewH2HScorecard(completedChallengeId), 500);
+            setTimeout(() => {
+                if (completedChallengeType === 'group') {
+                    viewGroupScorecard(completedChallengeId);
+                } else {
+                    viewH2HScorecard(completedChallengeId);
+                }
+            }, 500);
         }
     }
 
@@ -5695,6 +5984,7 @@
         // Not applicable in Supabase flow — run timeout handled server-side
         currentChallengeId = null;
         currentH2HRunId = null;
+        currentChallengeType = null;
         challengeStartTime = null;
         gameMode = 'practice';
         resetGameState();
@@ -5901,6 +6191,227 @@
         }
     }
     window.viewH2HScorecard = viewH2HScorecard;
+
+    // ===== GROUP CHALLENGE SCORECARD =====
+    async function viewGroupScorecard(challengeId) {
+        const backdrop = document.getElementById('h2hScorecardModalBackdrop');
+        const titleEl = document.getElementById('h2hScorecardTitle');
+        const contentEl = document.getElementById('h2hScorecardContent');
+
+        titleEl.textContent = 'Group Challenge';
+        contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading...</p>';
+        backdrop.classList.add('show');
+
+        try {
+            // Fetch challenge, participants, runs, entries, elo in parallel
+            const [challengeRes, participantsRes, runsRes, eloRes] = await Promise.all([
+                sb.from('h2h_challenges').select('*').eq('id', challengeId).single(),
+                sb.from('group_challenge_participants').select('*').eq('challenge_id', challengeId),
+                sb.from('h2h_runs').select('id, user_id, total_seconds').eq('challenge_id', challengeId),
+                sb.from('elo_history').select('user_id, old_elo, new_elo').eq('challenge_id', challengeId)
+            ]);
+
+            const challenge = challengeRes.data;
+            if (!challenge) {
+                contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;">Challenge not found</p>';
+                return;
+            }
+
+            const participants = participantsRes.data || [];
+            const runs = runsRes.data || [];
+            const eloData = eloRes.data || [];
+
+            // Build elo map
+            const eloMap = {};
+            for (const e of eloData) {
+                eloMap[e.user_id] = { oldElo: e.old_elo, newElo: e.new_elo, change: e.new_elo - e.old_elo };
+            }
+
+            // Fetch profiles for all participants
+            const allUserIds = participants.map(p => p.user_id);
+            for (const uid of allUserIds) {
+                if (!h2hProfilesCache[uid] && uid !== currentUser.id) {
+                    const { data: prof } = await sb.from('profiles').select('display_name, handle').eq('id', uid).single();
+                    if (prof) h2hProfilesCache[uid] = prof.display_name || (prof.handle ? '@' + prof.handle : null);
+                }
+            }
+
+            // Build run data per user
+            const runMap = {};
+            for (const run of runs) {
+                runMap[run.user_id] = { runId: run.id, totalSeconds: run.total_seconds };
+            }
+
+            // Fetch entries for completed runs
+            const entriesMap = {};
+            const completedRuns = runs.filter(r => r.total_seconds !== null);
+            if (completedRuns.length > 0) {
+                const { data: allEntries } = await sb.from('h2h_run_entries')
+                    .select('*')
+                    .in('run_id', completedRuns.map(r => r.id))
+                    .order('plate_index');
+                if (allEntries) {
+                    for (const entry of allEntries) {
+                        const run = completedRuns.find(r => r.id === entry.run_id);
+                        if (run) {
+                            if (!entriesMap[run.user_id]) entriesMap[run.user_id] = [];
+                            entriesMap[run.user_id].push(entry);
+                        }
+                    }
+                }
+            }
+
+            // Sort participants: completed first (by time), then pending
+            const sorted = [...participants].sort((a, b) => {
+                const aRun = runMap[a.user_id];
+                const bRun = runMap[b.user_id];
+                const aTime = aRun?.totalSeconds;
+                const bTime = bRun?.totalSeconds;
+                if (aTime != null && bTime != null) return aTime - bTime;
+                if (aTime != null) return -1;
+                if (bTime != null) return 1;
+                return 0;
+            });
+
+            const groupName = challenge.group_name || 'Group Challenge';
+            titleEl.textContent = groupName;
+
+            // === STANDINGS TAB ===
+            let html = '';
+            html += '<div id="groupScorecardTabs" style="display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:16px;">';
+            html += '<button class="group-sc-tab active" onclick="switchGroupScorecardTab(\'standings\',\'' + challengeId + '\')" data-tab="standings" style="flex:1;padding:10px;font-weight:700;font-size:0.9rem;border:none;background:none;cursor:pointer;border-bottom:3px solid #9370db;color:#9370db;">Standings</button>';
+
+            // Add a tab for each completed player
+            for (let i = 0; i < sorted.length; i++) {
+                const p = sorted[i];
+                const pRun = runMap[p.user_id];
+                if (pRun?.totalSeconds == null) continue;
+                const pName = p.user_id === currentUser.id ? 'You' : (h2hProfilesCache[p.user_id] || 'Player');
+                const shortName = pName.length > 8 ? pName.slice(0, 7) + '…' : pName;
+                html += `<button class="group-sc-tab" onclick="switchGroupScorecardTab('player-${i}','${challengeId}')" data-tab="player-${i}" style="flex:1;padding:10px;font-weight:600;font-size:0.85rem;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;color:#9ca3af;">${shortName}</button>`;
+            }
+            html += '</div>';
+
+            // Standings content
+            html += '<div id="groupTab-standings" class="group-tab-content">';
+            const medals = ['🥇', '🥈', '🥉'];
+            for (let i = 0; i < sorted.length; i++) {
+                const p = sorted[i];
+                const pRun = runMap[p.user_id];
+                const pName = p.user_id === currentUser.id ? 'You' : (h2hProfilesCache[p.user_id] || 'Player');
+                const isMe = p.user_id === currentUser.id;
+                const medal = (pRun?.totalSeconds != null && i < 3) ? medals[i] : '';
+                const time = pRun?.totalSeconds;
+                const elo = eloMap[p.user_id];
+
+                const bgColor = isMe ? '#f3e8ff' : '#f9fafb';
+                const borderColor = isMe ? '#d8b4fe' : '#e5e7eb';
+
+                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${bgColor};border:1px solid ${borderColor};">`;
+                html += `<div style="width:32px;font-size:1.3rem;text-align:center;">${medal || (i + 1)}</div>`;
+                html += `<div style="flex:1;min-width:0;margin-left:8px;">`;
+                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">${pName}</div>`;
+                if (elo) {
+                    const changeColor = elo.change >= 0 ? '#16a34a' : '#dc2626';
+                    const changeStr = elo.change >= 0 ? `+${elo.change}` : `${elo.change}`;
+                    html += `<div style="font-size:0.8rem;color:#6b7280;">${elo.newElo} <span style="color:${changeColor};">(${changeStr})</span></div>`;
+                }
+                html += `</div>`;
+                html += `<div style="text-align:right;">`;
+                if (time != null) {
+                    // Check forfeit
+                    const entries = entriesMap[p.user_id] || [];
+                    const solvedCount = entries.filter(e => !e.skipped).length;
+                    if (solvedCount < 10) {
+                        html += `<div style="font-size:1.1rem;">🏳️</div>`;
+                        html += `<div style="font-size:0.75rem;color:#9ca3af;">Forfeit</div>`;
+                    } else {
+                        html += `<div style="font-weight:700;font-size:1.05rem;color:#374151;">${time.toFixed(2)}s</div>`;
+                    }
+                } else {
+                    html += `<div style="font-size:0.85rem;color:#9ca3af;font-style:italic;">Pending</div>`;
+                }
+                html += `</div>`;
+                html += `</div>`;
+            }
+            html += '</div>';
+
+            // Per-player detail tabs
+            let playerTabIdx = 0;
+            for (let i = 0; i < sorted.length; i++) {
+                const p = sorted[i];
+                const pRun = runMap[p.user_id];
+                if (pRun?.totalSeconds == null) continue;
+                const pName = p.user_id === currentUser.id ? 'You' : (h2hProfilesCache[p.user_id] || 'Player');
+                const entries = entriesMap[p.user_id] || [];
+                const plates = challenge.plates || [];
+
+                html += `<div id="groupTab-player-${playerTabIdx}" class="group-tab-content" style="display:none;">`;
+                html += `<div style="text-align:center;margin-bottom:12px;">`;
+                html += `<div style="font-weight:700;font-size:1.1rem;color:#1f2937;">${pName}</div>`;
+                html += `<div style="font-size:0.95rem;color:#6b7280;">${pRun.totalSeconds.toFixed(2)}s</div>`;
+                html += `</div>`;
+
+                html += '<table class="scorecard-table"><thead><tr><th>#</th><th>Plate</th><th>Word</th><th>Time</th></tr></thead><tbody>';
+                for (let j = 0; j < entries.length; j++) {
+                    const e = entries[j];
+                    const plate = plates[j] || '--';
+                    const t = e.skipped ? (e.thinking_seconds + (e.penalty_seconds || 0)) : e.thinking_seconds;
+                    const bg = e.skipped ? '#fef2f2' : getTimeColor(t);
+                    const textC = e.skipped ? '#dc2626' : (t > 15 ? '#fff' : '#000');
+                    const word = e.skipped ? '❌' : (e.word || '');
+                    const timeStr = e.skipped ? `${e.thinking_seconds.toFixed(2)} (+${e.penalty_seconds || 0})` : t.toFixed(2);
+                    html += `<tr style="background:${bg};color:${textC};">`;
+                    html += `<td style="font-size:0.8rem;color:#9ca3af;width:24px;">${j + 1}</td>`;
+                    html += `<td class="sc-plate" onclick="showViableWordsForPlate('${plate}', false, 'practice')">${plate}</td>`;
+                    html += `<td>${word}</td>`;
+                    html += `<td style="font-size:0.85rem;">${timeStr}</td>`;
+                    html += `</tr>`;
+                }
+                html += '</tbody></table>';
+                html += '</div>';
+                playerTabIdx++;
+            }
+
+            // Chat section
+            html += '<div style="margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px;">';
+            html += '<div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;">Chat</div>';
+            html += `<div id="h2hChatMessages" style="max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>`;
+            html += '<div style="display:flex;gap:8px;">';
+            html += `<input type="text" id="h2hChatInput" placeholder="Message..." style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.9rem;" onkeydown="if(event.key==='Enter')sendH2HChat('${challengeId}')">`;
+            html += `<button onclick="sendH2HChat('${challengeId}')" style="padding:8px 16px;background:#9370db;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Send</button>`;
+            html += '</div></div>';
+
+            contentEl.innerHTML = html;
+            loadH2HChat(challengeId);
+            subscribeH2HChat(challengeId);
+
+        } catch (e) {
+            console.error('Error loading group scorecard:', e);
+            contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;">Error loading scorecard</p>';
+        }
+    }
+    window.viewGroupScorecard = viewGroupScorecard;
+
+    window.switchGroupScorecardTab = function(tab) {
+        // Hide all tab contents
+        document.querySelectorAll('.group-tab-content').forEach(el => el.style.display = 'none');
+        // Show selected
+        const target = document.getElementById('groupTab-' + tab);
+        if (target) target.style.display = '';
+        // Update tab buttons
+        document.querySelectorAll('.group-sc-tab').forEach(btn => {
+            if (btn.dataset.tab === tab) {
+                btn.style.borderBottomColor = '#9370db';
+                btn.style.color = '#9370db';
+                btn.classList.add('active');
+            } else {
+                btn.style.borderBottomColor = 'transparent';
+                btn.style.color = '#9ca3af';
+                btn.classList.remove('active');
+            }
+        });
+    };
 
     let h2hChatSubscription = null;
 
