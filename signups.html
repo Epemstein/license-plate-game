@@ -88,7 +88,8 @@ async function loadSignups() {
 
     // Fetch plate counts per user from all entry tables
     // Use live_plays for "last active" and total plates
-    const { data: playStats } = await sb.rpc('signup_plate_stats').catch(() => ({ data: null }));
+    let playStats = null;
+    try { const res = await sb.rpc('signup_plate_stats'); playStats = res.data; } catch(e) {}
 
     // Fallback: fetch from live_plays grouped by user
     let userPlayData = {};
