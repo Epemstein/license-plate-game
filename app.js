@@ -4952,20 +4952,21 @@
                 }
             }
 
-            // Store group participants for lookup
+            h2hChallengesCache = [...(data || []), ...groupChallenges];
+
+            // Store group participants for lookup — include all group challenges in cache
             window._groupParticipants = {};
-            if (groupChallengeIds.length > 0) {
+            const allGroupIds = h2hChallengesCache.filter(c => c.challenge_type === 'group').map(c => c.id);
+            if (allGroupIds.length > 0) {
                 const { data: allParts } = await sb
                     .from('group_challenge_participants')
                     .select('challenge_id, user_id, status')
-                    .in('challenge_id', groupChallengeIds);
+                    .in('challenge_id', allGroupIds);
                 (allParts || []).forEach(p => {
                     if (!window._groupParticipants[p.challenge_id]) window._groupParticipants[p.challenge_id] = [];
                     window._groupParticipants[p.challenge_id].push(p);
                 });
             }
-
-            h2hChallengesCache = [...(data || []), ...groupChallenges];
 
             // Collect unique user IDs for profile lookup
             const userIds = new Set();
