@@ -5775,13 +5775,20 @@
             gameMode = 'h2h_challenge';
             dailyPlateSequence = challenge.plates;
 
-            const isChallenger = challenge.challenger_id === currentUser.id;
-            const oppId = isChallenger ? challenge.opponent_id : challenge.challenger_id;
-            let oppName = h2hProfilesCache[oppId];
-            if (!oppName) {
-                const { data: prof } = await sb.from('profiles').select('display_name, handle').eq('id', oppId).single();
-                oppName = prof?.display_name || (prof?.handle ? '@' + prof.handle : 'Opponent');
-                h2hProfilesCache[oppId] = oppName;
+            const isGroup = challenge.challenge_type === 'group';
+            let displayName;
+            if (isGroup) {
+                displayName = (challenge.group_name || 'Group Challenge').toUpperCase();
+            } else {
+                const isChallenger = challenge.challenger_id === currentUser.id;
+                const oppId = isChallenger ? challenge.opponent_id : challenge.challenger_id;
+                let oppName = h2hProfilesCache[oppId];
+                if (!oppName) {
+                    const { data: prof } = await sb.from('profiles').select('display_name, handle').eq('id', oppId).single();
+                    oppName = prof?.display_name || (prof?.handle ? '@' + prof.handle : 'Opponent');
+                    h2hProfilesCache[oppId] = oppName;
+                }
+                displayName = `H2H vs ${oppName}`;
             }
 
             // Switch to game tab
@@ -5797,7 +5804,7 @@
             const mi = document.getElementById('modeIndicator');
             mi.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;">
-                    <span>H2H vs ${oppName} | Difficulty = ${currentH2HDifficulty}</span>
+                    <span>${displayName} | Difficulty ${currentH2HDifficulty}</span>
                     <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
                 </div>
             `;
