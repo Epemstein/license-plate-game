@@ -247,6 +247,14 @@ function renderTable() {
         </tr>`;
     });
 
+    const totDailies = sorted.reduce((s, u) => s + u.dailiesPlayed, 0);
+    const totPlates = sorted.reduce((s, u) => s + u.totalPlates, 0);
+    html += `<tr style="border-top:2px solid #e5e7eb;font-weight:600;">
+        <td>Total</td><td></td><td></td><td></td>
+        <td>${totDailies.toLocaleString()}</td>
+        <td>${totPlates.toLocaleString()}</td>
+        <td></td>
+    </tr>`;
     html += '</tbody></table>';
     document.getElementById('signupTable').innerHTML = html;
 }
