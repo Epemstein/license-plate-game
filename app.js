@@ -6359,13 +6359,13 @@
             });
 
             const groupName = challenge.group_name || 'Group Challenge';
-            titleEl.textContent = groupName;
+            titleEl.innerHTML = groupName + (challenge.group_name ? ` <span onclick="editGroupName('${challengeId}')" style="cursor:pointer;font-size:0.8rem;opacity:0.6;">✏️</span>` : '');
 
-            // === STANDINGS TAB ===
+            // === LEADERBOARD TAB ===
             const medals = ['🥇', '🥈', '🥉'];
             let html = '';
             html += '<div id="groupScorecardTabs" style="display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:16px;">';
-            html += '<button class="group-sc-tab active" onclick="switchGroupScorecardTab(\'standings\',\'' + challengeId + '\')" data-tab="standings" style="flex:1;padding:10px;font-weight:700;font-size:0.9rem;border:none;background:none;cursor:pointer;border-bottom:3px solid #9370db;color:#9370db;">Standings</button>';
+            html += '<button class="group-sc-tab active" onclick="switchGroupScorecardTab(\'standings\',\'' + challengeId + '\')" data-tab="standings" style="flex:1;padding:10px;font-weight:700;font-size:0.9rem;border:none;background:none;cursor:pointer;border-bottom:3px solid #9370db;color:#9370db;">Leaderboard</button>';
 
             // Add a tab for each completed player
             let completedIdx = 0;
@@ -6425,6 +6425,12 @@
                 html += `</div>`;
                 html += `</div>`;
             }
+            // Action buttons
+            html += '<div style="display:flex;gap:8px;margin-top:12px;">';
+            if (challenge.group_name) {
+                html += `<button onclick="viewGroupStandings('${challenge.group_name.replace(/'/g, "\\'")}')" style="flex:1;padding:10px;background:#9370db;color:white;border:none;border-radius:10px;font-weight:600;font-size:0.85rem;cursor:pointer;">Group Standings</button>`;
+            }
+            html += '</div>';
             html += '</div>';
 
             // Per-player detail tabs
@@ -6485,6 +6491,106 @@
         }
     }
     window.viewGroupScorecard = viewGroupScorecard;
+
+    window.editGroupName = async function(challengeId) {
+        const newName = prompt('Rename group:');
+        if (!newName || !newName.trim()) return;
+        try {
+            await sb.rpc('set_group_challenge_name', { p_challenge_id: challengeId, p_name: newName.trim() });
+            viewGroupScorecard(challengeId); // reload
+        } catch (e) {
+            alert('Error: ' + e.message);
+        }
+    };
+
+    window.viewGroupStandings = async function(groupName) {
+        const contentEl = document.getElementById('h2hScorecardContent');
+        const titleEl = document.getElementById('h2hScorecardTitle');
+        titleEl.textContent = groupName + ' Standings';
+        contentEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading standings...</p>';
+
+        try {
+            // Fetch all challenges with this group name
+            const { data: challenges } = await sb.from('h2h_challenges')
+                .select('id')
+                .eq('challenge_type', 'group')
+                .eq('group_name', groupName);
+            const challengeIds = (challenges || []).map(c => c.id);
+
+            if (challengeIds.length === 0) {
+                contentEl.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;">No games found</p>';
+                return;
+            }
+
+            // Fetch participants and runs
+            const { data: allParts } = await sb.from('group_challenge_participants')
+                .select('challenge_id, user_id, status')
+                .in('challenge_id', challengeIds);
+            const { data: allRuns } = await sb.from('h2h_runs')
+                .select('challenge_id, user_id, total_seconds')
+                .in('challenge_id', challengeIds);
+
+            // Count wins and games
+            const wins = {}, played = {};
+            const allUserIds = new Set();
+            (allParts || []).forEach(p => allUserIds.add(p.user_id));
+
+            let completedGames = 0;
+            for (const cid of challengeIds) {
+                const runs = (allRuns || []).filter(r => r.challenge_id === cid && r.total_seconds != null);
+                if (runs.length < 2) continue;
+                completedGames++;
+                const winner = runs.reduce((a, b) => (a.total_seconds < b.total_seconds ? a : b));
+                wins[winner.user_id] = (wins[winner.user_id] || 0) + 1;
+                const parts = (allParts || []).filter(p => p.challenge_id === cid && p.status === 'completed');
+                parts.forEach(p => { played[p.user_id] = (played[p.user_id] || 0) + 1; });
+            }
+
+            // Ensure all participants appear
+            allUserIds.forEach(uid => { if (!played[uid]) played[uid] = 0; });
+
+            // Fetch profiles
+            const uids = [...allUserIds];
+            for (const uid of uids) {
+                if (!h2hProfilesCache[uid] && uid !== currentUser.id) {
+                    const { data: prof } = await sb.from('profiles').select('display_name, handle').eq('id', uid).single();
+                    if (prof) h2hProfilesCache[uid] = prof.display_name || (prof.handle ? '@' + prof.handle : null);
+                }
+            }
+
+            // Sort by wins desc, played desc
+            const sorted = uids.sort((a, b) => (wins[b] || 0) - (wins[a] || 0) || (played[b] || 0) - (played[a] || 0));
+
+            const standingsMedals = ['🏆', '🥈', '🥉'];
+            let html = `<div style="text-align:center;color:#6b7280;font-size:0.9rem;margin-bottom:16px;">${completedGames} games played</div>`;
+
+            sorted.forEach((uid, idx) => {
+                const name = uid === currentUser.id ? 'You' : (h2hProfilesCache[uid] || 'Unknown');
+                const w = wins[uid] || 0;
+                const p = played[uid] || 0;
+                const pct = p > 0 ? Math.round(w / p * 100) : 0;
+                const medal = idx < 3 ? standingsMedals[idx] : (idx + 1);
+                const isMe = uid === currentUser.id;
+                const bg = isMe ? '#f3e8ff' : '#f9fafb';
+                const border = isMe ? '#d8b4fe' : '#e5e7eb';
+
+                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${bg};border:1px solid ${border};">`;
+                html += `<div style="width:32px;font-size:${idx < 3 ? '1.3rem' : '1rem'};text-align:center;font-weight:700;">${medal}</div>`;
+                html += `<div style="flex:1;margin-left:8px;">`;
+                html += `<div style="font-weight:700;font-size:0.95rem;">${name}</div>`;
+                html += `<div style="font-size:0.75rem;color:#9ca3af;">${p} played</div>`;
+                html += `</div>`;
+                html += `<div style="text-align:right;">`;
+                html += `<div style="font-weight:700;font-size:1rem;color:${idx === 0 && w > 0 ? '#16a34a' : '#374151'};">${w} ${w === 1 ? 'win' : 'wins'}</div>`;
+                html += `<div style="font-size:0.75rem;color:#9ca3af;">${pct}%</div>`;
+                html += `</div></div>`;
+            });
+
+            contentEl.innerHTML = html;
+        } catch (e) {
+            contentEl.innerHTML = '<p style="text-align:center;color:#dc2626;">Error loading standings</p>';
+        }
+    };
 
     window.switchGroupScorecardTab = function(tab) {
         // Hide all tab contents
