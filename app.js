@@ -5063,12 +5063,32 @@
         return 'Difficulty ' + d;
     }
 
+    function updateChallengesBadge() {
+        const badge = document.getElementById('challengesBadge');
+        if (!badge || !currentUser) { if (badge) badge.style.display = 'none'; return; }
+        const incomingCount = h2hChallengesCache.filter(c => {
+            if (c.opponent_id === currentUser.id && c.status === 'pending') return true;
+            if (c.challenge_type === 'group') {
+                const parts = window._groupParticipants?.[c.id] || [];
+                if (parts.some(p => p.user_id === currentUser.id && p.status === 'invited')) return true;
+            }
+            return false;
+        }).length;
+        if (incomingCount > 0) {
+            badge.textContent = incomingCount;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
     function renderChallengesList() {
         const contentEl = document.getElementById('challengesContent');
         if (!currentUser) {
             contentEl.innerHTML = '<div style="text-align:center;padding:40px 0;"><p style="color:#756e5c;margin-bottom:16px;">Sign in to view challenges</p><button onclick="switchTab(\'profile\')" style="padding:10px 24px;background:#9370db;color:white;border:2px solid #1a1714;border-radius:5px;font-weight:700;cursor:pointer;box-shadow:3px 3px 0 #1a1714;">Sign In</button></div>';
             return;
         }
+        updateChallengesBadge();
 
         let filtered = [];
         if (h2hActiveSubTab === 'incoming') {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v300</title>
+    <title>License Plate Game v301</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -23,7 +23,7 @@
     <nav class="tab-bar">
         <button class="tab-bar-item active" onclick="switchTab('game')">Game</button>
         <button class="tab-bar-item" onclick="switchTab('leaderboard')">Leaderboard</button>
-        <button class="tab-bar-item" onclick="switchTab('challenges')">Challenges</button>
+        <button class="tab-bar-item" onclick="switchTab('challenges')" id="challengesNavBtn" style="position:relative;">Challenges<span id="challengesBadge" style="display:none;position:absolute;top:2px;right:2px;background:#dc2626;color:white;font-size:10px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;"></span></button>
         <button class="tab-bar-item" onclick="switchTab('profile')">Profile</button>
         <button class="tab-bar-item" onclick="switchTab('feedback')">Feedback</button>
     </nav>
