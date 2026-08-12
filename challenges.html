@@ -201,18 +201,25 @@ function renderTable() {
         filtered = filtered.filter(c => getChallengeType(c) === currentFilter);
     }
     if (document.getElementById('todayOnly')?.checked) {
-        const today = new Date().toISOString().slice(0, 10);
-        filtered = filtered.filter(c => c.created_at && c.created_at.slice(0, 10) === today);
+        // Eastern Time today
+        const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+        const etToday = etNow.getFullYear() + '-' + String(etNow.getMonth() + 1).padStart(2, '0') + '-' + String(etNow.getDate()).padStart(2, '0');
+        filtered = filtered.filter(c => {
+            if (!c.created_at) return false;
+            const etDate = new Date(new Date(c.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const dateStr = etDate.getFullYear() + '-' + String(etDate.getMonth() + 1).padStart(2, '0') + '-' + String(etDate.getDate()).padStart(2, '0');
+            return dateStr === etToday;
+        });
     }
 
-    // Stats
-    const groupCount = allChallenges.filter(c => getChallengeType(c) === 'group').length;
-    const directCount = allChallenges.filter(c => getChallengeType(c) === 'direct').length;
-    const quickCount = allChallenges.filter(c => getChallengeType(c) === 'quick').length;
-    const withMsgs = allChallenges.filter(c => (allMsgCounts[c.id] || 0) > 0).length;
+    // Stats — reflect filtered list
+    const groupCount = filtered.filter(c => getChallengeType(c) === 'group').length;
+    const directCount = filtered.filter(c => getChallengeType(c) === 'direct').length;
+    const quickCount = filtered.filter(c => getChallengeType(c) === 'quick').length;
+    const withMsgs = filtered.filter(c => (allMsgCounts[c.id] || 0) > 0).length;
 
     document.getElementById('stats').innerHTML = `
-        <div class="stat-card"><div class="label">Total</div><div class="val">${allChallenges.length}</div></div>
+        <div class="stat-card"><div class="label">Total</div><div class="val">${filtered.length}</div></div>
         <div class="stat-card"><div class="label">Group</div><div class="val" style="color:#7c3aed;">${groupCount}</div></div>
         <div class="stat-card"><div class="label">Direct</div><div class="val" style="color:#2563eb;">${directCount}</div></div>
         <div class="stat-card"><div class="label">Quick Match</div><div class="val" style="color:#ea580c;">${quickCount}</div></div>
