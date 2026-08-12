@@ -6332,8 +6332,11 @@
             }
             html += '</div>';
 
+            // Tab content wrapper — fixed height so modal doesn't resize
+            html += '<div id="groupTabContentWrapper" style="min-height:400px;max-height:60vh;overflow-y:auto;">';
+
             // Standings content
-            html += '<div id="groupTab-standings" class="group-tab-content" style="min-height:300px;">';
+            html += '<div id="groupTab-standings" class="group-tab-content">';
             for (let i = 0; i < sorted.length; i++) {
                 const p = sorted[i];
                 const pRun = runMap[p.user_id];
@@ -6411,6 +6414,8 @@
                 html += '</div>';
                 playerTabIdx++;
             }
+
+            html += '</div>'; // close groupTabContentWrapper
 
             // Chat section
             html += '<div style="margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px;">';
