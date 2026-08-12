@@ -5718,8 +5718,55 @@
             });
             if (error) throw error;
             const result = Array.isArray(data) ? data[0] : data;
-            if (!result) throw new Error('Failed to accept');
-            await playH2HChallenge(challengeId);
+            if (!result || !result.run_id) throw new Error('Failed to accept');
+
+            // Fetch challenge data
+            const { data: challenge } = await sb
+                .from('h2h_challenges')
+                .select('*')
+                .eq('id', challengeId)
+                .single();
+            if (!challenge) throw new Error('Challenge not found');
+
+            // Reset game state
+            if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+            resetGameState();
+            gameOver = false;
+            gameStarted = false;
+
+            currentChallengeId = challengeId;
+            currentH2HRunId = result.run_id;
+            currentChallengeType = 'group';
+            gameMode = 'h2h_challenge';
+            dailyPlateSequence = challenge.plates;
+            currentH2HDifficulty = challenge.difficulty ?? 50;
+
+            const displayName = (challenge.group_name || 'Group Challenge').toUpperCase();
+
+            switchTab('game');
+
+            document.getElementById('practiceBtn').disabled = true;
+            document.getElementById('practiceBtn').style.opacity = '0.5';
+            document.getElementById('dailyChallengeBtn').disabled = true;
+            document.getElementById('dailyChallengeBtn').style.opacity = '0.5';
+            document.getElementById('quickMatchBtn').disabled = true;
+            document.getElementById('quickMatchBtn').style.opacity = '0.5';
+
+            const mi = document.getElementById('modeIndicator');
+            mi.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <span>${displayName} | Difficulty ${currentH2HDifficulty}</span>
+                    <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
+                </div>
+            `;
+            mi.style.background = '#fef3c7';
+            mi.style.color = '#92400e';
+            mi.style.border = '2px solid #fbbf24';
+
+            const startBtn = document.getElementById('startButton');
+            startBtn.style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            await beginNewRun();
         } catch(e) {
             console.error('Error accepting group challenge:', e);
             alert('Error: ' + e.message);
