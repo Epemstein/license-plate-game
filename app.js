@@ -5106,23 +5106,25 @@
             filtered = h2hChallengesCache.filter(c => {
                 const isChallenger = c.challenger_id === currentUser.id;
                 if ((isChallenger && c.status === 'pending') || c.status === 'accepted' || c.status === 'quick_match_waiting') return true;
-                // Group challenges I created or accepted
+                // Group challenges I created or accepted — only if no one else completed yet
                 if (c.challenge_type === 'group' && c.status === 'group_active') {
-                    if (isChallenger) return true;
                     const parts = window._groupParticipants?.[c.id] || [];
-                    if (parts.some(p => p.user_id === currentUser.id && (p.status === 'accepted' || p.status === 'completed'))) return true;
+                    const othersCompleted = parts.some(p => p.user_id !== currentUser.id && p.status === 'completed');
+                    if (!othersCompleted) {
+                        if (isChallenger) return true;
+                        if (parts.some(p => p.user_id === currentUser.id && (p.status === 'accepted' || p.status === 'completed'))) return true;
+                    }
                 }
                 return false;
             });
         } else if (h2hActiveSubTab === 'results') {
             filtered = h2hChallengesCache.filter(c => {
                 if (c.status === 'completed') return true;
-                // Group challenges where I completed and at least one other completed
+                // Group challenges where at least one other person completed
                 if (c.challenge_type === 'group' && c.status === 'group_active') {
                     const parts = window._groupParticipants?.[c.id] || [];
-                    const myPart = parts.find(p => p.user_id === currentUser.id);
                     const othersCompleted = parts.some(p => p.user_id !== currentUser.id && p.status === 'completed');
-                    if (myPart?.status === 'completed' && othersCompleted) return true;
+                    if (othersCompleted) return true;
                 }
                 return false;
             });
