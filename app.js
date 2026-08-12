@@ -1030,6 +1030,7 @@
             retryPendingSubmission();
             submitPendingPracticeStats();
             submitPendingEndlessState();
+            loadH2HChallenges();
 
             // Check if there's a challenge ID in the URL
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
