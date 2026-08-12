@@ -6313,24 +6313,27 @@
             titleEl.textContent = groupName;
 
             // === STANDINGS TAB ===
+            const medals = ['🥇', '🥈', '🥉'];
             let html = '';
             html += '<div id="groupScorecardTabs" style="display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:16px;">';
             html += '<button class="group-sc-tab active" onclick="switchGroupScorecardTab(\'standings\',\'' + challengeId + '\')" data-tab="standings" style="flex:1;padding:10px;font-weight:700;font-size:0.9rem;border:none;background:none;cursor:pointer;border-bottom:3px solid #9370db;color:#9370db;">Standings</button>';
 
             // Add a tab for each completed player
+            let completedIdx = 0;
             for (let i = 0; i < sorted.length; i++) {
                 const p = sorted[i];
                 const pRun = runMap[p.user_id];
                 if (pRun?.totalSeconds == null) continue;
                 const pName = p.user_id === currentUser.id ? 'You' : (h2hProfilesCache[p.user_id] || 'Player');
                 const shortName = pName.length > 8 ? pName.slice(0, 7) + '…' : pName;
-                html += `<button class="group-sc-tab" onclick="switchGroupScorecardTab('player-${i}','${challengeId}')" data-tab="player-${i}" style="flex:1;padding:10px;font-weight:600;font-size:0.85rem;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;color:#9ca3af;">${shortName}</button>`;
+                const tabMedal = completedIdx < 3 ? medals[completedIdx] + ' ' : '';
+                html += `<button class="group-sc-tab" onclick="switchGroupScorecardTab('player-${completedIdx}','${challengeId}')" data-tab="player-${completedIdx}" style="flex:1;padding:10px;font-weight:600;font-size:0.85rem;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;color:#9ca3af;">${tabMedal}${shortName}</button>`;
+                completedIdx++;
             }
             html += '</div>';
 
             // Standings content
-            html += '<div id="groupTab-standings" class="group-tab-content">';
-            const medals = ['🥇', '🥈', '🥉'];
+            html += '<div id="groupTab-standings" class="group-tab-content" style="min-height:300px;">';
             for (let i = 0; i < sorted.length; i++) {
                 const p = sorted[i];
                 const pRun = runMap[p.user_id];
@@ -6388,7 +6391,7 @@
                 html += `<div style="font-size:0.95rem;color:#6b7280;">${pRun.totalSeconds.toFixed(2)}s</div>`;
                 html += `</div>`;
 
-                html += '<table class="scorecard-table"><thead><tr><th>#</th><th>Plate</th><th>Word</th><th>Time</th></tr></thead><tbody>';
+                html += '<table class="scorecard-table" style="table-layout:fixed;"><thead><tr><th style="width:10%;">#</th><th style="width:25%;">Plate</th><th style="width:35%;">Word</th><th style="width:30%;">Time</th></tr></thead><tbody>';
                 for (let j = 0; j < entries.length; j++) {
                     const e = entries[j];
                     const plate = plates[j] || '--';
