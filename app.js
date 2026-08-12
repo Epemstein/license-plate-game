@@ -6333,7 +6333,7 @@
             html += '</div>';
 
             // Tab content wrapper — fixed height so modal doesn't resize
-            html += '<div id="groupTabContentWrapper" style="min-height:400px;max-height:60vh;overflow-y:auto;">';
+            html += '<div id="groupTabContentWrapper" style="height:50vh;overflow-y:auto;">';
 
             // Standings content
             html += '<div id="groupTab-standings" class="group-tab-content">';
