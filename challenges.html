@@ -47,6 +47,7 @@
         <button class="filter-btn" data-filter="group" onclick="setFilter('group', this)">Group</button>
         <button class="filter-btn" data-filter="direct" onclick="setFilter('direct', this)">Direct</button>
         <button class="filter-btn" data-filter="quick" onclick="setFilter('quick', this)">Quick Match</button>
+        <label style="font-size:12px;color:#6b7280;margin-left:12px;cursor:pointer;"><input type="checkbox" id="todayOnly" onchange="renderTable()" style="margin-right:4px;">Today only</label>
         <span id="countLabel" style="font-size:12px;color:#6b7280;margin-left:8px;"></span>
     </div>
 
@@ -197,7 +198,11 @@ async function loadChallenges() {
 function renderTable() {
     let filtered = allChallenges;
     if (currentFilter !== 'all') {
-        filtered = allChallenges.filter(c => getChallengeType(c) === currentFilter);
+        filtered = filtered.filter(c => getChallengeType(c) === currentFilter);
+    }
+    if (document.getElementById('todayOnly')?.checked) {
+        const today = new Date().toISOString().slice(0, 10);
+        filtered = filtered.filter(c => c.created_at && c.created_at.slice(0, 10) === today);
     }
 
     // Stats
@@ -229,33 +234,51 @@ function renderTable() {
         const type = getChallengeType(c);
         const typeLabel = getTypeLabel(type);
         const statusClass = `status-${c.status}`;
-        const statusText = c.status.replace(/_/g, ' ');
+        let statusText = c.status.replace(/_/g, ' ');
+        if (statusText === 'quick match waiting') statusText = 'waiting';
         const runs = allRuns[c.id] || [];
         const msgCount = allMsgCounts[c.id] || 0;
 
+        const playerRow = (icon, name, score, playedAt, isSender) => {
+            const nameStyle = isSender ? 'font-weight:700;' : '';
+            const scoreSpan = score ? `<span style="font-size:11px;color:#6b7280;font-family:monospace;">${score}</span>` : '';
+            const timeSpan = playedAt ? `<span style="font-size:10px;color:#b0b0b0;margin-left:2px;">${playedAt}</span>` : '';
+            return `<div style="display:flex;align-items:baseline;gap:4px;line-height:1.7;">${icon} <span style="${nameStyle}">${name}</span><span style="flex:1;"></span>${scoreSpan}${timeSpan}</div>`;
+        };
+
         let playersHtml = '';
-        let scoresHtml = '';
 
         if (type === 'group') {
-            const parts = allParticipants[c.id] || [];
-            const name = c.group_name ? `<div style="font-weight:700;margin-bottom:2px;">${c.group_name}</div>` : '';
-            playersHtml = name + parts.map(p => {
+            const parts = (allParticipants[c.id] || []).slice().sort((a, b) => {
+                const aRun = runs.find(r => r.user_id === a.user_id);
+                const bRun = runs.find(r => r.user_id === b.user_id);
+                const aTime = aRun?.total_seconds;
+                const bTime = bRun?.total_seconds;
+                if (aTime != null && bTime != null) return aTime - bTime;
+                if (aTime != null) return -1;
+                if (bTime != null) return 1;
+                return 0;
+            });
+            if (c.group_name) playersHtml += `<div style="font-weight:700;margin-bottom:2px;">${c.group_name}</div>`;
+            parts.forEach(p => {
                 const n = getName(p.user_id);
                 const run = runs.find(r => r.user_id === p.user_id);
-                const score = run?.total_seconds != null ? `<span style="color:#6b7280;font-size:11px;margin-left:4px;">${run.total_seconds.toFixed(1)}s</span>` : '';
-                const statusIcon = p.status === 'completed' ? '✅' : p.status === 'invited' ? '📩' : p.status === 'declined' ? '❌' : '⏳';
-                return `<div style="line-height:1.6;">${statusIcon} ${n}${score}</div>`;
-            }).join('');
-            scoresHtml = '';
+                const score = run?.total_seconds != null ? run.total_seconds.toFixed(1) + 's' : '';
+                const played = run?.total_seconds != null ? timeAgo(c.created_at) : '';
+                const icon = p.status === 'completed' ? '✅' : p.status === 'declined' ? '❌' : '❓';
+                const isSender = p.user_id === c.challenger_id;
+                playersHtml += playerRow(icon, n, score, played, isSender);
+            });
         } else {
             const challenger = getName(c.challenger_id);
             const opponent = c.opponent_id ? getName(c.opponent_id) : (type === 'quick' ? '<em style="color:#9ca3af;">waiting</em>' : '--');
             const myRun = runs.find(r => r.user_id === c.challenger_id);
-            const oppRun = runs.find(r => r.user_id === c.opponent_id);
-            const myScore = myRun?.total_seconds != null ? `<span style="color:#6b7280;font-size:11px;">${myRun.total_seconds.toFixed(1)}s</span>` : '';
-            const oppScore = oppRun?.total_seconds != null ? `<span style="color:#6b7280;font-size:11px;">${oppRun.total_seconds.toFixed(1)}s</span>` : '';
-            playersHtml = `<div style="line-height:1.6;">${challenger} ${myScore}</div><div style="line-height:1.6;">${opponent} ${oppScore}</div>`;
-            scoresHtml = '';
+            const oppRun = c.opponent_id ? runs.find(r => r.user_id === c.opponent_id) : null;
+            const myScore = myRun?.total_seconds != null ? myRun.total_seconds.toFixed(1) + 's' : '';
+            const oppScore = oppRun?.total_seconds != null ? oppRun.total_seconds.toFixed(1) + 's' : '';
+            const myPlayed = myRun?.total_seconds != null ? timeAgo(c.created_at) : '';
+            const oppPlayed = oppRun?.total_seconds != null ? timeAgo(c.created_at) : '';
+            playersHtml = playerRow('', challenger, myScore, myPlayed, true) + playerRow('', opponent, oppScore, oppPlayed, false);
         }
 
         const chatBtn = msgCount > 0
