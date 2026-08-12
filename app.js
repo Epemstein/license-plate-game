@@ -6566,11 +6566,13 @@
                 }
             } catch (e) { console.warn('Stats error:', e); }
 
-            // Fetch friend count
+            // Fetch friend count and friend IDs
             let friendCount = 0;
+            let friendUserIds = [];
             try {
-                const { data: friends } = await sb.from('friendships').select('id').or(`user_a.eq.${userId},user_b.eq.${userId}`).eq('status', 'accepted');
+                const { data: friends } = await sb.from('friendships').select('user_a, user_b').or(`user_a.eq.${userId},user_b.eq.${userId}`).eq('status', 'accepted');
                 friendCount = friends ? friends.length : 0;
+                friendUserIds = (friends || []).map(f => f.user_a === userId ? f.user_b : f.user_a);
             } catch (e) {}
 
             // Fetch streak
@@ -6628,7 +6630,7 @@
             html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value" style="color:#2563eb;">${avgTime > 0 ? avgTime.toFixed(1) : '--'}</div><div class="profile-modal-stat-label">avg time</div></div>`;
             html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value" style="color:#16a34a;">${beatPct}</div><div class="profile-modal-stat-label">beat</div></div>`;
             html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value" style="color:#9370db;">${overallPct}</div><div class="profile-modal-stat-label">overall</div></div>`;
-            html += `<div class="profile-modal-stat"><div class="profile-modal-stat-value">${friendCount}</div><div class="profile-modal-stat-label">friends</div></div>`;
+            html += `<div class="profile-modal-stat" style="cursor:pointer;" onclick="showFriendsList('${userId}')"><div class="profile-modal-stat-value" style="color:#374151;">${friendCount}</div><div class="profile-modal-stat-label" style="text-decoration:underline;">friends</div></div>`;
             html += '</div>';
 
             if (!isSelf && currentUser) {
@@ -6672,6 +6674,88 @@
 
     window.closeProfileModal = function() {
         document.getElementById('profileModalBackdrop').classList.remove('show');
+    };
+
+    window.showFriendsList = async function(userId) {
+        // Fetch this user's friends
+        const { data: friendships } = await sb.from('friendships')
+            .select('user_a, user_b')
+            .or(`user_a.eq.${userId},user_b.eq.${userId}`)
+            .eq('status', 'accepted');
+
+        const friendIds = (friendships || []).map(f => f.user_a === userId ? f.user_b : f.user_a);
+        if (friendIds.length === 0) { return; }
+
+        // Fetch profiles
+        const { data: profiles } = await sb.from('profiles')
+            .select('id, display_name, handle')
+            .in('id', friendIds);
+        const profileMap = {};
+        (profiles || []).forEach(p => { profileMap[p.id] = p; });
+
+        // Check which are already my friends
+        let myFriendIds = new Set();
+        if (currentUser) {
+            const { data: myFriends } = await sb.from('friendships')
+                .select('user_a, user_b')
+                .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`)
+                .eq('status', 'accepted');
+            (myFriends || []).forEach(f => {
+                myFriendIds.add(f.user_a === currentUser.id ? f.user_b : f.user_a);
+            });
+        }
+
+        let html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1100;display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)this.remove()">';
+        html += '<div style="background:white;border-radius:16px;padding:20px;max-width:400px;width:90%;max-height:70vh;display:flex;flex-direction:column;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><h3 style="margin:0;">Friends (' + friendIds.length + ')</h3><button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button></div>';
+        html += '<div style="overflow-y:auto;flex:1;">';
+
+        friendIds.forEach(fid => {
+            const p = profileMap[fid];
+            if (!p) return;
+            const name = p.display_name || (p.handle ? '@' + p.handle : 'Unknown');
+            const handle = p.handle ? '@' + p.handle : '';
+            const isMe = currentUser && fid === currentUser.id;
+            const isMyFriend = myFriendIds.has(fid);
+
+            html += '<div style="display:flex;align-items:center;padding:10px 8px;border-bottom:1px solid #f3f4f6;">';
+            html += '<div style="flex:1;min-width:0;cursor:pointer;" onclick="this.closest(\'div[style*=fixed]\').remove();openProfileModal(\'' + fid + '\',\'' + name.replace(/'/g, "\\'") + '\')">';
+            html += '<div style="font-weight:600;font-size:0.95rem;">' + name + '</div>';
+            if (handle) html += '<div style="font-size:0.8rem;color:#9ca3af;">' + handle + '</div>';
+            html += '</div>';
+
+            if (isMe) {
+                html += '<span style="font-size:0.75rem;color:#9ca3af;font-weight:600;">You</span>';
+            } else if (isMyFriend) {
+                html += '<span style="font-size:0.75rem;color:#16a34a;font-weight:600;">Friends ✓</span>';
+            } else if (currentUser) {
+                html += '<button onclick="addFriendFromList(\'' + fid + '\',this)" style="padding:4px 12px;background:#9370db;color:white;border:none;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;">Add</button>';
+            }
+            html += '</div>';
+        });
+
+        html += '</div></div></div>';
+        document.body.insertAdjacentHTML('beforeend', html);
+    };
+
+    window.addFriendFromList = async function(friendId, btn) {
+        if (!currentUser) return;
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+        try {
+            const ids = [currentUser.id, friendId].sort();
+            await sb.from('friendships').insert({
+                user_a: ids[0],
+                user_b: ids[1],
+                requested_by: currentUser.id,
+                status: 'pending'
+            });
+            btn.textContent = 'Sent ✓';
+            btn.style.background = '#16a34a';
+        } catch (e) {
+            btn.textContent = 'Error';
+            btn.style.background = '#dc2626';
+        }
     };
 
     // ========== PLAYER STATS ==========
