@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Challenges</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { font-size: 1.3rem; margin-bottom: 16px; }
+        .controls { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+        .controls button { background: #7c3aed; color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
+        .controls button:hover { background: #6d28d9; }
+        .filter-btn { background: #e5e7eb !important; color: #374151 !important; }
+        .filter-btn.active { background: #7c3aed !important; color: white !important; }
+        .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 18px; min-width: 110px; text-align: center; }
+        .stat-card .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .val { font-size: 1.3rem; font-weight: 700; margin-top: 4px; }
+        .table-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #e5e7eb; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; background: #fff; }
+        td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; }
+        tr:hover { background: #f9fafb; }
+        .type-group { background: #f3e8ff; color: #7c3aed; font-weight: 600; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+        .type-quick { background: #fff7ed; color: #ea580c; font-weight: 600; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+        .type-direct { background: #eff6ff; color: #2563eb; font-weight: 600; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+        .status-completed { color: #16a34a; font-weight: 600; }
+        .status-pending { color: #f59e0b; font-weight: 600; }
+        .status-group_active { color: #7c3aed; font-weight: 600; }
+        .status-quick_match_waiting { color: #ea580c; font-weight: 600; }
+        .status-accepted { color: #2563eb; font-weight: 600; }
+        .status-declined { color: #dc2626; font-weight: 600; }
+        .empty { text-align: center; padding: 40px; color: #9ca3af; }
+        .chat-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .chat-box { background: white; border-radius: 16px; padding: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>All Challenges</h1>
+    <div class="controls">
+        <button onclick="loadChallenges()">Refresh</button>
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+        <button class="filter-btn" data-filter="group" onclick="setFilter('group', this)">Group</button>
+        <button class="filter-btn" data-filter="direct" onclick="setFilter('direct', this)">Direct</button>
+        <button class="filter-btn" data-filter="quick" onclick="setFilter('quick', this)">Quick Match</button>
+        <span id="countLabel" style="font-size:12px;color:#6b7280;margin-left:8px;"></span>
+    </div>
+
+    <div id="stats" class="stats-row"></div>
+    <div id="tableWrap" class="table-wrap">
+        <div class="empty">Loading...</div>
+    </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTkxOTA1NSwiZXhwIjoyMDkxNDk1MDU1fQ.b_qDqjP-Nadk_M_kACc5mJB_OR_-Cx80vOgOfLYsDLQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false }
+});
+
+let allChallenges = [];
+let allProfiles = {};
+let allRuns = {};
+let allMsgCounts = {};
+let allParticipants = {};
+let currentFilter = 'all';
+
+function setFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+}
+
+function getChallengeType(c) {
+    if (c.challenge_type === 'group') return 'group';
+    if (c.status === 'quick_match_waiting' || c.status === 'completed' && !c.opponent_id) return 'quick';
+    // Check if it came from quick match by looking at queue data
+    if (c._fromQueue) return 'quick';
+    return 'direct';
+}
+
+function getTypeLabel(type) {
+    if (type === 'group') return '<span class="type-group">Group</span>';
+    if (type === 'quick') return '<span class="type-quick">Quick Match</span>';
+    return '<span class="type-direct">Direct</span>';
+}
+
+function getName(id) {
+    const p = allProfiles[id];
+    return p ? (p.display_name || (p.handle ? '@' + p.handle : id.slice(0, 8))) : (id ? id.slice(0, 8) : '--');
+}
+
+function timeAgo(dateStr) {
+    if (!dateStr) return '--';
+    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.round(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.round(diff / 3600) + 'h ago';
+    return Math.round(diff / 86400) + 'd ago';
+}
+
+async function loadChallenges() {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty">Loading...</div>';
+
+    // Fetch recent challenges
+    const { data: challenges } = await sb
+        .from('h2h_challenges')
+        .select('id, challenger_id, opponent_id, status, difficulty, created_at, completed_at, challenge_type, group_name')
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+    allChallenges = challenges || [];
+
+    // Collect all user IDs
+    const userIds = new Set();
+    const challengeIds = allChallenges.map(c => c.id);
+    allChallenges.forEach(c => {
+        if (c.challenger_id) userIds.add(c.challenger_id);
+        if (c.opponent_id) userIds.add(c.opponent_id);
+    });
+
+    // Fetch group participants
+    const groupIds = allChallenges.filter(c => c.challenge_type === 'group').map(c => c.id);
+    allParticipants = {};
+    if (groupIds.length > 0) {
+        const { data: parts } = await sb
+            .from('group_challenge_participants')
+            .select('challenge_id, user_id, status')
+            .in('challenge_id', groupIds);
+        (parts || []).forEach(p => {
+            if (!allParticipants[p.challenge_id]) allParticipants[p.challenge_id] = [];
+            allParticipants[p.challenge_id].push(p);
+            userIds.add(p.user_id);
+        });
+    }
+
+    // Fetch quick match queue entries to identify quick matches
+    const { data: queueEntries } = await sb
+        .from('h2h_queue')
+        .select('challenge_id')
+        .in('challenge_id', challengeIds);
+    const queueChallengeIds = new Set((queueEntries || []).map(q => q.challenge_id));
+    allChallenges.forEach(c => { c._fromQueue = queueChallengeIds.has(c.id); });
+
+    // Fetch profiles
+    allProfiles = {};
+    if (userIds.size > 0) {
+        const ids = [...userIds];
+        // Batch in chunks of 100
+        for (let i = 0; i < ids.length; i += 100) {
+            const { data: pRows } = await sb
+                .from('profiles')
+                .select('id, display_name, handle')
+                .in('id', ids.slice(i, i + 100));
+            (pRows || []).forEach(p => { allProfiles[p.id] = p; });
+        }
+    }
+
+    // Fetch runs
+    allRuns = {};
+    if (challengeIds.length > 0) {
+        for (let i = 0; i < challengeIds.length; i += 100) {
+            const { data: rRows } = await sb
+                .from('h2h_runs')
+                .select('challenge_id, user_id, total_seconds')
+                .in('challenge_id', challengeIds.slice(i, i + 100));
+            (rRows || []).forEach(r => {
+                if (!allRuns[r.challenge_id]) allRuns[r.challenge_id] = [];
+                allRuns[r.challenge_id].push(r);
+            });
+        }
+    }
+
+    // Fetch message counts
+    allMsgCounts = {};
+    if (challengeIds.length > 0) {
+        for (let i = 0; i < challengeIds.length; i += 100) {
+            const { data: msgs } = await sb
+                .from('h2h_messages')
+                .select('challenge_id')
+                .in('challenge_id', challengeIds.slice(i, i + 100));
+            (msgs || []).forEach(m => {
+                allMsgCounts[m.challenge_id] = (allMsgCounts[m.challenge_id] || 0) + 1;
+            });
+        }
+    }
+
+    renderTable();
+}
+
+function renderTable() {
+    let filtered = allChallenges;
+    if (currentFilter !== 'all') {
+        filtered = allChallenges.filter(c => getChallengeType(c) === currentFilter);
+    }
+
+    // Stats
+    const groupCount = allChallenges.filter(c => getChallengeType(c) === 'group').length;
+    const directCount = allChallenges.filter(c => getChallengeType(c) === 'direct').length;
+    const quickCount = allChallenges.filter(c => getChallengeType(c) === 'quick').length;
+    const withMsgs = allChallenges.filter(c => (allMsgCounts[c.id] || 0) > 0).length;
+
+    document.getElementById('stats').innerHTML = `
+        <div class="stat-card"><div class="label">Total</div><div class="val">${allChallenges.length}</div></div>
+        <div class="stat-card"><div class="label">Group</div><div class="val" style="color:#7c3aed;">${groupCount}</div></div>
+        <div class="stat-card"><div class="label">Direct</div><div class="val" style="color:#2563eb;">${directCount}</div></div>
+        <div class="stat-card"><div class="label">Quick Match</div><div class="val" style="color:#ea580c;">${quickCount}</div></div>
+        <div class="stat-card"><div class="label">With Chat</div><div class="val" style="color:#16a34a;">${withMsgs}</div></div>
+    `;
+
+    document.getElementById('countLabel').textContent = `Showing ${filtered.length} of ${allChallenges.length}`;
+
+    if (filtered.length === 0) {
+        document.getElementById('tableWrap').innerHTML = '<div class="empty">No challenges found</div>';
+        return;
+    }
+
+    let html = '<table><thead><tr>';
+    html += '<th>Type</th><th>Players</th><th>Status</th><th>Difficulty</th><th>Scores</th><th>Created</th><th>Chat</th>';
+    html += '</tr></thead><tbody>';
+
+    filtered.forEach(c => {
+        const type = getChallengeType(c);
+        const typeLabel = getTypeLabel(type);
+        const statusClass = `status-${c.status}`;
+        const statusText = c.status.replace(/_/g, ' ');
+        const runs = allRuns[c.id] || [];
+        const msgCount = allMsgCounts[c.id] || 0;
+
+        let playersHtml = '';
+        let scoresHtml = '';
+
+        if (type === 'group') {
+            const parts = allParticipants[c.id] || [];
+            const name = c.group_name ? `<strong>${c.group_name}</strong><br>` : '';
+            playersHtml = name + parts.map(p => {
+                const n = getName(p.user_id);
+                const statusIcon = p.status === 'completed' ? '✅' : p.status === 'invited' ? '📩' : p.status === 'declined' ? '❌' : '⏳';
+                return `${statusIcon} ${n}`;
+            }).join(', ');
+
+            const completedRuns = runs.filter(r => r.total_seconds != null);
+            scoresHtml = completedRuns
+                .sort((a, b) => a.total_seconds - b.total_seconds)
+                .map(r => `${getName(r.user_id)}: ${r.total_seconds.toFixed(1)}s`)
+                .join('<br>') || '--';
+        } else {
+            const challenger = getName(c.challenger_id);
+            const opponent = c.opponent_id ? getName(c.opponent_id) : (type === 'quick' ? '<em>waiting</em>' : '--');
+            playersHtml = `${challenger} vs ${opponent}`;
+
+            const myRun = runs.find(r => r.user_id === c.challenger_id);
+            const oppRun = runs.find(r => r.user_id === c.opponent_id);
+            const myScore = myRun?.total_seconds != null ? myRun.total_seconds.toFixed(1) + 's' : '--';
+            const oppScore = oppRun?.total_seconds != null ? oppRun.total_seconds.toFixed(1) + 's' : '--';
+            scoresHtml = `${myScore} vs ${oppScore}`;
+        }
+
+        const chatBtn = msgCount > 0
+            ? `<button onclick="showChat('${c.id}')" style="background:#7c3aed;color:white;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">${msgCount} msg${msgCount > 1 ? 's' : ''}</button>`
+            : '<span style="color:#d1d5db;">--</span>';
+
+        html += `<tr>
+            <td>${typeLabel}</td>
+            <td style="max-width:250px;">${playersHtml}</td>
+            <td class="${statusClass}">${statusText}</td>
+            <td>D${c.difficulty}</td>
+            <td style="font-size:12px;">${scoresHtml}</td>
+            <td>${timeAgo(c.created_at)}</td>
+            <td>${chatBtn}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('tableWrap').innerHTML = html;
+}
+
+async function showChat(challengeId) {
+    const { data: msgs } = await sb
+        .from('h2h_messages')
+        .select('user_id, text, created_at')
+        .eq('challenge_id', challengeId)
+        .order('created_at');
+
+    const userIds = [...new Set((msgs || []).map(m => m.user_id))];
+    let names = {};
+    if (userIds.length > 0) {
+        const { data: profs } = await sb
+            .from('profiles')
+            .select('id, display_name, handle')
+            .in('id', userIds);
+        (profs || []).forEach(p => { names[p.id] = p.display_name || (p.handle ? '@' + p.handle : p.id.slice(0, 8)); });
+    }
+
+    let html = '<div class="chat-modal" onclick="if(event.target===this)this.remove()">';
+    html += '<div class="chat-box">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3 style="margin:0;">Chat History</h3><button onclick="this.closest(\'.chat-modal\').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button></div>';
+
+    if (!msgs || msgs.length === 0) {
+        html += '<p style="color:#9ca3af;text-align:center;">No messages</p>';
+    } else {
+        msgs.forEach(m => {
+            const name = names[m.user_id] || m.user_id.slice(0, 8);
+            const time = new Date(m.created_at).toLocaleString();
+            html += `<div style="margin-bottom:10px;padding:8px 12px;background:#f9fafb;border-radius:10px;">`;
+            html += `<div style="font-size:12px;color:#6b7280;margin-bottom:2px;"><strong>${name}</strong> · ${time}</div>`;
+            html += `<div style="font-size:14px;">${m.text}</div>`;
+            html += `</div>`;
+        });
+    }
+
+    html += '</div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+loadChallenges();
+</script>
+</body>
+</html>
