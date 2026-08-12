@@ -121,16 +121,43 @@
         }
 
         async function loadData() {
-            document.getElementById('tableContainer').innerHTML = '<div class="loading">Loading plate data...</div>';
+            document.getElementById('tableContainer').innerHTML = `
+                <div style="text-align:center;padding:40px 0;">
+                    <div style="font-size:14px;color:#6b7280;margin-bottom:12px;">Loading plate data...</div>
+                    <div style="width:300px;max-width:80%;height:8px;background:#e5e7eb;border-radius:4px;margin:0 auto;overflow:hidden;">
+                        <div id="loadBar" style="height:100%;background:#7c3aed;border-radius:4px;width:0%;transition:width 0.3s;"></div>
+                    </div>
+                    <div id="loadPct" style="font-size:12px;color:#9ca3af;margin-top:6px;">0%</div>
+                </div>`;
             document.getElementById('cacheStatus').textContent = '';
+
+            // Animate progress bar while waiting
+            let pct = 0;
+            const barInterval = setInterval(() => {
+                pct = Math.min(pct + Math.random() * 8 + 2, 90);
+                const bar = document.getElementById('loadBar');
+                const label = document.getElementById('loadPct');
+                if (bar) bar.style.width = Math.round(pct) + '%';
+                if (label) label.textContent = Math.round(pct) + '%';
+            }, 200);
+
             try {
                 const { data, error } = await sb.rpc('plate_stats_summary');
+                clearInterval(barInterval);
                 if (error) throw error;
                 allPlateStats = data || [];
+
+                // Fill to 100%
+                const bar = document.getElementById('loadBar');
+                const label = document.getElementById('loadPct');
+                if (bar) bar.style.width = '100%';
+                if (label) label.textContent = '100%';
+
                 console.log('Loaded ' + allPlateStats.length + ' plates from RPC');
                 document.getElementById('cacheStatus').textContent = '(just loaded)';
-                reloadSources();
+                setTimeout(() => reloadSources(), 200);
             } catch (e) {
+                clearInterval(barInterval);
                 console.error('Load error:', e);
                 document.getElementById('tableContainer').innerHTML = '<div class="loading" style="color:#dc2626;">Error: ' + e.message + '</div>';
             }
