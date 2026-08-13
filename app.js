@@ -1838,6 +1838,7 @@
     let WORDS = [];
     let DICTIONARY = new Set();
     let dictionaryReady = false;
+    let REMOVED_WORDS = {};
 
     let PLATE_DIFFICULTY = null;
     let difficultyReady = false;
@@ -2021,6 +2022,12 @@
             }
 
             dictionaryReady = true;
+
+            // Load removed words (lazy, non-blocking)
+            fetch('removed_words.json').then(r => r.json()).then(data => {
+                REMOVED_WORDS = data || {};
+                console.log('[Dict] Loaded ' + Object.keys(REMOVED_WORDS).length + ' removed words');
+            }).catch(() => {});
             debugEl.textContent = '';
 
             tryBuildPlateList();
@@ -3539,7 +3546,21 @@
         }
 
         if (!DICTIONARY.has(rawWord.toUpperCase())) {
-            resultEl.textContent = `"${rawWord}" is not in the dictionary.`;
+            const removedCat = REMOVED_WORDS[rawWord.toLowerCase()];
+            if (removedCat) {
+                const msgs = {
+                    abbreviation: `"${rawWord.toUpperCase()}" is an abbreviation and cannot be used.`,
+                    initialism: `"${rawWord.toUpperCase()}" is an initialism and cannot be used.`,
+                    acronym: `"${rawWord.toUpperCase()}" is an acronym and cannot be used.`,
+                    clipping: `"${rawWord.toUpperCase()}" is an informal shortening and cannot be used.`,
+                    contraction: `"${rawWord.toUpperCase()}" is a contraction and cannot be used.`,
+                    short_form: `"${rawWord.toUpperCase()}" is a short form and cannot be used.`,
+                    misspelling: `"${rawWord.toUpperCase()}" is a misspelling and cannot be used.`,
+                };
+                resultEl.textContent = msgs[removedCat] || `"${rawWord.toUpperCase()}" has been removed from the dictionary.`;
+            } else {
+                resultEl.textContent = `"${rawWord}" is not in the dictionary.`;
+            }
             resultEl.style.color = "red";
             playSFX('wrong');
             return;
@@ -7610,7 +7631,18 @@ window.addEventListener('load', function() {
         if (tryItIndex >= tryItPlates.length) return;
         const plate = tryItPlates[tryItIndex];
         if (DICTIONARY.size > 0 && !DICTIONARY.has(word.toUpperCase())) {
-            document.getElementById('tryItResult').innerHTML = `<span style="color:#ff3b30;">"${word.toUpperCase()}" isn't in the dictionary</span>`;
+            const rc = REMOVED_WORDS[word.toLowerCase()];
+            const msgs = {
+                abbreviation: 'is an abbreviation and cannot be used',
+                initialism: 'is an initialism and cannot be used',
+                acronym: 'is an acronym and cannot be used',
+                clipping: 'is an informal shortening and cannot be used',
+                contraction: 'is a contraction and cannot be used',
+                short_form: 'is a short form and cannot be used',
+                misspelling: 'is a misspelling and cannot be used',
+            };
+            const msg = rc ? (msgs[rc] || 'has been removed from the dictionary') : "isn't in the dictionary";
+            document.getElementById('tryItResult').innerHTML = `<span style="color:#ff3b30;">"${word.toUpperCase()}" ${msg}</span>`;
             return;
         }
         // Check plate letters in order
