@@ -6551,7 +6551,7 @@
                     const timeStr = e.skipped ? `${e.thinking_seconds.toFixed(2)} (+${e.penalty_seconds || 0})` : t.toFixed(2);
                     html += `<tr style="background:${bg};color:${textC};">`;
                     html += `<td style="font-size:0.8rem;color:${numC};width:24px;">${j + 1}</td>`;
-                    html += `<td class="sc-plate" onclick="showViableWordsForPlate('${plate}', false, 'practice')">${plate}</td>`;
+                    html += `<td class="sc-plate" style="${e.skipped ? 'color:#dc2626;' : ''}" onclick="showViableWordsForPlate('${plate}', false, 'practice')">${plate}</td>`;
                     html += `<td>${word}</td>`;
                     html += `<td style="font-size:0.85rem;">${timeStr}</td>`;
                     html += `</tr>`;
