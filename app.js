@@ -6483,13 +6483,14 @@
 
                 const bgColor = isMe ? '#f3e8ff' : '#f9fafb';
                 const borderColor = isMe ? '#d8b4fe' : '#e5e7eb';
-                const rowClick = hasRun ? `onclick="switchGroupScorecardTab('player-${playerTabIdx}','${challengeId}')" style="cursor:pointer;"` : '';
+                const rowClickAttr = hasRun ? `onclick="switchGroupScorecardTab('player-${playerTabIdx}','${challengeId}')"` : '';
 
-                html += `<div ${rowClick} style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${bgColor};border:1px solid ${borderColor};${hasRun ? 'cursor:pointer;' : ''}">`;
+                html += `<div ${rowClickAttr} style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${bgColor};border:1px solid ${borderColor};${hasRun ? 'cursor:pointer;' : ''}">`;
                 html += `<div style="width:32px;font-size:1.3rem;text-align:center;">${medal || (i + 1)}</div>`;
                 html += `<div style="flex:1;min-width:0;margin-left:8px;">`;
-                const nameClick = !isMe ? `onclick="event.stopPropagation();openProfileModal('${p.user_id}','${pName.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;"` : '';
-                html += `<div ${nameClick} style="font-weight:700;font-size:0.95rem;color:#1f2937;">${pName}</div>`;
+                const nameClickAttr = !isMe ? `onclick="event.stopPropagation();openProfileModal('${p.user_id}','${pName.replace(/'/g,"\\'")}')"` : '';
+                const nameStyle = !isMe ? 'cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;' : '';
+                html += `<div ${nameClickAttr} style="font-weight:700;font-size:0.95rem;color:#1f2937;${nameStyle}">${pName}</div>`;
                 if (elo) {
                     const changeColor = elo.change >= 0 ? '#16a34a' : '#dc2626';
                     const changeStr = elo.change >= 0 ? `+${elo.change}` : `${elo.change}`;
@@ -6572,6 +6573,11 @@
             contentEl.innerHTML = html;
             loadH2HChat(challengeId);
             subscribeH2HChat(challengeId);
+
+            // Focus the modal so arrow keys work immediately
+            const backdrop = document.getElementById('h2hScorecardModalBackdrop');
+            backdrop.setAttribute('tabindex', '-1');
+            backdrop.focus();
 
         } catch (e) {
             console.error('Error loading group scorecard:', e);
