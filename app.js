@@ -6466,8 +6466,9 @@
             // Tab content wrapper — fixed height so modal doesn't resize
             html += '<div id="groupTabContentWrapper" style="height:50vh;overflow-y:auto;">';
 
-            // Standings content
+            // Standings content — track completed player index for tab switching
             html += '<div id="groupTab-standings" class="group-tab-content">';
+            let standingsCompletedIdx = 0;
             for (let i = 0; i < sorted.length; i++) {
                 const p = sorted[i];
                 const pRun = runMap[p.user_id];
@@ -6476,14 +6477,19 @@
                 const medal = (pRun?.totalSeconds != null && i < 3) ? medals[i] : '';
                 const time = pRun?.totalSeconds;
                 const elo = eloMap[p.user_id];
+                const hasRun = pRun?.totalSeconds != null;
+                const playerTabIdx = hasRun ? standingsCompletedIdx : -1;
+                if (hasRun) standingsCompletedIdx++;
 
                 const bgColor = isMe ? '#f3e8ff' : '#f9fafb';
                 const borderColor = isMe ? '#d8b4fe' : '#e5e7eb';
+                const rowClick = hasRun ? `onclick="switchGroupScorecardTab('player-${playerTabIdx}','${challengeId}')" style="cursor:pointer;"` : '';
 
-                html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${bgColor};border:1px solid ${borderColor};">`;
+                html += `<div ${rowClick} style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${bgColor};border:1px solid ${borderColor};${hasRun ? 'cursor:pointer;' : ''}">`;
                 html += `<div style="width:32px;font-size:1.3rem;text-align:center;">${medal || (i + 1)}</div>`;
                 html += `<div style="flex:1;min-width:0;margin-left:8px;">`;
-                html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">${pName}</div>`;
+                const nameClick = !isMe ? `onclick="event.stopPropagation();openProfileModal('${p.user_id}','${pName.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#d1d5db;"` : '';
+                html += `<div ${nameClick} style="font-weight:700;font-size:0.95rem;color:#1f2937;">${pName}</div>`;
                 if (elo) {
                     const changeColor = elo.change >= 0 ? '#16a34a' : '#dc2626';
                     const changeStr = elo.change >= 0 ? `+${elo.change}` : `${elo.change}`;
@@ -6674,24 +6680,43 @@
         }
     };
 
+    let _groupScorecardTabs = [];
+    let _groupScorecardCurrentTab = 0;
+    let _groupScorecardKeyHandler = null;
+
     window.switchGroupScorecardTab = function(tab) {
         // Hide all tab contents
         document.querySelectorAll('.group-tab-content').forEach(el => el.style.display = 'none');
-        // Show selected
         const target = document.getElementById('groupTab-' + tab);
         if (target) target.style.display = '';
-        // Update tab buttons
-        document.querySelectorAll('.group-sc-tab').forEach(btn => {
+        // Update tab buttons and track index
+        const tabs = document.querySelectorAll('.group-sc-tab');
+        _groupScorecardTabs = Array.from(tabs).map(b => b.dataset.tab);
+        tabs.forEach((btn, idx) => {
             if (btn.dataset.tab === tab) {
                 btn.style.borderBottomColor = '#9370db';
                 btn.style.color = '#9370db';
                 btn.classList.add('active');
+                _groupScorecardCurrentTab = idx;
             } else {
                 btn.style.borderBottomColor = 'transparent';
                 btn.style.color = '#9ca3af';
                 btn.classList.remove('active');
             }
         });
+
+        // Set up keyboard listener (once)
+        if (!_groupScorecardKeyHandler) {
+            _groupScorecardKeyHandler = (e) => {
+                if (!document.getElementById('h2hScorecardModalBackdrop')?.classList.contains('show')) return;
+                if (e.key === 'ArrowRight' && _groupScorecardCurrentTab < _groupScorecardTabs.length - 1) {
+                    switchGroupScorecardTab(_groupScorecardTabs[_groupScorecardCurrentTab + 1]);
+                } else if (e.key === 'ArrowLeft' && _groupScorecardCurrentTab > 0) {
+                    switchGroupScorecardTab(_groupScorecardTabs[_groupScorecardCurrentTab - 1]);
+                }
+            };
+            document.addEventListener('keydown', _groupScorecardKeyHandler);
+        }
     };
 
     let h2hChatSubscription = null;
