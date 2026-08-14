@@ -5570,16 +5570,18 @@
         // Saved groups (show when no friends selected)
         if (selectedFriendIds.size === 0 && savedGroupsList.length > 0) {
             const filteredGroups = query ? savedGroupsList.filter(g => g.name.toLowerCase().includes(query)) : savedGroupsList;
+            html += `<div onclick="document.getElementById('savedGroupsContent').style.display = document.getElementById('savedGroupsContent').style.display === 'none' ? '' : 'none'; document.getElementById('savedGroupsChevron').textContent = document.getElementById('savedGroupsContent').style.display === 'none' ? '▶' : '▼';" style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;padding:8px 12px 4px;cursor:pointer;user-select:none;">Saved Groups (${savedGroupsList.length}) <span id="savedGroupsChevron">▶</span></div>`;
+            html += '<div id="savedGroupsContent" style="display:none;">';
             if (filteredGroups.length > 0) {
-                html += '<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;padding:8px 12px 4px;">Saved Groups</div>';
                 filteredGroups.forEach(g => {
                     html += `<div class="friend-item" onclick="selectSavedGroup('${g.id}')" style="background:#f3e8ff;">`;
                     html += `<div class="friend-name" style="color:#7c3aed;">👥 ${g.name}</div>`;
                     html += `<div class="friend-handle">${g.member_ids.length} players</div>`;
                     html += `</div>`;
                 });
-                html += '<div style="border-bottom:1px solid #e5e7eb;margin:4px 0;"></div>';
             }
+            html += '</div>';
+            html += '<div style="border-bottom:1px solid #e5e7eb;margin:4px 0;"></div>';
         }
 
         // Selected friends chips
