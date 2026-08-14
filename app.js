@@ -6441,7 +6441,7 @@
             });
 
             const groupName = challenge.group_name || 'Group Challenge';
-            titleEl.innerHTML = groupName + (challenge.group_name ? ` <span onclick="editGroupName('${challengeId}')" style="cursor:pointer;font-size:0.8rem;opacity:0.6;">✏️</span>` : '');
+            titleEl.innerHTML = groupName + ` <span onclick="editGroupName('${challengeId}')" style="cursor:pointer;font-size:0.8rem;opacity:0.6;">✏️</span>`;
 
             // === LEADERBOARD TAB ===
             const medals = ['🥇', '🥈', '🥉'];
