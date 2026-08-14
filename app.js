@@ -4556,10 +4556,26 @@
                 document.getElementById('quickMatchBtn').disabled = true;
                 document.getElementById('quickMatchBtn').style.opacity = '0.5';
 
+                // Resolve opponent name
+                let qmOppName = result.matched ? '...' : 'TBD';
+                if (result.matched) {
+                    try {
+                        const { data: chal } = await sb.from('h2h_challenges').select('challenger_id, opponent_id').eq('id', result.challenge_id).single();
+                        if (chal) {
+                            const oppId = chal.challenger_id === currentUser.id ? chal.opponent_id : chal.challenger_id;
+                            if (oppId) {
+                                const { data: prof } = await sb.from('profiles').select('display_name, handle').eq('id', oppId).single();
+                                qmOppName = prof?.display_name || (prof?.handle ? '@' + prof.handle : 'Opponent');
+                                h2hProfilesCache[oppId] = qmOppName;
+                            }
+                        }
+                    } catch (_) {}
+                }
+
                 const mi = document.getElementById('modeIndicator');
                 mi.innerHTML = `
                     <div style="display:flex;align-items:center;justify-content:space-between;">
-                        <span>Quick Match | Difficulty 50</span>
+                        <span>Quick Match | vs <strong>${qmOppName}</strong></span>
                         <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
                     </div>
                 `;
