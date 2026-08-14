@@ -5344,6 +5344,7 @@
         html += '<th style="padding:6px 8px;text-align:center;width:28px;">#</th>';
         html += '<th style="padding:6px 8px;text-align:left;">Player</th>';
         html += '<th style="padding:6px 8px;text-align:left;">Elo</th>';
+        html += '<th style="padding:6px 8px;text-align:right;">Games</th>';
         html += '<th style="padding:6px 8px;text-align:right;">W</th>';
         html += '<th style="padding:6px 8px;text-align:right;">L</th>';
         html += '<th style="padding:6px 8px;text-align:right;">PCT</th>';
@@ -5365,6 +5366,9 @@
                 : `<span style="color:#7c3aed;cursor:pointer;" onclick="event.stopPropagation();preselectedChallengeUserId='${r.id}';preselectedChallengeUserName='${r.name.replace(/'/g,"\\'")}';openNewChallengeModal()">${r.name}</span>`;
             html += `<td style="padding:8px;${bold}max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nameContent}</td>`;
             html += `<td style="padding:8px;font-weight:700;font-variant-numeric:tabular-nums;">${r.elo.toLocaleString()}${todayStr}</td>`;
+            const todayGames = r.todayGames || 0;
+            const todayGamesStr = todayGames > 0 ? ` <span style="color:#16a34a;font-size:0.75rem;">(+${todayGames})</span>` : '';
+            html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.games}${todayGamesStr}</td>`;
             html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.wins}</td>`;
             html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.losses}</td>`;
             html += `<td style="padding:8px;text-align:right;color:#756e5c;font-variant-numeric:tabular-nums;">${pct}%</td>`;
@@ -5427,6 +5431,27 @@
                 html += `<div style="flex:1;padding:8px;border-radius:8px;background:#f9fafb;"><div style="font-size:1rem;font-weight:700;">${pct}%</div><div style="font-size:0.65rem;color:#6b7280;">Win%</div></div>`;
                 html += `</div>`;
             }
+
+            // Fetch today's game counts from elo_history
+            const todayET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const todayStr = todayET.getFullYear() + '-' + String(todayET.getMonth() + 1).padStart(2, '0') + '-' + String(todayET.getDate()).padStart(2, '0');
+            try {
+                const { data: todayElo } = await sb.from('elo_history')
+                    .select('user_id, challenge_id')
+                    .gte('created_at', todayStr + 'T00:00:00-04:00');
+                if (todayElo) {
+                    const gameCounts = {};
+                    const seen = new Set();
+                    todayElo.forEach(e => {
+                        const key = e.user_id + '_' + e.challenge_id;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            gameCounts[e.user_id] = (gameCounts[e.user_id] || 0) + 1;
+                        }
+                    });
+                    data.forEach(r => { r.todayGames = gameCounts[r.id] || 0; });
+                }
+            } catch (_) {}
 
             window._h2hRankingsData = data;
             window._h2hRankingsShown = 10;
