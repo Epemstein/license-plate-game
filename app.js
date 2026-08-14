@@ -5275,12 +5275,24 @@
                     const groupBg = groupElo > 0 ? '#f0fdf4' : groupElo < 0 ? '#fef2f2' : '#f3e8ff';
                     const groupBorder = groupElo > 0 ? '#bbf7d0' : groupElo < 0 ? '#fecaca' : '#d8b4fe';
                     const groupEloStr = groupElo > 0 ? `<span style="color:#16a34a;font-weight:600;">+${groupElo}</span>` : groupElo < 0 ? `<span style="color:#dc2626;font-weight:600;">${groupElo}</span>` : '';
+
+                    // Calculate rank
+                    const completedTimes = parts
+                        .filter(p => p.status === 'completed' && ch._runs && ch._runs[p.user_id]?.totalSeconds != null)
+                        .map(p => ({ uid: p.user_id, time: ch._runs[p.user_id].totalSeconds }))
+                        .sort((a, b) => a.time - b.time);
+                    const myRank = completedTimes.findIndex(t => t.uid === currentUser.id) + 1;
+                    const rankStr = myRank > 0 ? `${myRank} of ${completedTimes.length}` : '';
+
                     html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${groupBg};border:1px solid ${groupBorder};cursor:pointer;" onclick="viewGroupScorecard('${ch.id}')">`;
                     html += `<div style="flex:1;min-width:0;">`;
                     html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">👥 ${groupDisplayName}</div>`;
                     html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${completedCount}/${parts.length} played · ${diffLabel} · ${dateStr}</div>`;
                     html += `</div>`;
-                    html += `<div style="text-align:right;margin-right:8px;">${groupEloStr}</div>`;
+                    html += `<div style="text-align:right;margin-right:8px;">`;
+                    if (rankStr) html += `<div style="font-weight:700;font-size:0.9rem;">${rankStr}</div>`;
+                    html += `<div style="font-size:0.75rem;">${groupEloStr}</div>`;
+                    html += `</div>`;
                     html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
                     html += `</div>`;
                 } else {
