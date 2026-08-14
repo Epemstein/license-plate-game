@@ -6356,6 +6356,7 @@
 
     // ===== GROUP CHALLENGE SCORECARD =====
     async function viewGroupScorecard(challengeId) {
+        _lastGroupScorecardId = challengeId;
         const backdrop = document.getElementById('h2hScorecardModalBackdrop');
         const titleEl = document.getElementById('h2hScorecardTitle');
         const contentEl = document.getElementById('h2hScorecardContent');
@@ -6543,12 +6544,13 @@
                     const e = entries[j];
                     const plate = plates[j] || '--';
                     const t = e.skipped ? (e.thinking_seconds + (e.penalty_seconds || 0)) : e.thinking_seconds;
-                    const bg = e.skipped ? '#fef2f2' : getTimeColor(t);
+                    const bg = e.skipped ? '#1a1a1a' : getTimeColor(t);
                     const textC = e.skipped ? '#dc2626' : (t > 15 ? '#fff' : '#000');
+                    const numC = e.skipped ? '#dc2626' : '#000';
                     const word = e.skipped ? '❌' : (e.word || '');
                     const timeStr = e.skipped ? `${e.thinking_seconds.toFixed(2)} (+${e.penalty_seconds || 0})` : t.toFixed(2);
                     html += `<tr style="background:${bg};color:${textC};">`;
-                    html += `<td style="font-size:0.8rem;color:#9ca3af;width:24px;">${j + 1}</td>`;
+                    html += `<td style="font-size:0.8rem;color:${numC};width:24px;">${j + 1}</td>`;
                     html += `<td class="sc-plate" onclick="showViableWordsForPlate('${plate}', false, 'practice')">${plate}</td>`;
                     html += `<td>${word}</td>`;
                     html += `<td style="font-size:0.85rem;">${timeStr}</td>`;
@@ -6574,10 +6576,9 @@
             loadH2HChat(challengeId);
             subscribeH2HChat(challengeId);
 
-            // Focus the modal so arrow keys work immediately
-            const backdrop = document.getElementById('h2hScorecardModalBackdrop');
-            backdrop.setAttribute('tabindex', '-1');
-            backdrop.focus();
+            // Initialize tab navigation for arrow keys
+            _groupScorecardTabs = Array.from(document.querySelectorAll('.group-sc-tab')).map(b => b.dataset.tab);
+            _groupScorecardCurrentTab = 0;
 
         } catch (e) {
             console.error('Error loading group scorecard:', e);
@@ -6596,6 +6597,8 @@
             alert('Error: ' + e.message);
         }
     };
+
+    let _lastGroupScorecardId = null;
 
     window.viewGroupStandings = async function(groupName) {
         const contentEl = document.getElementById('h2hScorecardContent');
@@ -6656,7 +6659,11 @@
             const sorted = uids.sort((a, b) => (wins[b] || 0) - (wins[a] || 0) || (played[b] || 0) - (played[a] || 0));
 
             const standingsMedals = ['🏆', '🥈', '🥉'];
-            let html = `<div style="text-align:center;color:#6b7280;font-size:0.9rem;margin-bottom:16px;">${completedGames} games played</div>`;
+            let html = '';
+            if (_lastGroupScorecardId) {
+                html += `<div style="margin-bottom:12px;"><button onclick="viewGroupScorecard('${_lastGroupScorecardId}')" style="padding:6px 14px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;cursor:pointer;color:#374151;">← Back</button></div>`;
+            }
+            html += `<div style="text-align:center;color:#6b7280;font-size:0.9rem;margin-bottom:16px;">${completedGames} games played</div>`;
 
             sorted.forEach((uid, idx) => {
                 const name = uid === currentUser.id ? 'You' : (h2hProfilesCache[uid] || 'Unknown');
@@ -6688,7 +6695,6 @@
 
     let _groupScorecardTabs = [];
     let _groupScorecardCurrentTab = 0;
-    let _groupScorecardKeyHandler = null;
 
     window.switchGroupScorecardTab = function(tab) {
         // Hide all tab contents
@@ -6711,19 +6717,20 @@
             }
         });
 
-        // Set up keyboard listener (once)
-        if (!_groupScorecardKeyHandler) {
-            _groupScorecardKeyHandler = (e) => {
-                if (!document.getElementById('h2hScorecardModalBackdrop')?.classList.contains('show')) return;
-                if (e.key === 'ArrowRight' && _groupScorecardCurrentTab < _groupScorecardTabs.length - 1) {
-                    switchGroupScorecardTab(_groupScorecardTabs[_groupScorecardCurrentTab + 1]);
-                } else if (e.key === 'ArrowLeft' && _groupScorecardCurrentTab > 0) {
-                    switchGroupScorecardTab(_groupScorecardTabs[_groupScorecardCurrentTab - 1]);
-                }
-            };
-            document.addEventListener('keydown', _groupScorecardKeyHandler);
-        }
     };
+
+    // Global keyboard handler for group scorecard tab navigation
+    document.addEventListener('keydown', (e) => {
+        if (!document.getElementById('h2hScorecardModalBackdrop')?.classList.contains('show')) return;
+        if (_groupScorecardTabs.length === 0) return;
+        if (e.key === 'ArrowRight' && _groupScorecardCurrentTab < _groupScorecardTabs.length - 1) {
+            e.preventDefault();
+            switchGroupScorecardTab(_groupScorecardTabs[_groupScorecardCurrentTab + 1]);
+        } else if (e.key === 'ArrowLeft' && _groupScorecardCurrentTab > 0) {
+            e.preventDefault();
+            switchGroupScorecardTab(_groupScorecardTabs[_groupScorecardCurrentTab - 1]);
+        }
+    });
 
     let h2hChatSubscription = null;
 
