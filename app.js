@@ -5293,6 +5293,8 @@
                     if (rankStr) html += `<div style="font-weight:700;font-size:0.9rem;">${rankStr}</div>`;
                     html += `<div style="font-size:0.75rem;">${groupEloStr}</div>`;
                     html += `</div>`;
+                    const groupOppIds = parts.filter(p => p.user_id !== currentUser.id).map(p => p.user_id);
+                    html += `<button onclick="event.stopPropagation();rematchGroup(${JSON.stringify(groupOppIds)},${ch.difficulty ?? 50},'${(groupDisplayName).replace(/'/g,"\\'")}')" style="padding:4px 8px;background:none;border:1px solid #d1d5db;border-radius:6px;font-size:0.7rem;color:#6b7280;cursor:pointer;white-space:nowrap;margin-right:6px;" title="Rematch">↻</button>`;
                     html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
                     html += `</div>`;
                 } else {
@@ -6910,6 +6912,59 @@
             }
         };
         backdrop.classList.add('show');
+    };
+
+    window.rematchGroup = async function(oppIds, difficulty, groupName) {
+        if (!currentUser) return;
+        if (!confirm(`Rematch ${groupName}?`)) return;
+        try {
+            const plates = generateChallengeSequence(difficulty);
+            if (plates.length < 100) { alert('Error generating plates'); return; }
+            const { data, error } = await sb.rpc('create_group_challenge', {
+                p_opponent_ids: oppIds,
+                p_plates: plates,
+                p_difficulty: difficulty
+            });
+            if (error) throw error;
+            const result = Array.isArray(data) ? data[0] : data;
+            if (!result) throw new Error('Failed to create group challenge');
+
+            // Set group name
+            if (groupName) {
+                try { await sb.rpc('set_group_challenge_name', { p_challenge_id: result.challenge_id, p_name: groupName }); } catch (_) {}
+            }
+
+            // Start the game
+            if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; }
+            resetGameState();
+            gameOver = false;
+            gameStarted = false;
+            currentChallengeId = result.challenge_id;
+            currentH2HRunId = result.run_id;
+            currentChallengeType = 'group';
+            gameMode = 'h2h_challenge';
+            dailyPlateSequence = plates;
+            currentH2HDifficulty = difficulty;
+            switchTab('game');
+            document.getElementById('practiceBtn').disabled = true;
+            document.getElementById('practiceBtn').style.opacity = '0.5';
+            document.getElementById('dailyChallengeBtn').disabled = true;
+            document.getElementById('dailyChallengeBtn').style.opacity = '0.5';
+            document.getElementById('quickMatchBtn').disabled = true;
+            document.getElementById('quickMatchBtn').style.opacity = '0.5';
+            const mi = document.getElementById('modeIndicator');
+            mi.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><span>${groupName.toUpperCase()} | Difficulty ${difficulty}</span><button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button></div>`;
+            mi.style.background = '#fef3c7';
+            mi.style.color = '#92400e';
+            mi.style.border = '2px solid #fbbf24';
+            const startBtn = document.getElementById('startButton');
+            startBtn.style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            await beginNewRun();
+        } catch (e) {
+            console.error('Group rematch error:', e);
+            alert('Error: ' + e.message);
+        }
     };
 
     window.closeProfileModal = function() {
