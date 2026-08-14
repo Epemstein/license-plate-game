@@ -5061,6 +5061,9 @@
                 }
             }
 
+            // Reset elo data before re-fetching
+            h2hChallengesCache.forEach(c => { delete c._eloChange; delete c._oppElo; });
+
             // Fetch Elo history for completed and group_active challenges
             const eloIds = h2hChallengesCache.filter(c => c.status === 'completed' || c.status === 'group_active').map(c => c.id);
             if (eloIds.length > 0 && currentUser) {
