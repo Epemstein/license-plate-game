@@ -5061,21 +5061,25 @@
                 }
             }
 
-            // Fetch Elo history for completed challenges
-            const completedIds = h2hChallengesCache.filter(c => c.status === 'completed').map(c => c.id);
-            if (completedIds.length > 0 && currentUser) {
-                const { data: eloRows } = await sb.from('elo_history')
-                    .select('user_id, challenge_id, old_elo, new_elo')
-                    .in('challenge_id', completedIds);
-                if (eloRows) {
-                    for (const e of eloRows) {
-                        const ch = h2hChallengesCache.find(c => c.id === e.challenge_id);
-                        if (!ch) continue;
-                        if (e.user_id === currentUser.id) {
-                            ch._eloChange = e.new_elo - e.old_elo;
-                        } else {
-                            ch._oppElo = e.old_elo;
-                        }
+            // Fetch Elo history for completed and group_active challenges
+            const eloIds = h2hChallengesCache.filter(c => c.status === 'completed' || c.status === 'group_active').map(c => c.id);
+            if (eloIds.length > 0 && currentUser) {
+                let eloRows = [];
+                for (let i = 0; i < eloIds.length; i += 50) {
+                    const batch = eloIds.slice(i, i + 50);
+                    const { data } = await sb.from('elo_history')
+                        .select('user_id, challenge_id, old_elo, new_elo')
+                        .in('challenge_id', batch);
+                    if (data) eloRows = eloRows.concat(data);
+                }
+                for (const e of eloRows) {
+                    const ch = h2hChallengesCache.find(c => c.id === e.challenge_id);
+                    if (!ch) continue;
+                    if (e.user_id === currentUser.id) {
+                        // Sum for group challenges (multiple pairwise adjustments)
+                        ch._eloChange = (ch._eloChange || 0) + (e.new_elo - e.old_elo);
+                    } else {
+                        ch._oppElo = e.old_elo;
                     }
                 }
             }
@@ -5264,11 +5268,16 @@
                     const parts = window._groupParticipants?.[ch.id] || [];
                     const completedCount = parts.filter(p => p.status === 'completed').length;
                     const groupDisplayName = ch.group_name || 'Group Challenge';
-                    html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:#f3e8ff;border:1px solid #d8b4fe;cursor:pointer;" onclick="viewGroupScorecard('${ch.id}')">`;
+                    const groupElo = ch._eloChange || 0;
+                    const groupBg = groupElo > 0 ? '#f0fdf4' : groupElo < 0 ? '#fef2f2' : '#f3e8ff';
+                    const groupBorder = groupElo > 0 ? '#bbf7d0' : groupElo < 0 ? '#fecaca' : '#d8b4fe';
+                    const groupEloStr = groupElo > 0 ? `<span style="color:#16a34a;font-weight:600;">+${groupElo}</span>` : groupElo < 0 ? `<span style="color:#dc2626;font-weight:600;">${groupElo}</span>` : '';
+                    html += `<div style="display:flex;align-items:center;padding:12px 14px;margin-bottom:6px;border-radius:12px;background:${groupBg};border:1px solid ${groupBorder};cursor:pointer;" onclick="viewGroupScorecard('${ch.id}')">`;
                     html += `<div style="flex:1;min-width:0;">`;
                     html += `<div style="font-weight:700;font-size:0.95rem;color:#1f2937;">👥 ${groupDisplayName}</div>`;
                     html += `<div style="font-size:0.75rem;color:#9ca3af;margin-top:2px;">${completedCount}/${parts.length} played · ${diffLabel} · ${dateStr}</div>`;
                     html += `</div>`;
+                    html += `<div style="text-align:right;margin-right:8px;">${groupEloStr}</div>`;
                     html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
                     html += `</div>`;
                 } else {
