@@ -169,7 +169,7 @@ async function loadChallenges() {
         for (let i = 0; i < challengeIds.length; i += 100) {
             const { data: rRows } = await sb
                 .from('h2h_runs')
-                .select('challenge_id, user_id, total_seconds')
+                .select('challenge_id, user_id, total_seconds, created_at')
                 .in('challenge_id', challengeIds.slice(i, i + 100));
             (rRows || []).forEach(r => {
                 if (!allRuns[r.challenge_id]) allRuns[r.challenge_id] = [];
@@ -233,8 +233,18 @@ function renderTable() {
         return;
     }
 
+    // Compute last played time per challenge from runs
+    filtered.forEach(c => {
+        const runs = allRuns[c.id] || [];
+        const runTimes = runs.filter(r => r.total_seconds != null).map(r => r.created_at || c.created_at);
+        c._lastPlayed = runTimes.length > 0 ? runTimes.sort().pop() : c.created_at;
+    });
+
+    // Sort by last played descending
+    filtered.sort((a, b) => (b._lastPlayed || '').localeCompare(a._lastPlayed || ''));
+
     let html = '<table><thead><tr>';
-    html += '<th>Type</th><th>Players</th><th>Status</th><th>Diff</th><th>Created</th><th>Chat</th>';
+    html += '<th>Type</th><th>Players</th><th>Status</th><th>Diff</th><th>Last Played</th><th>Created</th><th>Chat</th>';
     html += '</tr></thead><tbody>';
 
     filtered.forEach(c => {
@@ -297,6 +307,7 @@ function renderTable() {
             <td style="max-width:280px;">${playersHtml}</td>
             <td class="${statusClass}">${statusText}</td>
             <td>D${c.difficulty}</td>
+            <td>${timeAgo(c._lastPlayed)}</td>
             <td>${timeAgo(c.created_at)}</td>
             <td>${chatBtn}</td>
         </tr>`;
