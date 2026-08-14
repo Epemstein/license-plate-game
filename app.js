@@ -1814,24 +1814,20 @@
     // --------- CONFIG ---------
     const TOTAL_PLATES = 10;
 
-    const VERY_EASY_PROB = 0.40;
-    const EASY_PROB      = 0.20;
-    const MEDIUM_PROB    = 0.15;
-    const DIFFICULT_PROB = 0.15;
-    const HARD_PROB      = 0.05;
-    const VERY_HARD_PROB = 0.03;
-    const IMPOSSIBLE_PROB= 0.01;
+    // Daily mode fixed probabilities (difficulty ~50)
+    const EASY_PROB      = 0.36;
+    const MEDIUM_PROB    = 0.31;
+    const HARD_PROB      = 0.27;
+    const EXPERT_PROB    = 0.04;
+    const EXTREME_PROB   = 0.02;
 
-    // 8 bands matching iOS PlateDifficulty.swift (based on common/viable word counts)
+    // 5 bands matching iOS PlateDifficulty.swift (based on common/viable word counts)
     const BAND_NAMES = [
-        "very_easy",    // 45+ common
-        "easy",         // 20-44 common
-        "medium_easy",  // 8-19 common
-        "medium",       // 4-7 common
-        "hard",         // 2-3 common
-        "very_hard",    // 1 common
-        "impossible",   // 0 common, 28+ viable
-        "dead"          // 0 common, 1-27 viable
+        "easy",         // 20+ common
+        "medium",       // 4-19 common
+        "hard",         // 1-3 common
+        "expert",       // 0 common, 25+ viable
+        "extreme"       // 0 common, 1-24 viable
     ];
 
     // --------- GLOBAL STATE ---------
@@ -1846,14 +1842,11 @@
     let ALL_PLATES = [];
     let platesReady = false;
 
-    let VERY_EASY_PLATES = [];
     let EASY_PLATES      = [];
-    let MEDIUM_EASY_PLATES = [];
     let MEDIUM_PLATES    = [];
     let HARD_PLATES      = [];
-    let VERY_HARD_PLATES = [];
-    let IMPOSSIBLE_PLATES= [];
-    let DEAD_PLATES      = [];
+    let EXPERT_PLATES    = [];
+    let EXTREME_PLATES   = [];
 
     let usedPlates = new Set();
     let currentPlate = null;
@@ -2130,14 +2123,11 @@
     function getBandForPlate(entry) {
         const common = entry.common || 0;
         const viable = entry.viable || 0;
-        if (common >= 45) return "very_easy";
         if (common >= 20) return "easy";
-        if (common >= 8) return "medium_easy";
         if (common >= 4) return "medium";
-        if (common >= 2) return "hard";
-        if (common >= 1) return "very_hard";
-        if (viable >= 28) return "impossible";
-        if (viable > 0) return "dead";
+        if (common >= 1) return "hard";
+        if (viable >= 25) return "expert";
+        if (viable > 0) return "extreme";
         return null; // unplayable
     }
 
@@ -2145,39 +2135,33 @@
         if (!dictionaryReady || !PLATE_DIFFICULTY || platesReady) return;
 
         const all = [];
-        const ve = [], e = [], me = [], m = [], h = [], vh = [], im = [], de = [];
+        const e = [], m = [], h = [], ex = [], xt = [];
 
         for (const plate of Object.keys(PLATE_DIFFICULTY)) {
             const entry = PLATE_DIFFICULTY[plate];
             const band = getBandForPlate(entry);
-            if (!band) continue; // skip unplayable
+            if (!band) continue;
 
             all.push(plate);
 
             switch (band) {
-                case "very_easy":   ve.push(plate); break;
-                case "easy":        e.push(plate); break;
-                case "medium_easy": me.push(plate); break;
-                case "medium":      m.push(plate); break;
-                case "hard":        h.push(plate); break;
-                case "very_hard":   vh.push(plate); break;
-                case "impossible":  im.push(plate); break;
-                case "dead":        de.push(plate); break;
+                case "easy":     e.push(plate); break;
+                case "medium":   m.push(plate); break;
+                case "hard":     h.push(plate); break;
+                case "expert":   ex.push(plate); break;
+                case "extreme":  xt.push(plate); break;
             }
         }
 
-        ALL_PLATES         = all;
-        VERY_EASY_PLATES   = ve;
-        EASY_PLATES        = e;
-        MEDIUM_EASY_PLATES = me;
-        MEDIUM_PLATES      = m;
-        HARD_PLATES        = h;
-        VERY_HARD_PLATES   = vh;
-        IMPOSSIBLE_PLATES  = im;
-        DEAD_PLATES        = de;
+        ALL_PLATES     = all;
+        EASY_PLATES    = e;
+        MEDIUM_PLATES  = m;
+        HARD_PLATES    = h;
+        EXPERT_PLATES  = ex;
+        EXTREME_PLATES = xt;
 
         platesReady = true;
-        console.log('Plate bands:', {ve:ve.length, e:e.length, me:me.length, m:m.length, h:h.length, vh:vh.length, im:im.length, de:de.length, total:all.length});
+        console.log('Plate bands:', {easy:e.length, medium:m.length, hard:h.length, expert:ex.length, extreme:xt.length, total:all.length});
         maybeEnableStart();
     }
 
@@ -2240,15 +2224,12 @@
     // --------- PLATE SELECTION ---------
     function getBandPool(bandName) {
         switch (bandName) {
-            case "very_easy":   return VERY_EASY_PLATES;
-            case "easy":        return EASY_PLATES;
-            case "medium_easy": return MEDIUM_EASY_PLATES;
-            case "medium":      return MEDIUM_PLATES;
-            case "hard":        return HARD_PLATES;
-            case "very_hard":   return VERY_HARD_PLATES;
-            case "impossible":  return IMPOSSIBLE_PLATES;
-            case "dead":        return DEAD_PLATES;
-            default:            return [];
+            case "easy":     return EASY_PLATES;
+            case "medium":   return MEDIUM_PLATES;
+            case "hard":     return HARD_PLATES;
+            case "expert":   return EXPERT_PLATES;
+            case "extreme":  return EXTREME_PLATES;
+            default:         return [];
         }
     }
 
@@ -2261,20 +2242,17 @@
     }
 
     // Piecewise linear weight system (ported from iOS PlateDifficulty.swift)
-    // Maps difficulty slider 0-100 to weights across 8 bands using common/viable counts
+    // Maps difficulty slider 0-100 to weights across 5 bands using common/viable counts
     const H2H_CONTROL_POINTS = [0, 25, 50, 75, 90, 100];
-    //                                s=0  s=25  s=50  s=75  s=90  s=100
+    //                            s=0  s=25  s=50  s=75  s=90  s=100
     const H2H_BAND_WEIGHTS = [
-        /* veryEasy   */             [42,   28,   20,    2,    0,    0],
-        /* easy       */             [28,   24,   16,    2,    0,    0],
-        /* mediumEasy */             [17,   20,   14,    4,    1,    0],
-        /* medium     */             [ 8,   14,   17,   10,    3,    4],
-        /* hard       */             [ 3,    8,   17,   20,   14,   18],
-        /* veryHard   */             [ 1,    3,   10,   28,   38,   30],
-        /* impossible */             [ 1,    2,    4,   26,   38,   35],
-        /* dead       */             [ 0,    1,    2,    8,    6,   13],
+        /* easy    */             [70,   52,   36,    4,    0,    0],
+        /* medium  */             [25,   34,   31,   14,    4,    4],
+        /* hard    */             [ 4,   11,   27,   48,   52,   48],
+        /* expert  */             [ 1,    2,    4,   26,   38,   35],
+        /* extreme */             [ 0,    1,    2,    8,    6,   13],
     ];
-    const H2H_BAND_NAMES_ORDERED = ["very_easy", "easy", "medium_easy", "medium", "hard", "very_hard", "impossible", "dead"];
+    const H2H_BAND_NAMES_ORDERED = ["easy", "medium", "hard", "expert", "extreme"];
 
     function weightsForDifficulty(difficulty) {
         const d = Math.min(100, Math.max(0, difficulty));
@@ -2306,16 +2284,14 @@
             }
             return H2H_BAND_NAMES_ORDERED[H2H_BAND_NAMES_ORDERED.length - 1];
         }
-        // Default fixed weights for daily mode
+        // Default fixed weights for daily mode (~difficulty 50)
         const r = Math.random();
         let threshold = 0;
-        threshold += VERY_EASY_PROB; if (r < threshold) return "very_easy";
         threshold += EASY_PROB; if (r < threshold) return "easy";
         threshold += MEDIUM_PROB; if (r < threshold) return "medium";
-        threshold += DIFFICULT_PROB; if (r < threshold) return "difficult";
         threshold += HARD_PROB; if (r < threshold) return "hard";
-        threshold += VERY_HARD_PROB; if (r < threshold) return "very_hard";
-        return "impossible";
+        threshold += EXPERT_PROB; if (r < threshold) return "expert";
+        return "extreme";
     }
 
     function pickRandomPlate() {
