@@ -4905,6 +4905,8 @@
     let h2hChallengesCache = [];
     let h2hProfilesCache = {};
     let h2hActiveSubTab = 'incoming';
+    let h2hResultsLimit = 15;
+    let h2hHasMoreResults = false;
     let selectedFriendId = null;
     let friendsListData = [];
 
@@ -4940,6 +4942,7 @@
     // === Challenge Tab ===
     function switchChallengeTab(tab) {
         h2hActiveSubTab = tab;
+        h2hResultsLimit = 15;
         document.getElementById('chTabIncoming').classList.toggle('active', tab === 'incoming');
         document.getElementById('chTabPending').classList.toggle('active', tab === 'pending');
         document.getElementById('chTabResults').classList.toggle('active', tab === 'results');
@@ -4965,7 +4968,8 @@
                 .from('h2h_challenges')
                 .select('*')
                 .or(`challenger_id.eq.${currentUser.id},opponent_id.eq.${currentUser.id}`)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(200);
 
             if (error) throw error;
 
@@ -5172,6 +5176,7 @@
                 return false;
             });
             filtered.sort((a, b) => (b.completed_at || b.created_at || '').localeCompare(a.completed_at || a.created_at || ''));
+            h2hHasMoreResults = filtered.length > h2hResultsLimit;
         }
 
         if (filtered.length === 0) {
@@ -5182,8 +5187,10 @@
             return;
         }
 
+        const displayList = h2hActiveSubTab === 'results' ? filtered.slice(0, h2hResultsLimit) : filtered;
+
         let html = '';
-        filtered.forEach(ch => {
+        displayList.forEach(ch => {
             const oppName = getOpponentName(ch);
             const isChallenger = ch.challenger_id === currentUser.id;
             const diffLabel = getDifficultyLabel(ch.difficulty ?? 50);
@@ -5312,6 +5319,12 @@
                 } // close else for non-group results
             }
         });
+
+        if (h2hActiveSubTab === 'results' && h2hHasMoreResults) {
+            html += `<div style="text-align:center;padding:16px;">
+                <button onclick="h2hResultsLimit+=15;renderChallengesList();" style="padding:10px 32px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;font-weight:600;font-size:0.9rem;cursor:pointer;color:#374151;">Show More</button>
+            </div>`;
+        }
 
         contentEl.innerHTML = html;
     }
