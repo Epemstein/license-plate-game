@@ -5034,11 +5034,17 @@
             // Load runs for score display
             const challengeIds = h2hChallengesCache.map(c => c.id);
             if (challengeIds.length > 0) {
-                const { data: runs } = await sb
-                    .from('h2h_runs')
-                    .select('id, challenge_id, user_id, total_seconds, h2h_run_entries(id, skipped)')
-                    .in('challenge_id', challengeIds);
-                if (runs) {
+                // Fetch runs in batches to avoid PostgREST row limit
+                let runs = [];
+                for (let i = 0; i < challengeIds.length; i += 50) {
+                    const batch = challengeIds.slice(i, i + 50);
+                    const { data: batchRuns } = await sb
+                        .from('h2h_runs')
+                        .select('id, challenge_id, user_id, total_seconds, h2h_run_entries(id, skipped)')
+                        .in('challenge_id', batch);
+                    if (batchRuns) runs = runs.concat(batchRuns);
+                }
+                if (runs.length > 0) {
                     runs.forEach(r => {
                         const ch = h2hChallengesCache.find(c => c.id === r.challenge_id);
                         if (ch) {
