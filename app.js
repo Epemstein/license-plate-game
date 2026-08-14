@@ -4974,13 +4974,18 @@
 
             // Store group participants for lookup — include all group challenges in cache
             window._groupParticipants = {};
-            const allGroupIds = h2hChallengesCache.filter(c => c.challenge_type === 'group').map(c => c.id);
+            const allGroupIds = [...new Set(h2hChallengesCache.filter(c => c.challenge_type === 'group').map(c => c.id))];
             if (allGroupIds.length > 0) {
-                const { data: allParts } = await sb
-                    .from('group_challenge_participants')
-                    .select('challenge_id, user_id, status')
-                    .in('challenge_id', allGroupIds);
-                (allParts || []).forEach(p => {
+                let allParts = [];
+                for (let i = 0; i < allGroupIds.length; i += 50) {
+                    const batch = allGroupIds.slice(i, i + 50);
+                    const { data } = await sb
+                        .from('group_challenge_participants')
+                        .select('challenge_id, user_id, status')
+                        .in('challenge_id', batch);
+                    if (data) allParts = allParts.concat(data);
+                }
+                allParts.forEach(p => {
                     if (!window._groupParticipants[p.challenge_id]) window._groupParticipants[p.challenge_id] = [];
                     window._groupParticipants[p.challenge_id].push(p);
                 });
