@@ -5275,7 +5275,8 @@
                     html += `<div style="font-size:0.75rem;">${groupEloStr}</div>`;
                     html += `</div>`;
                     const groupOppIds = parts.filter(p => p.user_id !== currentUser.id).map(p => p.user_id);
-                    html += `<button onclick="event.stopPropagation();rematchGroup(${JSON.stringify(groupOppIds)},${ch.difficulty ?? 50},'${(groupDisplayName).replace(/'/g,"\\'")}')" style="padding:4px 8px;background:none;border:1px solid #d1d5db;border-radius:6px;font-size:0.7rem;color:#6b7280;cursor:pointer;white-space:nowrap;margin-right:6px;" title="Rematch">↻</button>`;
+                    const gOppJson = encodeURIComponent(JSON.stringify(groupOppIds));
+                    html += `<button onclick="event.stopPropagation();showGroupRematchConfirm(decodeURIComponent('${gOppJson}'),${ch.difficulty ?? 50},'${(groupDisplayName).replace(/'/g,"\\'")}')" style="padding:4px 8px;background:none;border:1px solid #d1d5db;border-radius:6px;font-size:0.7rem;color:#6b7280;cursor:pointer;white-space:nowrap;margin-right:6px;" title="Rematch">↻</button>`;
                     html += `<span style="color:#9ca3af;font-size:1rem;">›</span>`;
                     html += `</div>`;
                 } else {
@@ -6960,9 +6961,21 @@
         backdrop.classList.add('show');
     };
 
+    window.showGroupRematchConfirm = function(oppIdsJson, difficulty, groupName) {
+        if (!currentUser) return;
+        const oppIds = JSON.parse(oppIdsJson);
+        const backdrop = document.getElementById('rematchConfirmBackdrop');
+        document.getElementById('rematchConfirmName').textContent = groupName;
+        document.getElementById('rematchConfirmDiff').textContent = getDifficultyLabel(difficulty);
+        document.getElementById('rematchConfirmBtn').onclick = async () => {
+            backdrop.classList.remove('show');
+            await rematchGroup(oppIds, difficulty, groupName);
+        };
+        backdrop.classList.add('show');
+    };
+
     window.rematchGroup = async function(oppIds, difficulty, groupName) {
         if (!currentUser) return;
-        if (!confirm(`Rematch ${groupName}?`)) return;
         try {
             const plates = generateChallengeSequence(difficulty);
             if (plates.length < 100) { alert('Error generating plates'); return; }
