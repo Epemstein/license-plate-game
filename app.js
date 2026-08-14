@@ -5344,7 +5344,7 @@
         html += '<th style="padding:6px 8px;text-align:center;width:28px;">#</th>';
         html += '<th style="padding:6px 8px;text-align:left;">Player</th>';
         html += '<th style="padding:6px 8px;text-align:left;">Elo</th>';
-        html += '<th style="padding:6px 8px;text-align:right;">Games</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Games</th>';
         html += '<th style="padding:6px 8px;text-align:right;">W</th>';
         html += '<th style="padding:6px 8px;text-align:right;">L</th>';
         html += '<th style="padding:6px 8px;text-align:right;">PCT</th>';
@@ -5368,7 +5368,7 @@
             html += `<td style="padding:8px;font-weight:700;font-variant-numeric:tabular-nums;">${r.elo.toLocaleString()}${todayStr}</td>`;
             const todayGames = r.todayGames || 0;
             const todayGamesStr = todayGames > 0 ? ` <span style="color:#16a34a;font-size:0.75rem;">(+${todayGames})</span>` : '';
-            html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.games}${todayGamesStr}</td>`;
+            html += `<td style="padding:8px;text-align:left;font-variant-numeric:tabular-nums;">${r.games}${todayGamesStr}</td>`;
             html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.wins}</td>`;
             html += `<td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums;">${r.losses}</td>`;
             html += `<td style="padding:8px;text-align:right;color:#756e5c;font-variant-numeric:tabular-nums;">${pct}%</td>`;
