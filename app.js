@@ -3678,6 +3678,7 @@
 
     wordInputEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter") checkWord();
+        if (e.key === "Escape") { e.preventDefault(); handleSkip(); }
     });
 
     wordsModalCloseBtnEl.addEventListener("click", closeWordsModal);
