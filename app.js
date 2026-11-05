@@ -4247,6 +4247,15 @@
     }
     window.changeDateBy = changeDateBy;
 
+    window.setLeaderboardDate = function(dateStr) {
+        const picker = document.getElementById('leaderboardDatePicker');
+        picker.value = dateStr;
+        const dateDisplay = document.getElementById('leaderboardDateDisplay');
+        if (dateDisplay) dateDisplay.textContent = formatDateForDisplay(dateStr);
+        displayLeaderboard(dateStr);
+        updateNavigationButtons();
+    };
+
     const EARLIEST_DATE = '2026-04-15';
 
     function updateNavigationButtons() {
@@ -6834,7 +6843,7 @@
 
         try {
             // Fetch profile
-            const { data: profile } = await sb.from('profiles').select('id, display_name, handle').eq('id', userId).single();
+            const { data: profile } = await sb.from('profiles').select('id, display_name, handle, created_at').eq('id', userId).single();
             const name = profile?.display_name || displayName || 'Player';
             const handle = profile?.handle;
             const initials = name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
@@ -6852,7 +6861,12 @@
                 if (stats && stats.length > 0) {
                     const s = stats[0];
                     if (s.ratio != null) beatPct = (s.ratio * 100).toFixed(1) + '%';
-                    if (s.percentile_rank != null) overallPct = 'Top ' + Math.max(1, Math.round(100 - s.percentile_rank)) + '%';
+                    if (s.percentile_rank != null) {
+                        const topPct = 100 - s.percentile_rank;
+                        if (topPct < 1) overallPct = 'Top ' + Math.max(0.01, topPct).toFixed(2) + '%';
+                        else if (topPct <= 10) overallPct = 'Top ' + topPct.toFixed(1) + '%';
+                        else overallPct = 'Top ' + Math.max(1, Math.round(topPct)) + '%';
+                    }
                 }
             } catch (e) { console.warn('Stats error:', e); }
 
@@ -6885,6 +6899,28 @@
             const isSelf = currentUser && currentUser.id === userId;
             const streakHtml = streak >= 3 ? `<span style="margin-left:8px;">🔥 ${streak}</span>` : '';
 
+            // Fetch podium medals
+            let gold = 0, silver = 0, bronze = 0;
+            let medalRows = [];
+            try {
+                const { data: medalData } = await sb.rpc('daily_history_with_stats', { p_user_id: userId });
+                if (medalData) {
+                    const today = new Date().toISOString().split('T')[0];
+                    for (const row of medalData) {
+                        if (row.date === today || row.percentile == null || row.total_players == null || row.total_players < 3) continue;
+                        const rank = Math.max(1, Math.round(row.total_players * (1 - row.percentile / 100)));
+                        if (rank === 1) gold++;
+                        else if (rank === 2) silver++;
+                        else if (rank === 3) bronze++;
+                        else continue;
+                        medalRows.push({ date: row.date, totalSeconds: row.total_seconds, rank, totalPlayers: row.total_players });
+                    }
+                    medalRows.sort((a, b) => b.date.localeCompare(a.date));
+                }
+            } catch (e) { console.warn('Medal fetch error:', e); }
+            window._profileMedalRows = medalRows;
+            window._profileMedalUserId = userId;
+
             // Check friendship status early
             let friendStatus = null;
             if (!isSelf && currentUser) {
@@ -6901,6 +6937,22 @@
             html += `<div class="profile-modal-avatar">${initials}</div>`;
             html += `<div class="profile-modal-name">${name}${streakHtml}</div>`;
             if (handle) html += `<div class="profile-modal-handle">@${handle}</div>`;
+
+            // Medals row
+            if (gold + silver + bronze > 0) {
+                html += '<div style="display:flex;justify-content:center;gap:12px;margin:8px 0 4px;cursor:pointer;" onclick="showTrophyCase()" title="View trophy case">';
+                if (gold > 0) html += `<span style="font-size:1.1rem;">🏆 ${gold}</span>`;
+                if (silver > 0) html += `<span style="font-size:1.1rem;">🥈 ${silver}</span>`;
+                if (bronze > 0) html += `<span style="font-size:1.1rem;">🥉 ${bronze}</span>`;
+                html += '</div>';
+            }
+
+            // Joined date
+            if (profile?.created_at) {
+                const joined = new Date(profile.created_at);
+                const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                html += `<div style="font-size:0.8rem;color:#9ca3af;margin:4px 0 8px;">Joined ${monthNames[joined.getMonth()]} ${joined.getFullYear()}</div>`;
+            }
 
             // Friend button under handle
             if (!isSelf && currentUser) {
@@ -7029,6 +7081,31 @@
 
     window.closeProfileModal = function() {
         document.getElementById('profileModalBackdrop').classList.remove('show');
+    };
+
+    window.showTrophyCase = function() {
+        const rows = window._profileMedalRows || [];
+        if (!rows.length) return;
+        const content = document.getElementById('profileModalContent');
+        const title = document.getElementById('profileModalTitle');
+        title.textContent = '🏆 Trophy Case (' + rows.length + ')';
+
+        const rankEmoji = r => r === 1 ? '🥇' : r === 2 ? '🥈' : '🥉';
+        const rankColor = r => r === 1 ? '#b8860d' : r === 2 ? '#999' : '#cd7f32';
+        const fmtDate = ds => {
+            const d = new Date(ds + 'T12:00:00');
+            return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        };
+
+        let html = '';
+        for (const row of rows) {
+            html += `<div onclick="closeProfileModal();switchTab('leaderboard');setTimeout(()=>setLeaderboardDate('${row.date}'),50)" style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid #f0f0f0;cursor:pointer;border-radius:8px;transition:background 0.1s;" onmouseenter="this.style.background='#f9f5ff'" onmouseleave="this.style.background=''">`;
+            html += `<span style="font-size:1.3rem;">${rankEmoji(row.rank)}</span>`;
+            html += `<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:0.9rem;">${fmtDate(row.date)}</div><div style="font-size:0.75rem;color:#9ca3af;">${row.totalPlayers} players</div></div>`;
+            html += `<span style="font-weight:700;font-size:0.95rem;color:${rankColor(row.rank)};">${row.totalSeconds != null ? row.totalSeconds.toFixed(1) + 's' : '--'}</span>`;
+            html += '</div>';
+        }
+        content.innerHTML = html;
     };
 
     window.showFriendsList = async function(userId) {
