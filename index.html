@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Plate Game v337</title>
+    <title>License Plate Game v338</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=253">
+    <link rel="stylesheet" href="styles.css?v=254">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -72,7 +72,13 @@
         <div id="difficultyLabel2" class="difficulty-label">Normal plates</div>
     </div>
 
-    <div id="modeIndicator" style="padding:10px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:10px;margin-bottom:12px;font-weight:600;text-align:center;color:#000000;">Select a game mode above to begin</div>
+    <div id="modeIndicator" style="padding:10px;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:10px;margin-bottom:12px;font-weight:600;text-align:center;color:#000000;">
+        <span id="modeIndicatorText">Select a game mode above to begin</span>
+        <span id="bannerStartWrap" style="display:none;margin-left:12px;">
+            <span class="start-arrow">&#x27A4;</span>
+            <button id="bannerStartBtn">Start Game</button>
+        </span>
+    </div>
 
     <!-- Hidden elements for JS compat -->
     <div id="difficultyLabel" style="display:none;"></div>

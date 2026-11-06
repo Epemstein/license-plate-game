@@ -1982,6 +1982,9 @@
     const checkButtonEl = document.getElementById("checkButton");
     const skipButtonEl = document.getElementById("skipButton");
     const chartButtonEl = document.getElementById("chartButton");
+    const bannerStartBtn = document.getElementById("bannerStartBtn");
+    const bannerStartWrap = document.getElementById("bannerStartWrap");
+    const modeIndicatorTextEl = document.getElementById("modeIndicatorText");
 
     const gameModalBackdropEl = document.getElementById("gameModalBackdrop");
     const gameModalTitleEl = document.getElementById("gameModalTitle");
@@ -2483,6 +2486,11 @@
         startButtonEl.disabled = !ready;
         startButtonEl.style.opacity = ready ? '1' : '0.5';
         startButtonEl.style.cursor = ready ? 'pointer' : 'not-allowed';
+        // Hide original start button, show in banner instead
+        startButtonEl.style.display = 'none';
+        bannerStartBtn.textContent = "Start Game";
+        bannerStartBtn.disabled = !ready;
+        bannerStartWrap.style.display = 'inline';
     }
 
     function showRestartGameButton() {
@@ -2494,12 +2502,16 @@
         startButtonEl.disabled = false;
         startButtonEl.style.opacity = '1';
         startButtonEl.style.cursor = 'pointer';
+        startButtonEl.style.display = 'inline-block';
+        // Hide banner start once game has started
+        bannerStartWrap.style.display = 'none';
     }
 
     function hideMainStartButton() {
         startButtonEl.disabled = true;
         startButtonEl.style.opacity = '0.5';
         startButtonEl.style.cursor = 'not-allowed';
+        bannerStartWrap.style.display = 'none';
     }
 
     function showChartButton() {
@@ -2584,6 +2596,7 @@
 
     async function beginNewRun() {
         startButtonEl.classList.remove('pulse-button');
+        bannerStartWrap.style.display = 'none';
         resetGameState();
         currentLiveRunId = crypto.randomUUID();
         gameStarted = true;
@@ -3709,6 +3722,7 @@
     updateSkipButtonLabel();
 
     startButtonEl.addEventListener("click", startOrRestartFromMain);
+    bannerStartBtn.addEventListener("click", startOrRestartFromMain);
     checkButtonEl.addEventListener("click", checkWord);
     skipButtonEl.addEventListener("click", handleSkip);
     chartButtonEl.addEventListener("click", openChartModal);
@@ -4342,8 +4356,9 @@
         const practiceBtn = document.getElementById('practiceBtn');
         const startBtn = document.getElementById('startButton');
 
+        const miText = document.getElementById('modeIndicatorText');
         if (gameMode === 'endless') {
-            mi.textContent = 'Endless Mode';
+            miText.textContent = 'Endless Mode';
             mi.style.background = '#f0fdfa';
             mi.style.color = '#0f766e';
             mi.style.border = '2px solid #99f6e4';
@@ -4403,7 +4418,7 @@
                 } catch (e) { console.error('[Endless] Session restore error:', e); }
             }, 1500);
         } else {
-            mi.textContent = 'Practice Mode - Difficulty ' + (typeof practiceDifficulty === 'number' ? practiceDifficulty : 50);
+            miText.textContent = 'Practice Mode - Difficulty ' + (typeof practiceDifficulty === 'number' ? practiceDifficulty : 50);
             mi.style.background = '#f3e8ff';
             mi.style.color = '#6b21a8';
             mi.style.border = '2px solid #e9d5ff';
@@ -4412,6 +4427,10 @@
         startBtn.disabled = false;
         startBtn.style.opacity = '1';
         startBtn.style.cursor = 'pointer';
+        // Show start button in banner instead of button row
+        startBtn.style.display = 'none';
+        document.getElementById('bannerStartWrap').style.display = 'inline';
+        document.getElementById('bannerStartBtn').disabled = false;
 
         document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
             if (gameMode === 'practice' && gameHistory.length > 0) {
@@ -4442,14 +4461,16 @@
 
             // Update mode indicator
             const mi = document.getElementById('modeIndicator');
-            mi.textContent = 'Daily Challenge - 1 attempt per day';
+            document.getElementById('modeIndicatorText').textContent = 'Daily Challenge - 1 attempt per day';
             mi.style.background = '#fef3c7';
             mi.style.color = '#92400e';
             mi.style.border = '2px solid #fbbf24';
 
             const startBtn = document.getElementById('startButton');
             startBtn.textContent = 'Start Game';
-            startBtn.style.display = 'inline-block';
+            startBtn.style.display = 'none';
+            document.getElementById('bannerStartWrap').style.display = 'inline';
+            document.getElementById('bannerStartBtn').disabled = false;
         });
 
         // Rules button
@@ -4596,7 +4617,7 @@
                 }
 
                 const mi = document.getElementById('modeIndicator');
-                mi.innerHTML = `
+                document.getElementById('modeIndicatorText').innerHTML = `
                     <div style="display:flex;align-items:center;justify-content:space-between;">
                         <span>Quick Match | vs <strong>${qmOppName}</strong></span>
                         <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
@@ -4666,17 +4687,19 @@
 
             const mi = document.getElementById('modeIndicator');
             const timedLabel = practiceTimed ? '' : ' | UNTIMED';
-            mi.textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
+            document.getElementById('modeIndicatorText').textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
             mi.style.background = '#f3e8ff';
             mi.style.color = '#6b21a8';
             mi.style.border = '2px solid #e9d5ff';
 
             const startBtn = document.getElementById('startButton');
             startBtn.textContent = 'Start Game';
-            startBtn.style.display = 'inline-block';
+            startBtn.style.display = 'none';
             startBtn.disabled = false;
             startBtn.style.opacity = '1';
             startBtn.style.cursor = 'pointer';
+            document.getElementById('bannerStartWrap').style.display = 'inline';
+            document.getElementById('bannerStartBtn').disabled = false;
 
             document.getElementById('dailyChallengeBtn').disabled = false;
             document.getElementById('dailyChallengeBtn').style.opacity = '1';
@@ -4742,7 +4765,7 @@
             gameHistory = [];
 
             const mi = document.getElementById('modeIndicator');
-            mi.textContent = 'Endless Mode';
+            document.getElementById('modeIndicatorText').textContent = 'Endless Mode';
             mi.style.background = '#f0fdfa';
             mi.style.color = '#0f766e';
             mi.style.border = '2px solid #99f6e4';
@@ -4784,10 +4807,12 @@
 
             const startBtn = document.getElementById('startButton');
             startBtn.textContent = 'Start Game';
-            startBtn.style.display = 'inline-block';
+            startBtn.style.display = 'none';
             startBtn.disabled = false;
             startBtn.style.opacity = '1';
             startBtn.style.cursor = 'pointer';
+            document.getElementById('bannerStartWrap').style.display = 'inline';
+            document.getElementById('bannerStartBtn').disabled = false;
 
             document.getElementById('dailyChallengeBtn').disabled = false;
             document.getElementById('dailyChallengeBtn').style.opacity = '1';
@@ -4892,7 +4917,7 @@
             updateDiffLabel(practiceDifficulty);
             if (gameMode === 'practice') {
                 const timedLabel = practiceTimed ? '' : ' | UNTIMED';
-                document.getElementById('modeIndicator').textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
+                document.getElementById('modeIndicatorText').textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
             }
         });
 
@@ -4900,7 +4925,7 @@
             practiceTimed = timedToggle.checked;
             if (gameMode === 'practice') {
                 const timedLabel = practiceTimed ? '' : ' | UNTIMED';
-                document.getElementById('modeIndicator').textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
+                document.getElementById('modeIndicatorText').textContent = `Practice Mode | Diff ${practiceDifficulty}${timedLabel}`;
             }
             localStorage.setItem('practiceTimed', practiceTimed);
         });
@@ -5779,7 +5804,7 @@
                 document.getElementById('quickMatchBtn').style.opacity = '0.5';
 
                 const mi = document.getElementById('modeIndicator');
-                mi.innerHTML = `
+                document.getElementById('modeIndicatorText').innerHTML = `
                     <div style="display:flex;align-items:center;justify-content:space-between;">
                         <span>${displayName.toUpperCase()} | Difficulty ${difficulty}</span>
                         <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
@@ -5893,7 +5918,7 @@
             document.getElementById('quickMatchBtn').style.opacity = '0.5';
 
             const mi = document.getElementById('modeIndicator');
-            mi.innerHTML = `
+            document.getElementById('modeIndicatorText').innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <span>${displayName} | Difficulty ${currentH2HDifficulty}</span>
                     <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
@@ -6011,7 +6036,7 @@
             currentH2HDifficulty = challenge.difficulty ?? 50;
 
             const mi = document.getElementById('modeIndicator');
-            mi.innerHTML = `
+            document.getElementById('modeIndicatorText').innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <span>${displayName} | Difficulty ${currentH2HDifficulty}</span>
                     <button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button>
@@ -6099,7 +6124,7 @@
         dailyBtn.style.cursor = 'pointer';
 
         const mi = document.getElementById('modeIndicator');
-        mi.textContent = 'Select a game mode above to begin';
+        document.getElementById('modeIndicatorText').textContent = 'Select a game mode above to begin';
         mi.style.background = '#f3f4f6';
         mi.style.color = '#000000';
         mi.style.border = '2px dashed #d1d5db';
@@ -6107,6 +6132,8 @@
         const startBtn = document.getElementById('startButton');
         startBtn.textContent = 'Start Game';
         startBtn.classList.remove('pulse-button');
+        startBtn.style.display = 'none';
+        document.getElementById('bannerStartWrap').style.display = 'none';
         updateDailyBtnState();
     };
 
@@ -6164,7 +6191,7 @@
 
         // Update banner
         const mi = document.getElementById('modeIndicator');
-        mi.innerHTML = '<span>H2H Complete!</span>';
+        document.getElementById('modeIndicatorText').innerHTML = '<span>H2H Complete!</span>';
         mi.style.background = '#f0fdf4';
         mi.style.color = '#16a34a';
         mi.style.border = '2px solid #86efac';
@@ -7102,7 +7129,7 @@
             document.getElementById('quickMatchBtn').disabled = true;
             document.getElementById('quickMatchBtn').style.opacity = '0.5';
             const mi = document.getElementById('modeIndicator');
-            mi.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><span>${groupName.toUpperCase()} | Difficulty ${difficulty}</span><button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button></div>`;
+            document.getElementById('modeIndicatorText').innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><span>${groupName.toUpperCase()} | Difficulty ${difficulty}</span><button onclick="forfeitH2H()" style="padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem;">Forfeit</button></div>`;
             mi.style.background = '#fef3c7';
             mi.style.color = '#92400e';
             mi.style.border = '2px solid #fbbf24';
