@@ -5,6 +5,12 @@
         localStorage.setItem('pkce_migrated_v266', '1');
     }
 
+    // Migration back to implicit flow (v335) — clear PKCE tokens
+    if (!localStorage.getItem('implicit_migrated_v335')) {
+        Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+        localStorage.setItem('implicit_migrated_v335', '1');
+    }
+
     // === TAB SWITCHING ===
     const validTabs = ['game', 'leaderboard', 'challenges', 'profile', 'feedback'];
     const savedTab = sessionStorage.getItem('activeTab');
@@ -908,29 +914,8 @@
     const SUPABASE_URL = 'https://ggbvtaegsnlimscmjirf.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnZ0YWVnc25saW1zY21qaXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTkwNTUsImV4cCI6MjA5MTQ5NTA1NX0.RRQA0fW02H6XKj7xKUTSnR9zrGbWuE2kSmspCeHCfyQ';
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { flowType: 'pkce', persistSession: true, detectSessionInUrl: true }
+        auth: { flowType: 'implicit', persistSession: true }
     });
-
-    // Handle OAuth callback — if URL has a code param, exchange it explicitly
-    (async () => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('code')) {
-            console.log('[Auth] OAuth code detected in URL, exchanging...');
-            try {
-                const { data, error } = await sb.auth.exchangeCodeForSession(params.get('code'));
-                if (error) {
-                    console.error('[Auth] Code exchange failed:', error.message);
-                } else {
-                    console.log('[Auth] Code exchange successful');
-                }
-            } catch (e) {
-                console.error('[Auth] Code exchange error:', e);
-            }
-            // Clean up the URL
-            const cleanUrl = window.location.origin + window.location.pathname;
-            window.history.replaceState({}, '', cleanUrl);
-        }
-    })();
 
     // Capture referral from URL
     const urlRef = new URLSearchParams(window.location.search).get('ref');
