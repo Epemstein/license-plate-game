@@ -356,10 +356,11 @@
 
     function showEditProfile() {
         const container = document.getElementById('profileContent');
-        sb.from('profiles').select('display_name, handle').eq('id', currentUser.id).single()
+        sb.from('profiles').select('display_name, handle, is_public').eq('id', currentUser.id).single()
             .then(({ data }) => {
                 const name = data?.display_name || '';
                 const handle = data?.handle || '';
+                const isPublic = data?.is_public !== false;
                 container.innerHTML = `
                     <div style="max-width:360px;margin:20px auto;text-align:left;">
                         <button onclick="updateProfileTab()" style="padding:6px 14px;border:none;background:#eee9db;border-radius:5px;cursor:pointer;font-size:0.85rem;margin-bottom:12px;">&larr; Back</button>
@@ -373,6 +374,16 @@
                             <div style="padding:10px 12px;border:2px solid #d9cfb6;border-radius:5px;margin-top:4px;background:#eee9db;color:#756e5c;">@${handle}</div>
                             <div style="font-size:0.75rem;color:#756e5c;margin-top:4px;">Username cannot be changed.</div>
                         </div>
+                        <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;padding:12px;border:2px solid #d9cfb6;border-radius:5px;background:#fefcf7;">
+                            <div>
+                                <div style="font-size:0.9rem;font-weight:600;color:#1a1714;">Public Profile</div>
+                                <div style="font-size:0.75rem;color:#756e5c;margin-top:2px;">When off, you appear as "Anonymous" on the global leaderboard.</div>
+                            </div>
+                            <label class="toggle-switch" style="flex-shrink:0;margin-left:12px;">
+                                <input type="checkbox" id="editIsPublic" ${isPublic ? 'checked' : ''} onchange="togglePublicProfile(this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                         <div id="editError" style="color:#ff3b30;font-size:0.85rem;margin-bottom:8px;display:none;"></div>
                         <button onclick="submitEditProfile()" style="width:100%;padding:14px;background:#9370db;color:white;border:2px solid #1a1714;border-radius:5px;font-size:1rem;font-weight:700;cursor:pointer;box-shadow:3px 3px 0 #1a1714;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #1a1714'">Save</button>
                     </div>
@@ -380,6 +391,15 @@
             });
     }
     window.showEditProfile = showEditProfile;
+
+    async function togglePublicProfile(isPublic) {
+        try {
+            await sb.from('profiles').update({ is_public: isPublic }).eq('id', currentUser.id);
+        } catch (e) {
+            console.error('Toggle public error:', e);
+        }
+    }
+    window.togglePublicProfile = togglePublicProfile;
 
     async function submitEditProfile() {
         const displayName = document.getElementById('editDisplayName').value.trim();
