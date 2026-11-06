@@ -820,18 +820,15 @@
                 <div style="padding:32px 32px 28px;text-align:center;">
                     <div style="font-family:'Newsreader',Georgia,serif;font-size:1.8rem;font-weight:800;margin-bottom:16px;">Sign in / Create account</div>
                     <div style="font-family:'Newsreader',Georgia,serif;font-style:italic;color:#756e5c;font-size:0.95rem;margin-bottom:28px;">Sign in to play the daily challenge, add friends, and challenge users head-to-head.</div>
-
                     <button onclick="signInWithGoogle()" style="width:100%;padding:14px 20px;background:#fefcf7;color:#1a1714;border:2px solid #1a1714;border-radius:5px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:3px 3px 0 #1a1714;font-family:'Public Sans',system-ui,sans-serif;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #1a1714'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #1a1714'">
                         <svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                         Continue with Google
                     </button>
-
                     <div style="display:flex;align-items:center;gap:12px;margin:20px 0;">
                         <div style="flex:1;height:1px;background:#d9cfb6;"></div>
                         <span style="font-size:0.8rem;color:#756e5c;letter-spacing:0.1em;">OR</span>
                         <div style="flex:1;height:1px;background:#d9cfb6;"></div>
                     </div>
-
                     <button onclick="signInWithApple()" style="width:100%;padding:14px 20px;background:#1a1714;color:#ffffff;border:2px solid #1a1714;border-radius:5px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:3px 3px 0 #9370db;font-family:'Public Sans',system-ui,sans-serif;" onmouseenter="this.style.transform='translate(-1px,-1px)';this.style.boxShadow='5px 5px 0 #9370db'" onmouseleave="this.style.transform='';this.style.boxShadow='3px 3px 0 #9370db'">
                         &#63743; Continue with Apple
                     </button>
@@ -1209,41 +1206,54 @@
 
     async function updateDailyBtnState() {
         const btn = document.getElementById('dailyChallengeBtn');
+        const practiceBtn = document.getElementById('practiceBtn');
         const practiceSettingsBtn = document.getElementById('practiceSettingsBtn');
         if (!currentUser) {
-            if (btn) {
-                btn.textContent = 'Sign in to play daily';
-                btn.style.background = '#e5e7eb';
-                btn.style.color = '#9ca3af';
-                btn.style.cursor = 'pointer';
-                btn.disabled = false;
-                btn.onclick = () => switchTab('profile');
-            }
-            if (practiceSettingsBtn) practiceSettingsBtn.style.display = '';
+            btn.textContent = 'Sign in to play Daily';
+            btn.style.background = '#e5e7eb';
+            btn.style.color = '#9ca3af';
+            btn.style.cursor = 'pointer';
+            btn.disabled = false;
+            btn.onclick = () => switchTab('profile');
+            // Practice stays available for guests
+            practiceBtn.textContent = 'Practice Mode';
+            practiceBtn.style.background = '#e9d5ff';
+            practiceBtn.style.color = '#6b21a8';
+            practiceBtn.style.cursor = 'pointer';
+            practiceBtn.disabled = false;
+            practiceBtn.onclick = null;
+            practiceSettingsBtn.style.display = '';
             return;
         }
         // Restore buttons
-        if (btn) btn.onclick = null;
-        if (practiceSettingsBtn) practiceSettingsBtn.style.display = '';
+        btn.onclick = null;
+        practiceBtn.onclick = null;
+        if (gameMode === 'endless') {
+            practiceBtn.textContent = 'Endless Mode';
+            practiceBtn.style.background = '#ccfbf1';
+            practiceBtn.style.color = '#0f766e';
+            practiceSettingsBtn.style.background = '#14b8a6';
+        } else {
+            practiceBtn.textContent = 'Practice Mode';
+            practiceBtn.style.background = '#9370db';
+            practiceBtn.style.color = '#ffffff';
+        }
+        practiceBtn.style.cursor = 'pointer';
+        practiceBtn.disabled = false;
+        practiceSettingsBtn.style.display = '';
         const played = await checkIfPlayedToday();
         if (played && todaysDailyTime) {
-            if (btn) {
-                btn.textContent = `Completed: ${todaysDailyTime.toFixed(2)}s`;
-                btn.style.background = '#eee9db';
-                btn.style.color = '#756e5c';
-                btn.style.cursor = 'not-allowed';
-                btn.disabled = true;
-            }
-            const headline = document.getElementById('landingHeadline');
-            if (headline) headline.textContent = "You've played today's daily. See you tomorrow!";
+            btn.textContent = `Daily Challenge: ${todaysDailyTime.toFixed(2)}`;
+            btn.style.background = '#e5e7eb';
+            btn.style.color = '#9ca3af';
+            btn.style.cursor = 'not-allowed';
+            btn.disabled = true;
         } else {
-            if (btn) {
-                btn.textContent = "Play today's daily";
-                btn.style.background = '#1a1714';
-                btn.style.color = '#f7f4eb';
-                btn.style.cursor = 'pointer';
-                btn.disabled = false;
-            }
+            btn.textContent = 'Daily Challenge';
+            btn.style.background = '#fbbf24';
+            btn.style.color = '#92400e';
+            btn.style.cursor = 'pointer';
+            btn.disabled = false;
         }
     }
 
@@ -4402,52 +4412,6 @@
         startBtn.style.opacity = '1';
         startBtn.style.cursor = 'pointer';
 
-        // Landing page setup
-        function showGameLanding() {
-            const landing = document.getElementById('gameLanding');
-            const active = document.getElementById('gameActiveArea');
-            if (landing) landing.style.display = '';
-            if (active) active.style.display = 'none';
-        }
-        function hideGameLanding() {
-            const landing = document.getElementById('gameLanding');
-            const active = document.getElementById('gameActiveArea');
-            if (landing) landing.style.display = 'none';
-            if (active) active.style.display = '';
-        }
-        window.showGameLanding = showGameLanding;
-
-        // Populate landing date
-        const landingDateEl = document.getElementById('landingDate');
-        if (landingDateEl) {
-            landingDateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        }
-
-        // Populate landing stats (streak + player count)
-        async function updateLandingStats() {
-            if (!currentUser) return;
-            try {
-                const { data: stats } = await sb.rpc('user_overall_stats', { p_user_id: currentUser.id });
-                if (stats && stats[0]) {
-                    const s = stats[0];
-                    const streakEl = document.getElementById('landingStreak');
-                    const streakLabel = document.getElementById('landingStreakLabel');
-                    if (streakEl && s.daily_current_streak != null) {
-                        streakEl.textContent = s.daily_current_streak;
-                        if (streakLabel) streakLabel.textContent = s.daily_current_streak === 1 ? 'day' : 'days in a row';
-                    }
-                }
-            } catch(e) {}
-            try {
-                const today = getTodayString();
-                const { count } = await sb.from('daily_runs').select('id', { count: 'exact', head: true }).eq('date', today).not('total_seconds', 'is', null);
-                const playersEl = document.getElementById('landingPlayers');
-                if (playersEl && count != null) playersEl.textContent = count;
-            } catch(e) {}
-        }
-        // Update landing when auth is ready
-        setTimeout(updateLandingStats, 1500);
-
         document.getElementById('dailyChallengeBtn').addEventListener('click', async () => {
             if (gameMode === 'practice' && gameHistory.length > 0) {
                 submitPracticePlateStats();
@@ -4472,7 +4436,6 @@
                 return;
             }
 
-            hideGameLanding();
             gameMode = 'daily';
             dailyPlateSequence = null; // will be fetched from server in beginNewRun
 
@@ -4565,7 +4528,6 @@
                 document.getElementById('qmCancel').addEventListener('click', () => { modal.style.display = 'none'; });
                 document.getElementById('qmStart').addEventListener('click', async () => {
                     modal.style.display = 'none';
-                    hideGameLanding();
                     await startQuickMatch();
                 });
             } else {
@@ -4608,7 +4570,6 @@
                 currentH2HDifficulty = 50;
 
                 switchTab('game');
-                if (window.showGameLanding) { const l = document.getElementById('gameLanding'); const a = document.getElementById('gameActiveArea'); if (l) l.style.display = 'none'; if (a) a.style.display = ''; }
 
                 document.getElementById('practiceBtn').disabled = true;
                 document.getElementById('practiceBtn').style.opacity = '0.5';
@@ -4656,14 +4617,22 @@
 
         document.getElementById('choosePracticeBtn').addEventListener('click', () => {
             document.getElementById('practiceModeBackdrop').classList.remove('show');
-            hideGameLanding();
+            const btn = document.getElementById('practiceBtn');
+            btn.textContent = 'Practice Mode';
+            btn.style.background = '#e9d5ff';
+            btn.style.color = '#6b21a8';
+            document.querySelector('.mode-btn-settings').style.background = '#7c5cbf';
             startPracticeMode();
         });
 
         document.getElementById('chooseEndlessBtn').addEventListener('click', () => {
             if (!currentUser) { switchTab('profile'); document.getElementById('practiceModeBackdrop').classList.remove('show'); return; }
             document.getElementById('practiceModeBackdrop').classList.remove('show');
-            hideGameLanding();
+            const btn = document.getElementById('practiceBtn');
+            btn.textContent = 'Endless Mode';
+            btn.style.background = '#ccfbf1';
+            btn.style.color = '#0f766e';
+            document.querySelector('.mode-btn-settings').style.background = '#14b8a6';
             startEndlessMode();
         });
 
@@ -5800,7 +5769,6 @@
                 currentH2HDifficulty = difficulty;
 
                 switchTab('game');
-                if (window.showGameLanding) { const l = document.getElementById('gameLanding'); const a = document.getElementById('gameActiveArea'); if (l) l.style.display = 'none'; if (a) a.style.display = ''; }
 
                 document.getElementById('practiceBtn').disabled = true;
                 document.getElementById('practiceBtn').style.opacity = '0.5';
@@ -5915,7 +5883,6 @@
             const displayName = (challenge.group_name || 'Group Challenge').toUpperCase();
 
             switchTab('game');
-            if (window.showGameLanding) { const l = document.getElementById('gameLanding'); const a = document.getElementById('gameActiveArea'); if (l) l.style.display = 'none'; if (a) a.style.display = ''; }
 
             document.getElementById('practiceBtn').disabled = true;
             document.getElementById('practiceBtn').style.opacity = '0.5';
@@ -6034,7 +6001,6 @@
 
             // Switch to game tab
             switchTab('game');
-            if (window.showGameLanding) { const l = document.getElementById('gameLanding'); const a = document.getElementById('gameActiveArea'); if (l) l.style.display = 'none'; if (a) a.style.display = ''; }
 
             document.getElementById('practiceBtn').disabled = true;
             document.getElementById('practiceBtn').style.opacity = '0.5';
@@ -6141,7 +6107,6 @@
         startBtn.textContent = 'Start Game';
         startBtn.classList.remove('pulse-button');
         updateDailyBtnState();
-        if (window.showGameLanding) showGameLanding();
     };
 
     async function saveChallengeResult(time, solved, skipped) {

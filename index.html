@@ -42,87 +42,14 @@
 <!-- ===== GAME TAB ===== -->
 <div id="gameTab" class="tab-content active">
 
-    <!-- ===== NEWSPAPER LANDING ===== -->
-    <div id="gameLanding" class="news-landing">
-        <!-- Date line -->
-        <div class="news-dateline">
-            <span class="news-edition">Daily Edition</span>
-            <span class="news-date" id="landingDate"></span>
-        </div>
-
-        <!-- Masthead -->
-        <div class="news-masthead">LICENSE PLATE GAME</div>
-        <div class="news-subtitle">Spell words from license plates — as fast as you can.</div>
-
-        <hr class="news-rule">
-
-        <!-- Two-column layout -->
-        <div class="news-columns">
-            <div class="news-col-main">
-                <div class="news-section-label">TODAY'S DAILY CHALLENGE</div>
-                <div class="news-headline" id="landingHeadline">Ten plates. One shot. How fast can you go?</div>
-                <p class="news-body">Solve 10 license plates as fast as you can. Every player gets the same plates. Skip a plate for a time penalty. Your time goes on the global leaderboard.</p>
-                <button id="dailyChallengeBtn" class="news-cta">Play today's daily</button>
-                <div class="news-meta" id="landingMeta">10 plates · ~2 min · free</div>
-            </div>
-            <div class="news-col-side">
-                <div class="news-mode" id="quickMatchBtn">
-                    <div>
-                        <div class="news-mode-name">Quick Match</div>
-                        <div class="news-mode-desc">Random plates, random difficulty.</div>
-                    </div>
-                    <span class="news-mode-arrow">&#9654;</span>
-                </div>
-                <div class="news-mode" id="practiceBtn">
-                    <div>
-                        <div class="news-mode-name">Practice Mode</div>
-                        <div class="news-mode-desc">Choose your difficulty. No pressure.</div>
-                    </div>
-                    <span class="news-mode-arrow">&#9654;</span>
-                </div>
-                <div class="news-mode" id="rulesBtn">
-                    <div>
-                        <div class="news-mode-name">How to Play</div>
-                        <div class="news-mode-desc">Learn the rules. Try a plate.</div>
-                    </div>
-                    <span class="news-mode-arrow">&#9654;</span>
-                </div>
-            </div>
-        </div>
-
-        <hr class="news-rule">
-
-        <!-- Bottom row -->
-        <div class="news-bottom-row">
-            <div class="news-bottom-col">
-                <div class="news-section-label">YOUR STREAK</div>
-                <div id="landingStreak" class="news-streak-value">--</div>
-                <div class="news-streak-sub" id="landingStreakLabel">Sign in to track</div>
-            </div>
-            <div class="news-bottom-col news-bottom-divider">
-                <div class="news-section-label">TODAY'S PLAYERS</div>
-                <div id="landingPlayers" class="news-streak-value">--</div>
-                <div class="news-streak-sub" id="landingPlayersLabel">have played today</div>
-            </div>
-            <div class="news-bottom-col news-bottom-divider">
-                <div class="news-section-label">HOW IT WORKS</div>
-                <ol class="news-rules-list">
-                    <li>You get a 3-letter plate</li>
-                    <li>Type a word containing those letters <em>in order</em></li>
-                    <li>Skip adds +5s, +10s, +15s…</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== ORIGINAL GAME UI (hidden until mode selected) ===== -->
-    <div id="gameActiveArea" style="display:none;">
-
-    <div class="mode-buttons" style="margin-bottom:8px;">
-        <button class="mode-btn" onclick="showGameLanding()" style="background:#eee9db;color:#4a4338;font-size:0.8rem;padding:6px 12px;">← Back</button>
+    <div class="mode-buttons">
+        <button id="dailyChallengeBtn" class="mode-btn">Daily Challenge</button>
+        <button id="quickMatchBtn" class="mode-btn" style="background:#f59e0b;color:white;">Quick Match</button>
         <div class="practice-btn-group">
-            <button id="practiceSettingsBtn" class="mode-btn-settings" title="Practice Settings" style="display:none;">&#9881;</button>
+            <button id="practiceBtn" class="mode-btn">Practice Mode</button>
+            <button id="practiceSettingsBtn" class="mode-btn-settings" title="Practice Settings">&#9881;</button>
         </div>
+        <button id="rulesBtn" class="mode-btn">How to Play</button>
     </div>
 
     <!-- Practice Settings Panel (hidden by default) -->
@@ -203,7 +130,6 @@
             </div>
         </div>
     </div>
-    </div><!-- /gameActiveArea -->
 </div>
 
 <!-- ===== LEADERBOARD TAB ===== -->
