@@ -137,6 +137,182 @@
             display: block;
         }
 
+        /* ===== NEWSPAPER LANDING ===== */
+        .news-landing {
+            max-width: 820px;
+            margin: 0 auto;
+        }
+        .news-dateline {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 6px 0;
+            font-family: "Public Sans", system-ui, sans-serif;
+            font-size: 0.75rem;
+            color: #756e5c;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .news-masthead {
+            text-align: center;
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 3.2rem;
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            color: #1a1714;
+            line-height: 1.1;
+            padding: 12px 0 4px;
+        }
+        .news-subtitle {
+            text-align: center;
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.1rem;
+            font-style: italic;
+            color: #756e5c;
+            margin-bottom: 4px;
+        }
+        .news-rule {
+            border: none;
+            border-top: 2px solid #1a1714;
+            margin: 12px 0;
+        }
+        .news-columns {
+            display: flex;
+            gap: 0;
+        }
+        .news-col-main {
+            flex: 1.3;
+            padding-right: 24px;
+            border-right: 1px solid #d9cfb6;
+        }
+        .news-col-side {
+            flex: 1;
+            padding-left: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        .news-section-label {
+            font-family: "Public Sans", system-ui, sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #b8860d;
+            margin-bottom: 8px;
+        }
+        .news-headline {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.7rem;
+            font-weight: 800;
+            line-height: 1.2;
+            color: #1a1714;
+            margin-bottom: 10px;
+        }
+        .news-body {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #4a4338;
+            margin: 0 0 16px;
+        }
+        .news-cta {
+            display: block;
+            width: 100%;
+            padding: 14px 24px;
+            background: #1a1714;
+            color: #f7f4eb;
+            font-family: "Public Sans", system-ui, sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            transition: background 0.15s;
+        }
+        .news-cta:hover { background: #332e28; }
+        .news-cta:active { background: #000; }
+        .news-meta {
+            text-align: center;
+            font-family: "Public Sans", system-ui, sans-serif;
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 8px;
+        }
+        .news-mode {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-bottom: 1px solid #e5e0d4;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .news-mode:last-child { border-bottom: none; }
+        .news-mode:hover { background: rgba(147,112,219,0.06); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 6px; }
+        .news-mode-name {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #1a1714;
+        }
+        .news-mode-desc {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 0.8rem;
+            color: #756e5c;
+            margin-top: 1px;
+        }
+        .news-mode-arrow {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+        .news-bottom-row {
+            display: flex;
+            gap: 0;
+        }
+        .news-bottom-col {
+            flex: 1;
+            padding: 4px 20px 4px 0;
+        }
+        .news-bottom-col.news-bottom-divider {
+            padding-left: 20px;
+            border-left: 1px solid #d9cfb6;
+        }
+        .news-streak-value {
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 2rem;
+            font-weight: 800;
+            color: #1a1714;
+            line-height: 1.2;
+        }
+        .news-streak-sub {
+            font-family: "Public Sans", system-ui, sans-serif;
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+        .news-rules-list {
+            margin: 0;
+            padding-left: 16px;
+            font-family: "Newsreader", Georgia, serif;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            color: #4a4338;
+        }
+        @media (max-width: 700px) {
+            .news-masthead { font-size: 2rem; letter-spacing: 0.03em; }
+            .news-subtitle { font-size: 0.95rem; }
+            .news-columns { flex-direction: column; }
+            .news-col-main { padding-right: 0; border-right: none; padding-bottom: 16px; border-bottom: 1px solid #d9cfb6; }
+            .news-col-side { padding-left: 0; padding-top: 8px; }
+            .news-headline { font-size: 1.4rem; }
+            .news-bottom-row { flex-direction: column; gap: 16px; }
+            .news-bottom-col { padding: 0; }
+            .news-bottom-col.news-bottom-divider { padding-left: 0; border-left: none; border-top: 1px solid #d9cfb6; padding-top: 12px; }
+        }
+
         /* ===== GAME TAB ===== */
         .game-title {
             text-align: center;
